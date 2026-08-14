@@ -10,14 +10,11 @@ backend y un frontend que lo exponen. Ver `README.md` y `docs/00-contexto/SCJ-CT
 
 ## Stack y cómo correrlo
 
-- **Base de datos:** PostgreSQL 16 + extensión `btree_gist`, esquemas `personas` (stub) y
-  `tiempo` (todo el trabajo). Levantar con Docker:
-  ```bash
-  cp .env.example .env      # sólo la primera vez
-  docker compose up -d db
-  ```
-  El DDL de `db/ddl/` corre solo al crear el volumen. Sin Docker, los pasos manuales están en
-  `README.md` §"Cómo levantar la base".
+- **Base de datos:** Supabase (Postgres administrado, extensión `btree_gist`), esquemas
+  `personas` (stub) y `tiempo` (todo el trabajo). **No hay Postgres local ni contenedor de base
+  de datos** — el DDL de `db/ddl/` corre contra el proyecto de Supabase, vía `psql "$DATABASE_URL"`
+  o pegado en su SQL Editor. Configuración en `.env` (plantilla en `.env.example`). Pasos completos
+  en `README.md` §"Cómo levantar el proyecto".
 - **Generador de datos sintéticos:** Python, en `tools/generador/`. Comando en `README.md` §3.
 - **Backend:** Python. `TODO:` framework (FastAPI o Django), estructura y comando de arranque —
   `backend/` está vacío.

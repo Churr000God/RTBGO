@@ -42,25 +42,41 @@ el subsistema de Tiempo referencia a las personas **exclusivamente por un identi
 
 ## Cómo levantar el proyecto
 
+La base de datos vive en **Supabase** (Postgres administrado). No hay Postgres local ni
+contenedor de base de datos: el DDL corre contra el proyecto de Supabase, directo.
+
 ### Requisitos
 
-- PostgreSQL 16 o superior
+- Una cuenta y un proyecto de Supabase (gratis para desarrollo)
 - Python 3.11 o superior *(sólo para el generador de datos sintéticos)*
 
-### 1. Crear la base y los esquemas
+### 0. Configurar la conexión
 
 ```bash
-createdb scj
-psql -d scj -f db/ddl/00_esquemas.sql
-psql -d scj -f db/ddl/01_persona_stub.sql
-psql -d scj -f db/ddl/02_tiempo.sql
-psql -d scj -f db/indices/01_indices.sql
+cp .env.example .env
 ```
+
+Llena `DATABASE_URL` con la cadena de conexión del proyecto (Dashboard → Project Settings →
+Database → Connection string) y las dos llaves de API (Project Settings → API). `.env` ya está en
+`.gitignore`.
+
+### 1. Crear los esquemas
+
+```bash
+source .env    # o exporta DATABASE_URL a mano
+psql "$DATABASE_URL" -f db/ddl/00_esquemas.sql
+psql "$DATABASE_URL" -f db/ddl/01_persona_stub.sql
+psql "$DATABASE_URL" -f db/ddl/02_tiempo.sql
+psql "$DATABASE_URL" -f db/indices/01_indices.sql
+```
+
+Alternativa sin `psql`: pegar cada archivo, en el mismo orden, en el **SQL Editor** del dashboard
+de Supabase.
 
 ### 2. Cargar parámetros de ejemplo
 
 ```bash
-psql -d scj -f db/ddl/03_parametros_ejemplo.sql
+psql "$DATABASE_URL" -f db/ddl/03_parametros_ejemplo.sql
 ```
 
 > Los valores son **de ejemplo**. Las políticas reales se cargan como parámetros en el despliegue y
@@ -71,7 +87,7 @@ psql -d scj -f db/ddl/03_parametros_ejemplo.sql
 ```bash
 cd tools/generador
 python generar.py --personas 8 --meses 6 --semilla 42 --salida ../../db/seeds/
-psql -d scj -f ../../db/seeds/datos_sinteticos.sql
+psql "$DATABASE_URL" -f ../../db/seeds/datos_sinteticos.sql
 ```
 
 La semilla fija hace el conjunto reproducible: la misma semilla produce siempre los mismos datos.
@@ -79,7 +95,7 @@ La semilla fija hace el conjunto reproducible: la misma semilla produce siempre 
 ### 4. Correr las consultas de validación
 
 ```bash
-for f in db/consultas/validacion/*.sql; do echo "== $f"; psql -d scj -f "$f"; done
+for f in db/consultas/validacion/*.sql; do echo "== $f"; psql "$DATABASE_URL" -f "$f"; done
 ```
 
 ---
@@ -101,11 +117,11 @@ diagramas/           Fuente en texto (Mermaid/PlantUML) e imágenes exportadas
 backend/             API del sistema completo (TODO: framework por decidir)
 frontend/            Interfaz web, React
 diseno_paginas/      Diseño de pantallas, previo a implementarlas en frontend/
-docker-compose.yml   Levanta la base de datos con el DDL ya cargado
 ```
 
-> `RTB-ACA-01` documenta sólo la vía de diseño de base de datos. `backend/`, `frontend/` y
-> `docker-compose.yml` son el resto del proyecto y no tienen documento `SCJ-` propio todavía.
+> `RTB-ACA-01` documenta sólo la vía de diseño de base de datos. `backend/` y `frontend/` son el
+> resto del proyecto y no tienen documento `SCJ-` propio todavía. La base de datos es Supabase, no
+> hay servicio de base de datos local que levantar.
 
 ---
 

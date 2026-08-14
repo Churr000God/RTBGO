@@ -35,14 +35,14 @@ Guía maestra de trabajo para agentes en `sistema-control-jornada`.
   o cualquier cálculo de saldos/paridad en backend.
 - `code-review` — si el cambio toca DDL junto con código de aplicación, o cualquier KPI visible
   en frontend.
-- `run` — para levantar el proyecto (`docker compose up -d db`, backend, frontend) y observar
-  comportamiento real, no sólo leer código.
+- `run` — para levantar el proyecto (backend, frontend; la base de datos ya vive en Supabase, no
+  se levanta) y observar comportamiento real, no sólo leer código.
 - `verification-before-completion` — antes de reportar cualquier tarea como lista.
 - `security-review` — antes de cualquier merge a `main`.
 
 ## Verificación antes de cerrar
 
-1. El DDL corre limpio sobre una base nueva (`docker compose up -d db` desde volumen vacío).
+1. El DDL corre limpio sobre un proyecto de Supabase nuevo (o reseteado desde su dashboard).
 2. Las consultas de validación de `db/consultas/validacion/` devuelven lo esperado.
 3. El nombre del archivo y la versión del encabezado del documento coinciden.
 4. El checklist de `docs/00-contexto/SCJ-ANO-01_*.md` está corrido sobre lo que se va a subir.
@@ -51,7 +51,7 @@ Guía maestra de trabajo para agentes en `sistema-control-jornada`.
 
 ## MCP disponibles relevantes
 
-- **Supabase** — plausible si el backend termina usando Postgres administrado; hoy el desarrollo
-  es con `docker-compose.yml` local.
+- **Supabase** — es la base de datos del proyecto. Útil para correr DDL, revisar tablas y datos,
+  y leer logs sin salir de Claude Code.
 - **Figma** — plausible para `diseno_paginas/`, si el diseño de pantallas se hace ahí.
 - Gmail, Calendar, Drive, Notion, Gamma, Canva, n8n — sin uso previsto en este proyecto.
