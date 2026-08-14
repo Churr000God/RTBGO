@@ -1,0 +1,7 @@
+-- 02_tiempo.sql
+-- Tablas del subsistema de Tiempo.
+-- Depende de: 00_esquemas.sql, 01_persona_stub.sql
+-- Justificación: SCJ-MOD-03 · Decisiones SCJ-DEC-01 a SCJ-DEC-05
+--
+-- PENDIENTE: se escribe en C2.1 (4 de septiembre), después de cerrar
+-- SCJ-DEC-01 a SCJ-DEC-04.

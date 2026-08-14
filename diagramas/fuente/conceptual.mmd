@@ -1,0 +1,14 @@
+%% Modelo conceptual del sistema completo
+%% Documento: SCJ-MOD-01 · Sesión J1.1 · 22 de agosto de 2026
+%% Exportar a: diagramas/export/conceptual.svg
+
+erDiagram
+    PERSONA ||--o{ ASIGNACION : tiene
+    PUESTO  ||--o{ ASIGNACION : ocupa
+
+    PERSONA ||--|| PERSONA_STUB : "persona_id — LA FRONTERA"
+
+    PERSONA_STUB ||--o{ MARCA : produce
+    PERSONA_STUB ||--o{ JORNADA_ASIGNADA : tiene
+    PERSONA_STUB ||--o{ AUSENCIA : solicita
+    MARCA ||--o{ CORRECCION : recibe
