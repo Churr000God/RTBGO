@@ -50,7 +50,7 @@ cantidad suficiente para que las consultas de validación tengan qué encontrar.
 
 | # | Caso | Frecuencia objetivo | Prueba qué |
 |---|---|---|---|
-| 1 | **Días con número impar de marcas** | ~2% de los días | `SCJ-ESP-01 §III.2` · `SCJ-DEC-01` |
+| 1 | **Días con número impar de marcas** | ~2% de los días | `SCJ-ESP-01 §VI.2` · `SCJ-DEC-01` |
 | 2 | **Jornadas personalizadas con horario partido** | 1 persona (`P07`) | `§III.3` |
 | 3 | **Deuda acumulada y episodios de reposición** | 2 personas | `§III.5`, `§III.6` · `SCJ-DEC-02` |
 | 4 | **Marcas que llegan fuera de orden** | ~5% de los lotes | `§IV` |
@@ -64,7 +64,7 @@ cantidad suficiente para que las consultas de validación tengan qué encontrar.
 |---|---|
 | Un cambio de jornada a mitad del periodo | Prueba el cálculo histórico de `SCJ-DEC-04` |
 | Una persona con pausa nunca registrada (`P06`) | Prueba el descuento fijo configurable |
-| Un lote enviado dos veces | Prueba la idempotencia de `SCJ-CDT-01 §V` |
+| Un lote enviado dos veces | Prueba la idempotencia de `SCJ-CDT-01 §VIII` |
 | Un cruce de año | Prueba el cambio de tope legal de 48 h a 46 h |
 
 ---

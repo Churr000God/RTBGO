@@ -50,7 +50,7 @@ Las que se implementan en la base y no en la aplicación, con la decisión que l
 | Restricción | Tabla | Tipo | Decisión |
 |---|---|---|---|
 | Paridad de marcas por día | `marca` | | `SCJ-DEC-01` |
-| Idempotencia terminal + secuencia | `marca` | `UNIQUE` | `SCJ-CDT-01 §V` |
+| Idempotencia terminal + secuencia | `marca` | `UNIQUE` | `SCJ-CDT-01 §VIII` |
 | Inmutabilidad de la marca | `marca` | | `SCJ-DEC-03` |
 | No traslape de vigencias | `jornada_asignada` | `EXCLUDE` | `SCJ-DEC-04` |
 | | | | |

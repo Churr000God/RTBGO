@@ -38,7 +38,7 @@ Ancla de claves foráneas. Una sola columna. Ver `SCJ-FRO-01`.
 
 ### II.3 `tramo`
 
-*Par de marcas: la impar abre, la par cierra. Ver `SCJ-ESP-01 §III.1`.*
+*Par de marcas: la impar abre, la par cierra. Ver `SCJ-ESP-01 §VI.1`.*
 
 | Atributo | Tipo | Clave | Nulo | Descripción |
 |---|---|---|---|---|
@@ -46,7 +46,7 @@ Ancla de claves foráneas. Una sola columna. Ver `SCJ-FRO-01`.
 
 ### II.4 `jornada_asignada`
 
-*Jornada de una persona **con vigencia**. Ver `SCJ-ESP-01 §III.3`.*
+*Jornada de una persona **con vigencia**. Ver `SCJ-ESP-01 §VI.3`.*
 
 | Atributo | Tipo | Clave | Nulo | Descripción |
 |---|---|---|---|---|
@@ -58,23 +58,23 @@ Ancla de claves foráneas. Una sola columna. Ver `SCJ-FRO-01`.
 
 ### II.6 `tope_legal`
 
-*Máximo semanal por vigencia. Ver `SCJ-ESP-01 §III.4`.*
+*Máximo semanal por vigencia. Ver `SCJ-ESP-01 §VI.4`.*
 
 ### II.7 `banco_de_horas` y `movimiento_de_saldo`
 
-*Deuda, ventana de resolución y las cuatro salidas. Ver `SCJ-ESP-01 §III.6` y `SCJ-DEC-02`.*
+*Deuda, ventana de resolución y las cuatro salidas. Ver `SCJ-ESP-01 §VI.6` y `SCJ-DEC-02`.*
 
 ### II.8 `correccion`
 
-*Registro nuevo que apunta al original. Ver `SCJ-ESP-01 §III.7` y `SCJ-DEC-03`.*
+*Registro nuevo que apunta al original. Ver `SCJ-ESP-01 §VI.7` y `SCJ-DEC-03`.*
 
 ### II.9 `ausencia`, `tipo_de_ausencia` y `paso_de_autorizacion`
 
-*Ver `SCJ-ESP-01 §III.8` y `SCJ-DEC-05`.*
+*Ver `SCJ-ESP-01 §VI.8` y `SCJ-DEC-05`.*
 
 ### II.10 `parametro`
 
-*Toda regla de negocio vive aquí. Ver `SCJ-ESP-01 §III.9`.*
+*Toda regla de negocio vive aquí. Ver `SCJ-ESP-01 §VI.9`.*
 
 ### II.11 `excepcion`
 

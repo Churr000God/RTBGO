@@ -12,9 +12,9 @@ Tres cosas del modelo tienen vigencia, y las tres por razones distintas:
 
 | Qué | Vigencia | Requisito |
 |---|---|---|
-| **Jornada asignada** | Por persona, cambia cuando la empresa lo decide | `SCJ-ESP-01 §III.3` |
-| **Topes legales** | Global, cambia en fecha fija por ley | `SCJ-ESP-01 §III.4` |
-| **Tabla de vacaciones por antigüedad** | Global, configurable | `SCJ-ESP-01 §III.8` |
+| **Jornada asignada** | Por persona, cambia cuando la empresa lo decide | `SCJ-ESP-01 §VI.3` |
+| **Topes legales** | Global, cambia en fecha fija por ley | `SCJ-ESP-01 §VI.4` |
+| **Tabla de vacaciones por antigüedad** | Global, configurable | `SCJ-ESP-01 §VI.8` |
 
 **El requisito duro es el mismo para las tres:** un cálculo de un periodo pasado debe dar **el mismo
 resultado indefinidamente**, aunque la jornada haya cambiado tres veces y el tope legal dos desde

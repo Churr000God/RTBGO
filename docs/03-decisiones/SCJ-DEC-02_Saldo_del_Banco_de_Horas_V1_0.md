@@ -8,12 +8,12 @@
 
 ## Contexto
 
-`SCJ-ESP-01 §III.6` exige que la deuda se salde dentro de una ventana configurable de seis meses,
+`SCJ-ESP-01 §VI.6` exige que la deuda se salde dentro de una ventana configurable de seis meses,
 con umbrales de alerta calculados como porcentaje de la jornada semanal de cada persona.
 
 La consulta más exigente no es *"¿cuál es el saldo hoy?"* sino **"¿cuál era el saldo el 14 de
 marzo?"** — porque de ahí sale la clasificación del tiempo entre reposición y extra
-(`SCJ-ESP-01 §III.5`), y esa clasificación debe poder recalcularse igual años después.
+(`SCJ-ESP-01 §VI.5`), y esa clasificación debe poder recalcularse igual años después.
 
 > El documento lo enuncia como pregunta abierta explícita: *"hay argumentos válidos de los dos
 > lados"*.

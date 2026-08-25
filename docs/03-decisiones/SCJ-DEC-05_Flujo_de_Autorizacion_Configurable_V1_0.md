@@ -8,7 +8,7 @@
 
 ## Contexto
 
-`SCJ-ESP-01 §III.8` exige que una ausencia soporte un **flujo de autorización de varios pasos,
+`SCJ-ESP-01 §VI.8` exige que una ausencia soporte un **flujo de autorización de varios pasos,
 configurable**. No dos pasos, no tres: un número variable, distinto según el tipo de ausencia y
 posiblemente según quién la solicita.
 
@@ -49,7 +49,7 @@ consultando el organigrama.
 
 **A favor:** el esquema queda mínimo. El flujo puede ser tan complejo como se quiera sin tocar la
 base.
-**En contra:** **contradice `SCJ-ESP-01 §III.9`** — ninguna regla de negocio codificada. Saca el
+**En contra:** **contradice `SCJ-ESP-01 §VI.9`** — ninguna regla de negocio codificada. Saca el
 flujo del alcance del modelo de datos, que es justamente el objeto de este proyecto. Y el
 organigrama vive del otro lado de la frontera.
 

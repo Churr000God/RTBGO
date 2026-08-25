@@ -35,7 +35,7 @@ el subsistema de Tiempo referencia a las personas **exclusivamente por un identi
 2. [`SCJ-ESP-01`](docs/00-contexto/SCJ-ESP-01_Especificacion_Funcional_V1_0.md) — **qué debe poder representar el modelo**
 3. [`SCJ-MOD-01`](docs/01-analisis/SCJ-MOD-01_Modelo_Conceptual_V1_0.md) — modelo conceptual
 4. [`SCJ-MOD-02`](docs/02-modelo/SCJ-MOD-02_Modelo_Logico_V1_0.md) — modelo lógico
-5. [`docs/03-decisiones/`](docs/03-decisiones/) — **las cinco decisiones de diseño** *(lo más sustancioso del proyecto)*
+5. [`docs/03-decisiones/`](docs/03-decisiones/) — **las nueve decisiones de diseño** *(lo más sustancioso del proyecto)*
 6. [`SCJ-TRZ-01`](docs/01-analisis/SCJ-TRZ-01_Matriz_de_Trazabilidad_V1_0.md) — requisito → tabla → consulta que lo demuestra
 
 ---
@@ -47,8 +47,9 @@ contenedor de base de datos: el DDL corre contra el proyecto de Supabase, direct
 
 ### Requisitos
 
-- Una cuenta y un proyecto de Supabase (gratis para desarrollo)
-- Python 3.11 o superior *(sólo para el generador de datos sintéticos)*
+- Una cuenta y un proyecto de Supabase (gratis para desarrollo), **propio de este proyecto** — no
+  se comparte con ningún entorno operativo
+- Python 3.11 o superior, gestionado con `uv` *(sólo para el generador de datos sintéticos)*
 
 ### 0. Configurar la conexión
 
@@ -84,9 +85,12 @@ psql "$DATABASE_URL" -f db/ddl/03_parametros_ejemplo.sql
 
 ### 3. Generar datos sintéticos
 
+**Pendiente.** `tools/generador/` está vacío — es el entregable `E5` (`SCJ-GEN-01`), programado para
+el 8 de septiembre. Una vez escrito, se invoca con `uv run python`, no con `python3` directo:
+
 ```bash
 cd tools/generador
-python generar.py --personas 8 --meses 6 --semilla 42 --salida ../../db/seeds/
+uv run python generar.py --personas 8 --meses 6 --semilla 42 --salida ../../db/seeds/
 psql "$DATABASE_URL" -f ../../db/seeds/datos_sinteticos.sql
 ```
 
@@ -119,7 +123,7 @@ frontend/            Interfaz web, React
 diseno_paginas/      Diseño de pantallas, previo a implementarlas en frontend/
 ```
 
-> `RTB-ACA-01` documenta sólo la vía de diseño de base de datos. `backend/` y `frontend/` son el
+> Este repositorio documenta sólo la vía de diseño de base de datos. `backend/` y `frontend/` son el
 > resto del proyecto y no tienen documento `SCJ-` propio todavía. La base de datos es Supabase, no
 > hay servicio de base de datos local que levantar.
 
@@ -129,8 +133,8 @@ diseno_paginas/      Diseño de pantallas, previo a implementarlas en frontend/
 
 | Hito | Fecha | Estado |
 |---|---|---|
-| Modelo conceptual y frontera acordados | 22 ago 2026 | Pendiente |
-| Modelo lógico y decisiones de diseño | 28 ago 2026 | Pendiente |
+| Modelo conceptual y frontera acordados | 22 ago 2026 | **Vencido, sin evidencia registrada** — bitácora y `SCJ-ACT-01` sin llenar |
+| Modelo lógico y decisiones de diseño | 28 ago 2026 | Pendiente — bloqueado por el hito anterior |
 | Modelo físico y generador de datos | 8 sep 2026 | Pendiente |
 | Consultas de validación | 11 sep 2026 | Pendiente |
 | Vacaciones, reporte, volumen, índices | 25 sep 2026 | Pendiente |

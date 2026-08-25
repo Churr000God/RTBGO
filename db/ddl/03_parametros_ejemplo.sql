@@ -1,7 +1,7 @@
 -- 03_parametros_ejemplo.sql
 -- Parámetros del sistema con VALORES DE EJEMPLO.
 -- Depende de: 02_tiempo.sql
--- Justificación: SCJ-ESP-01 §III.9
+-- Justificación: SCJ-ESP-01 §VI.9
 --
 -- IMPORTANTE: ninguno de estos valores es un valor de operación. Las políticas
 -- reales se cargan como parámetros en el despliegue y no forman parte del

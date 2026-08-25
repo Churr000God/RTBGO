@@ -15,7 +15,9 @@ backend y un frontend que lo exponen. Ver `README.md` y `docs/00-contexto/SCJ-CT
   de datos** — el DDL de `db/ddl/` corre contra el proyecto de Supabase, vía `psql "$DATABASE_URL"`
   o pegado en su SQL Editor. Configuración en `.env` (plantilla en `.env.example`). Pasos completos
   en `README.md` §"Cómo levantar el proyecto".
-- **Generador de datos sintéticos:** Python, en `tools/generador/`. Comando en `README.md` §3.
+- **Generador de datos sintéticos:** Python, en `tools/generador/` — carpeta vacía por ahora
+  (`SCJ-GEN-01`, entregable `E5`). Se invoca con `uv run python generar.py ...`, no `python3`
+  directo: `python3` está bloqueado por un hook de este entorno.
 - **Backend:** Python. `TODO:` framework (FastAPI o Django), estructura y comando de arranque —
   `backend/` está vacío.
 - **Frontend:** React. `TODO:` bootstrap del proyecto y comando de arranque —
@@ -40,6 +42,10 @@ Cada una vive en su propio documento de decisión — no se duplican aquí, sól
 - Modelo de correcciones (inmutabilidad de la marca) → `docs/03-decisiones/SCJ-DEC-03_*.md`
 - Vigencias temporales sin traslape → `docs/03-decisiones/SCJ-DEC-04_*.md`
 - Flujo de autorización configurable → `docs/03-decisiones/SCJ-DEC-05_*.md`
+- Entidad día o estado derivado (día bloqueado) → `docs/03-decisiones/SCJ-DEC-06_*.md`
+- Modelo de excepciones (`requiere_revision`/`motivo_revision`) → `docs/03-decisiones/SCJ-DEC-07_*.md`
+- Clave de la marca (`evento_id`) → `docs/03-decisiones/SCJ-DEC-08_*.md`
+- Unicidad parcial de secuencia (`terminal_id` + `secuencia_local`) → `docs/03-decisiones/SCJ-DEC-09_*.md`
 
 ## Gotchas conocidos
 

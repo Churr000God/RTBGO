@@ -8,7 +8,7 @@
 
 ## Contexto
 
-`SCJ-ESP-01 §III.7`: una marca registrada **nunca se modifica ni se elimina**. Una corrección es un
+`SCJ-ESP-01 §VI.7`: una marca registrada **nunca se modifica ni se elimina**. Una corrección es un
 registro nuevo que apunta a la original, con el valor corregido, el motivo, el autor y el momento.
 
 **El requisito duro:** debe poder reconstruirse el estado del registro **tal como era en cualquier

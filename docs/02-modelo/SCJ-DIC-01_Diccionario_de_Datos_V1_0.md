@@ -69,7 +69,7 @@ esquema.
 
 ## IV. Parámetros del sistema
 
-Todos los valores son **de ejemplo**. Ver `SCJ-ESP-01 §III.9`.
+Todos los valores son **de ejemplo**. Ver `SCJ-ESP-01 §VI.9`.
 
 | Clave | Tipo | Valor de ejemplo | Qué controla |
 |---|---|---|---|

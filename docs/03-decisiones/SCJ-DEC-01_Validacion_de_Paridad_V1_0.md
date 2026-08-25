@@ -8,7 +8,7 @@
 
 ## Contexto
 
-`SCJ-ESP-01 §III.1` establece que las marcas no tienen tipo: la impar abre y la par cierra, y **el
+`SCJ-ESP-01 §VI.1` establece que las marcas no tienen tipo: la impar abre y la par cierra, y **el
 número de marcas de un día cerrado siempre es par**.
 
 No hay respuesta obvia porque la paridad **no es una propiedad de una fila**, sino de un conjunto de
@@ -46,7 +46,7 @@ clasificar tiempo—; validar la paridad ahí es un paso más del mismo proceso.
 ### Opción D — No validar: derivar
 
 **A favor:** la paridad no se "viola", simplemente el día es impar y **eso es un dato, no un error**.
-`SCJ-ESP-01 §III.2` ya define qué hacer: rellenar, bloquear y encolar la excepción. Bajo esta
+`SCJ-ESP-01 §VI.2` ya define qué hacer: rellenar, bloquear y encolar la excepción. Bajo esta
 lectura, no hay restricción que imponer.
 **En contra:** deja sin garantía estructural una regla que el documento enuncia como invariante.
 
@@ -73,7 +73,7 @@ lectura, no hay restricción que imponer.
 ## Cómo se verifica
 
 `db/consultas/validacion/01_paridad.sql` — cuenta días con número impar de marcas por persona y
-periodo, que es además el requisito de conteo de `SCJ-ESP-01 §III.2`.
+periodo, que es además el requisito de conteo de `SCJ-ESP-01 §VI.2`.
 
 ---
 
