@@ -1,7 +1,7 @@
 # SCJ-DEC-03 · ¿Versionado, tabla de auditoría o registro de eventos para las correcciones?
 
-**Estado:** Propuesta
-**Fecha de la decisión:** —
+**Estado:** Aceptada
+**Fecha de la decisión:** 2026-09-02
 **Última revisión:** —
 
 ---
@@ -57,19 +57,35 @@ eventos, o un campo derivado que hay que mantener. Más caro de consultar y más
 
 ## Decisión
 
-*(pendiente)*
-
----
+**Opción C — registro de eventos.** `tiempo.correccion(id, marca_id, valor_corregido, motivo,
+autor_id, creado_en)`. La marca original se inserta una vez y nunca se toca; cada corrección es
+una fila nueva en `correccion` que apunta a la marca y describe qué valor debió tener y por qué.
 
 ## Por qué
 
-*(pendiente)*
+Es la única de las tres que cumple el requisito de forma literal: la inmutabilidad de la marca
+queda garantizada por construcción (no existe ningún `UPDATE` posible sobre `marca` una vez
+insertada, porque el esquema no lo permite), no por convención o por confiar en que nadie la toque
+directamente. A partir de enero de 2027 eso deja de ser preferencia de diseño.
 
----
+La Opción A mezcla el dato original con sus correcciones en la misma tabla, lo que hace más fácil
+violar la inmutabilidad sin darse cuenta. La Opción B contradice el requisito de raíz: la marca sí
+se modifica, sólo que además queda copia — y esa copia depende de un disparador que puede fallar o
+deshabilitarse sin dejar rastro.
 
 ## Consecuencias
 
-*(pendiente)*
+Se vuelve fácil: motivo y autor son atributos naturales de la corrección, no columnas extra que
+sobrescriben la fila original. Auditar cuántas veces se corrigió una marca es contar filas en
+`correccion`, no inspeccionar un historial de versiones.
+
+Se vuelve difícil: el estado vigente de una marca corregida no es una lectura directa — requiere
+una vista o consulta que aplique la corrección más reciente sobre el original. Es exactamente el
+costo que la Opción C anticipa y que `db/consultas/validacion/05_reconstruccion_historica.sql`
+tiene que demostrar que vale la pena.
+
+Queda cerrado para siempre: `tiempo.marca` no lleva `UPDATE` ni `DELETE` en ningún flujo de la
+aplicación — sólo `INSERT`. Cualquier corrección, sin excepción, pasa por `tiempo.correccion`.
 
 ---
 

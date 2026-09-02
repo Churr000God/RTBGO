@@ -25,10 +25,14 @@ Términos del dominio, con el significado exacto que tienen en este proyecto.
 | **Banco de horas** | Mecanismo de acumulación y resolución de deuda dentro de una ventana configurable |
 | **Deuda** | Diferencia negativa entre lo trabajado y la jornada asignada |
 | **Ventana** | Periodo dentro del cual una deuda debe resolverse. Ejemplo: seis meses |
-| **Cubrir / arrastrar / descontar / condonar** | Las cuatro salidas posibles de un saldo |
+| **Cubrir / arrastrar / descontar / condonar** | Las cuatro salidas posibles de un saldo. No generan deuda, la resuelven |
+| **Generado_quincena** | El quinto tipo de movimiento de saldo, el único que aumenta la deuda — automático, al corte quincenal, sólo si horas esperadas > horas trabajadas |
 | **Saldo a favor** | **No existe.** El excedente sin deuda previa se resuelve como tiempo extra en el momento |
 | **Corrección** | Registro nuevo que apunta a una marca original. La marca **nunca** se modifica |
-| **Excepción** | Caso que requiere revisión humana: día impar, reloj desincronizado, saldo vencido |
+| **Excepción** | Registro con ciclo de vida propio (no un atributo de la marca) que apunta a una marca **o** a un día, nunca ambos: reloj desincronizado, día sin checada sin ausencia, jornada en domingo/festivo sin autorizar |
+| **Día revisado** | Cuarto estado de `día` (junto a abierto/cerrado/bloqueado): un día que estuvo bloqueado y que RH ya revisó. No vuelve a `cerrado` — conserva que estuvo bloqueado |
+| **Día festivo** | Catálogo de fechas festivas, no calculable por fórmula (festivos móviles). Domingo no necesita catálogo, se deriva de la fecha |
+| **Ausencia** | Periodo no trabajado con naturaleza (vacaciones/permiso con o sin goce/incapacidad/falta) y autorización. Si se autoriza tarde, resuelve sola cualquier excepción abierta por el mismo periodo |
 | **Persona_id** | Identificador opaco. **Lo único que cruza la frontera** entre subsistemas |
 | **Frontera** | Límite entre el subsistema de Personas y el de Tiempo. Ver `SCJ-FRO-01` |
 | **Terminal** | Aparato montado en pared que identifica a la persona y produce marcas |

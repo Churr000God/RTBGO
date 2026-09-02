@@ -1,7 +1,7 @@
 # SCJ-DEC-06 · ¿El día es una entidad materializada con estado propio, o un estado derivado de sus marcas?
 
-**Estado:** Propuesta
-**Fecha de la decisión:** —
+**Estado:** Aceptada
+**Fecha de la decisión:** 2026-09-02
 **Última revisión:** —
 
 ---
@@ -64,19 +64,39 @@ bloqueado, el registro de bloqueo. Depende de cómo quede resuelto `SCJ-DEC-07`.
 
 ## Decisión
 
-*(pendiente)*
+**Opción A — entidad materializada `dia(id, persona_id, fecha, estado, horas_totales, ...)`**, con
+un cuarto estado que las opciones originales no contemplaban: `abierto` / `cerrado` / `bloqueado` /
+**`revisado`**. Un día bloqueado no vuelve a `cerrado` cuando RH lo revisa — pasa a `revisado`,
+para que quede registro de que alguien lo miró sin perder el hecho de que en su momento estuvo
+bloqueado.
 
----
+La fila se crea al cierre (no con la primera marca): el proceso de cierre diario es el que arma
+`tramo` a partir de las marcas del día, calcula `horas_totales` y decide el `estado` inicial.
 
 ## Por qué
 
-*(pendiente)*
-
----
+Un derivado puro (Opción B) recalcularía el bloqueo cada vez que se consulta, y podría cambiar de
+opinión si llegan marcas tardías — exactamente lo que `§VI.2` prohíbe ("marca tardía sobre día
+cerrado no reabre"). La Opción C evita la tabla `dia` completa, pero el requisito no es sólo
+"recordar que se bloqueó": también hace falta un lugar natural para `horas_totales` y el resto de
+lo que el día agrega, y separar eso en dos estructuras (marca de bloqueo aparte + cálculo derivado
+del resto) es más superficie de sincronización que una sola tabla con estado propio.
 
 ## Consecuencias
 
-*(pendiente)*
+Se vuelve fácil: contar días bloqueados por persona y periodo es un filtro directo. Distinguir "se
+bloqueó y nadie lo ha visto" de "se bloqueó y RH ya lo revisó" es una lectura del `estado`, no una
+consulta que cruce `dia` contra `excepcion` para inferirlo.
+
+Se vuelve difícil: `dia` y `marca` son ahora dos fuentes que pueden desincronizarse si el proceso
+de cierre falla a la mitad — necesita ser una transacción, no una serie de pasos sueltos. Una
+marca tardía sobre un día `revisado` (no sólo `bloqueado`) sigue siendo un caso a decidir: por
+ahora se trata igual que sobre un día `bloqueado` — se registra, no reabre nada — pero queda como
+refinamiento a probar en `SCJ-CVA-01`.
+
+Queda cerrado para siempre: ningún proceso reabre un día `cerrado`, `bloqueado` o `revisado`
+automáticamente. Cambiar de `bloqueado` a `revisado` es la única transición manual permitida, y
+sólo la hace RH.
 
 ---
 

@@ -9,6 +9,11 @@ esquema.
 > **Se genera parcialmente desde la base.** Ver `tools/generar_diccionario.sql`. Los comentarios de
 > `COMMENT ON` del DDL son la fuente; este documento los presenta.
 
+> **Nota (2026-09-02, no sube de versión — `tools/generar_diccionario.sql` sigue sin existir):**
+> `02_tiempo.sql` ya tiene las 14 tablas con `COMMENT ON` completo (ver el archivo directamente
+> para el detalle columna por columna mientras el generador no exista). Sólo se actualiza aquí el
+> resumen del esquema, que faltaba reflejar las tablas nuevas.
+
 ---
 
 ## I. Resumen del esquema
@@ -17,12 +22,19 @@ esquema.
 |---|---|---|
 | `persona` | 8 | Stub de la frontera |
 | `marca` | ~5,800 | Eventos crudos del terminal |
+| `dia` | ~1,450 | Marcas de una persona en una fecha, con estado |
 | `tramo` | ~2,900 | Pares de marcas |
+| `clasificacion_de_tiempo` | ~2,900 | Ordinario/reposición/extra por tramo |
 | `jornada_asignada` | ~15 | Vigencias de jornada |
-| `banco_de_horas` | | Saldos |
+| `patron_semanal` | ~50 | Días/horario por jornada asignada |
+| `tope_legal` | ~2 | Máximos semanales por vigencia |
+| `dia_festivo` | ~15 | Catálogo de festivos (6 meses) |
+| `banco_de_horas` | 8 | Un renglón acumulador por persona |
+| `movimiento_de_saldo` | ~100 | Libro de movimientos del saldo |
+| `correccion` | ~20 | Correcciones sobre marcas |
 | `ausencia` | ~60 | |
 | `parametro` | ~20 | |
-| `excepcion` | | |
+| `excepcion` | ~40 | |
 
 ---
 

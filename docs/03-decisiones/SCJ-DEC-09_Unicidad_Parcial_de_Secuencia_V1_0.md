@@ -1,7 +1,7 @@
 # SCJ-DEC-09 · ¿Cómo se aplica la unicidad de `terminal_id` + `secuencia_local`, que sólo rige cuando `origen = terminal`?
 
-**Estado:** Propuesta
-**Fecha de la decisión:** —
+**Estado:** Aceptada
+**Fecha de la decisión:** 2026-09-02
 **Última revisión:** —
 
 ---
@@ -65,19 +65,27 @@ bien.
 
 ## Decisión
 
-*(pendiente)*
-
----
+**Opción A — índice único parcial**, tal como está redactado en el contexto:
+`CREATE UNIQUE INDEX uq_marca_terminal_secuencia ON tiempo.marca (terminal_id, secuencia_local)
+WHERE origen = 'terminal';`
 
 ## Por qué
 
-*(pendiente)*
-
----
+Es la vía nativa de PostgreSQL para exactamente este caso, y las opciones B y C no ofrecen ninguna
+ventaja a cambio de su complejidad o su riesgo: B llega al mismo resultado por un camino más largo,
+C saca la garantía de la base y la deja depender de que la aplicación se porte bien —lo que
+`SCJ-ESP-01 §V` prohíbe para evidencia de integridad.
 
 ## Consecuencias
 
-*(pendiente)*
+Se vuelve fácil: detectar huecos de secuencia por terminal es una consulta directa sobre `marca`
+filtrada por `origen = 'terminal'`, sin `CASE` ni lógica adicional para ignorar los nulos de otros
+orígenes.
+
+Se vuelve difícil: nada nuevo — es la razón por la que se eligió.
+
+Queda cerrado para siempre: ninguna ruta de inserción de marcas de `origen = 'terminal'` puede
+evadir esta restricción, porque vive en el índice, no en el código que inserta.
 
 ---
 

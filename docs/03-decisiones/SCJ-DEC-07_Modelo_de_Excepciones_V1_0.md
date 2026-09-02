@@ -1,7 +1,7 @@
 # SCJ-DEC-07 · ¿`requiere_revision` y `motivo_revision` viven como atributos de la marca, o como una entidad de excepción con ciclo de vida propio?
 
-**Estado:** Propuesta
-**Fecha de la decisión:** —
+**Estado:** Aceptada
+**Fecha de la decisión:** 2026-09-02
 **Última revisión:** —
 
 ---
@@ -52,19 +52,42 @@ cero o un motivo— es más estructura de la que hace falta.
 
 ## Decisión
 
-*(pendiente)*
+**Opción B — entidad `tiempo.excepcion` con ciclo de vida propio.**
 
----
+`excepcion(id, marca_id, dia_id, motivo_revision, estado, creado_en)`, con exactamente uno de
+`marca_id` / `dia_id` no nulo (nunca los dos, nunca ninguno — `ck_excepcion_marca_o_dia`). La
+`marca` conserva `requiere_revision` como bandera rápida (evita unir con `excepcion` sólo para
+filtrar "¿esta marca necesita algo?"), pero `motivo_revision` deja de vivir ahí: se muda a
+`excepcion.motivo_revision`, que además cubre el caso de `dia` (día sin checada y sin ausencia que
+lo justifique — no sólo marcas problemáticas).
+
+La resolución no sobrescribe la fila: `estado` pasa de `pendiente` a `resuelto`, y el motivo de la
+resolución se anota en el mismo `motivo_revision` (se le concatena, no se reemplaza) o, si el
+volumen lo justifica más adelante, en una columna `motivo_resolucion` aparte — se deja abierto
+como refinamiento menor, no bloquea la decisión.
 
 ## Por qué
 
-*(pendiente)*
-
----
+El requisito de `SCJ-ESP-01 §VI.7.5` pide que la resolución sea auditable — quién, cuándo, con qué
+motivo — sin borrar la señal original. Eso es exactamente lo que una fila con `estado` que
+transiciona una sola vez (`pendiente → resuelto`) garantiza, y lo que una columna sobrescrita con
+`UPDATE` no. Además, con Opción A una marca sólo puede señalar **un** motivo a la vez; con la
+entidad aparte, nada impide que existan dos excepciones abiertas sobre la misma marca si el
+proceso las genera por razones distintas.
 
 ## Consecuencias
 
-*(pendiente)*
+Se vuelve fácil: la cola de excepciones (`§VI.7.5`, "por persona, por periodo, por motivo") es una
+consulta directa sobre `excepcion`, sin filtrar `marca` por un campo que también sirve para otra
+cosa. Cerrar automáticamente una excepción de `dia` cuando llega una `ausencia` autorizada tardía
+es un disparador sobre `ausencia`, no un `UPDATE` manual buscado a mano.
+
+Se vuelve difícil: dos lugares para saber si algo necesita revisión — `marca.requiere_revision`
+como bandera, y `excepcion` como detalle. Hay que mantenerlos sincronizados (un disparador sobre
+`excepcion` que apague `requiere_revision` al resolver, si aplica).
+
+Queda cerrado para siempre: ninguna resolución de excepción se implementa como `UPDATE` que borre
+el motivo original.
 
 ---
 
