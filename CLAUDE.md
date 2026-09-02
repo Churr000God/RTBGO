@@ -11,10 +11,13 @@ backend y un frontend que lo exponen. Ver `README.md` y `docs/00-contexto/SCJ-CT
 ## Stack y cómo correrlo
 
 - **Base de datos:** Supabase (Postgres administrado, extensión `btree_gist`), esquemas
-  `personas` (stub) y `tiempo` (todo el trabajo). **No hay Postgres local ni contenedor de base
-  de datos** — el DDL de `db/ddl/` corre contra el proyecto de Supabase, vía `psql "$DATABASE_URL"`
-  o pegado en su SQL Editor. Configuración en `.env` (plantilla en `.env.example`). Pasos completos
-  en `README.md` §"Cómo levantar el proyecto".
+  `personas` y `tiempo`, ambos con DDL real (decisión de sesión 2026-08-31: `personas` ya no es
+  sólo stub — ver `bitacora/2026-08-31_campos_persona.md`). El stub original de `tiempo.persona`
+  se mantiene como ancla de la frontera (`SCJ-FRO-01`); `personas.persona` es la implementación
+  completa. **No hay Postgres local ni contenedor de base de datos** — el DDL de `db/ddl/` corre
+  contra el proyecto de Supabase, vía `psql "$DATABASE_URL"` o pegado en su SQL Editor.
+  Configuración en `.env` (plantilla en `.env.example`). Pasos completos en `README.md`
+  §"Cómo levantar el proyecto".
 - **Generador de datos sintéticos:** Python, en `tools/generador/` — carpeta vacía por ahora
   (`SCJ-GEN-01`, entregable `E5`). Se invoca con `uv run python generar.py ...`, no `python3`
   directo: `python3` está bloqueado por un hook de este entorno.

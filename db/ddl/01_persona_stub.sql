@@ -4,7 +4,7 @@
 -- Justificación: SCJ-FRO-01 §I y §II
 
 CREATE TABLE tiempo.persona (
-  id bigint PRIMARY KEY
+  id uuid PRIMARY KEY
 );
 
 COMMENT ON TABLE tiempo.persona IS
@@ -12,5 +12,5 @@ COMMENT ON TABLE tiempo.persona IS
   'ni NSS, ni salario. Si un requisito parece necesitarlos, el requisito está mal planteado. '
   'Ver SCJ-FRO-01.';
 COMMENT ON COLUMN tiempo.persona.id IS
-  'Identificador opaco. En operación se sincroniza desde personas.persona; en este proyecto lo '
-  'puebla el generador de datos sintéticos.';
+  'Identificador opaco, mismo valor que personas.persona.id (uuid). En operación se sincroniza '
+  'desde personas.persona; en este proyecto lo puebla el generador de datos sintéticos.';

@@ -57,9 +57,10 @@ derivable. No codifica antigüedad, puesto, área ni fecha de alta. Dos marcas d
 Estas siete reglas son duras. Una violación de cualquiera de ellas es un defecto, no una decisión de
 diseño.
 
-1. **`persona_id` es el único valor que cruza la frontera.** Ningún otro atributo de identidad
-   entra al subsistema de Tiempo, en ninguna forma, ni siquiera desnormalizado "para conveniencia
-   de reportes".
+1. **`persona_id` es el único valor que cruza la frontera**, salvo la excepción documentada en
+   `SCJ-FRO-01 §V` (`fecha_ingreso`, de sólo lectura, resuelta el 29 de agosto de 2026). Ningún
+   otro atributo de identidad entra al subsistema de Tiempo, en ninguna forma, ni siquiera
+   desnormalizado "para conveniencia de reportes".
 2. **Ningún dato biométrico cruza.** Ni huella, ni plantilla, ni imagen, ni derivado. Las plantillas
    viven dentro del chip del módulo lector y no llegan a la base. Las plantillas nunca salen del chip del módulo.
 3. **`plantilla_num` no existe en Tiempo.** Es un identificador interno del módulo lector; vive en
