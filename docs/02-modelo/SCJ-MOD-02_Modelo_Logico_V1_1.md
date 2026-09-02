@@ -35,7 +35,7 @@ Ancla de claves foráneas. Una sola columna. Ver `SCJ-FRO-01`.
 
 | Atributo | Tipo | Clave | Nulo | Descripción |
 |---|---|---|---|---|
-| `id` | bigint | PK | No | Subrogada — ver `SCJ-DEC-08`, sigue abierta |
+| `id` | bigint | PK | No | Subrogada — `SCJ-DEC-08`, Opción B (aceptada) |
 | `evento_id` | uuid | UNIQUE | No | Llave de negocio, idempotencia global |
 | `persona_id` | uuid | FK → `persona` | No | Ya resuelto por el terminal, nunca la plantilla |
 | `terminal_id` | uuid | | Sí | Nulo salvo `origen = terminal` |
@@ -74,7 +74,8 @@ Ancla de claves foráneas. Una sola columna. Ver `SCJ-FRO-01`.
 | `id` | bigint | PK | No | |
 | `persona_id` | uuid | FK → `persona` | No | |
 | `tipo_jornada` | varchar(20) | | No | `normal` / `flexible` / `de_confianza` |
-| `vigencia` | daterange | | No | `EXCLUDE` evita traslape por persona, `SCJ-DEC-04` |
+| `vigente_desde` | date | | No | `SCJ-DEC-04`, Opción A |
+| `vigente_hasta` | date | | Sí | `NULL` = vigente. Traslape por persona validado en la aplicación, no con `EXCLUDE` (`SCJ-DEC-04`) |
 | `descuento_comida_fija` | boolean | | No | |
 | `minutos_descuento_comida_fija` | int | | Sí | No nulo si `descuento_comida_fija` |
 | `horas_semanales_calculadas` | numeric(6,2) | | Sí | Derivado de `patron_semanal` |

@@ -97,6 +97,7 @@ El procedimiento:
 | Calcular el descuento por horas no repuestas | El subsistema de Tiempo entrega **horas**. El monto lo calcula quien tiene el salario |
 | Agrupar por área para detectar traslapes de vacaciones | El subsistema de Tiempo tiene un **grupo** propio, sin relación con el organigrama |
 | Saber la antigüedad para calcular días de vacaciones | La **fecha de ingreso** es el único candidato a excepción → ver §V |
+| Saber quién debe aprobar una ausencia (`SCJ-DEC-05`, Opción C) | **Nuevo caso, resuelto 2026-09-02, aún sin validación conjunta.** Se resuelve en la aplicación, consultando `puesto_permiso`/`asignacion` de Personas con `persona_id` — el organigrama y los permisos heredables (RH/responsable hacia arriba en la jerarquía) sí se consultan para esto, a diferencia del caso de "agrupar por área" de arriba. No se replica ningún atributo de identidad en el esquema de Tiempo; la consulta cruza en la capa de aplicación, igual patrón que "mostrar el nombre en un reporte". Autorizado por Diego al cerrar `SCJ-DEC-05`; **falta el mismo paso pendiente que el resto de este documento: sesión conjunta y firma (§VI)** |
 
 ---
 

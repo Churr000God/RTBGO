@@ -72,7 +72,7 @@ herramientas también.
 | Instantes | `timestamptz` — **siempre con zona horaria** |
 | Fechas de calendario | `date` |
 | Duraciones | `interval`, o entero de minutos si la decisión lo justifica |
-| Rangos de vigencia | `daterange` / `tstzrange` con exclusión `GIST` |
+| Rangos de vigencia | `vigente_desde date NOT NULL` + `vigente_hasta date` (`NULL` = vigente), traslape validado en la aplicación — no `EXCLUDE GIST` (`SCJ-DEC-04`, Opción A) |
 | Identificadores | `bigint` generado por identidad, salvo justificación |
 | Dinero | `numeric(12,2)` — **nunca** `float` |
 

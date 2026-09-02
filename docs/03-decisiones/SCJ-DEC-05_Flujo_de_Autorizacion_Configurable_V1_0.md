@@ -1,8 +1,8 @@
 # SCJ-DEC-05 · ¿Cómo se modela un flujo de autorización de pasos variables sin cablear ninguno?
 
-**Estado:** Propuesta
-**Fecha de la decisión:** —
-**Última revisión:** —
+**Estado:** Aceptada
+**Fecha de la decisión:** 2026-09-02
+**Última revisión:** 2026-09-02
 
 ---
 
@@ -69,19 +69,53 @@ abiertas.
 
 ## Decisión
 
-*(pendiente)*
+**Opción C — cadena de aprobaciones sin definición previa.** `tiempo.ausencia` guarda sólo el
+registro de aprobación (`estado_autorizacion`, y quién aprobó cada paso). **Quién debe aprobar se
+resuelve en la aplicación**, consultando el organigrama del subsistema de Personas: permiso
+atómico de autorización (p. ej. `autorizar_ausencia`), asignado por `puesto_permiso` con
+`heredable = true` en el puesto de **RH/responsable directo**, y heredado hacia arriba en la
+jerarquía (nivel Gerencia/Dirección) cuando el flujo del tipo de ausencia exige más de un paso.
+
+**Esto sí cruza la frontera** — a diferencia de "mostrar el nombre en un reporte" (que sólo cruza
+`persona_id` en la capa de consulta), aquí Tiempo necesita **resolver una pregunta que depende del
+organigrama**, y el organigrama vive enteramente en Personas. Autorizado explícitamente por Diego
+en esta sesión, por ser necesario para el diseño. **Lo único que queda intacto al otro lado de la
+frontera es la nómina** (salarios, cálculo de compensación) — el organigrama y los permisos ya no
+se tratan como zona prohibida para esta consulta.
 
 ---
 
 ## Por qué
 
-*(pendiente)*
+Opción A (definición + instancias) y B (máquina de estados) modelan un flujo que, en este proyecto,
+ya existe en otro lugar: la jerarquía de puestos y el catálogo de permisos heredables del
+subsistema de Personas (`RTB-ESP-01 §III.4`, ver `[[diseno-bd-scj-control-jornada]]`). Construir una
+definición de flujo *dentro* de Tiempo sería duplicar esa estructura con datos que ya viven en
+Personas. Opción C evita la duplicación: el flujo de aprobación de una ausencia **es** un caso más
+de la pregunta general "¿quién tiene tal permiso sobre tal persona/puesto?", que el subsistema de
+Personas ya resuelve.
 
 ---
 
 ## Consecuencias
 
-*(pendiente)*
+- `tiempo.ausencia` no necesita tabla de "definición de flujo" ni "instancia de paso" — sólo el
+  registro de aprobación por ausencia (quién aprobó, cuándo, en qué paso si el tipo exige más de
+  uno).
+- La aplicación, al recibir una solicitud de ausencia, consulta Personas (`puesto_permiso`,
+  `asignacion`, jerarquía por `nivel`/`area`/`departamento`) para resolver la cadena de aprobadores
+  vigente **en el momento de crear la solicitud**.
+- **Pregunta que el propio documento de decisión exige responder — confirmada:** si el permiso de
+  aprobación cambia de dueño (RH se reasigna, un puesto se vuelve heredable o deja de serlo)
+  **mientras una ausencia sigue pendiente**, **la solicitud sigue con el aprobador que tenía
+  vigente al crearse** — no se recalcula contra el permiso actual. Consistente con `SCJ-DEC-04`
+  (vigencias): la aplicación debe resolver y **congelar** el aprobador/cadena de aprobación en el
+  momento de crear la solicitud, no re-resolverlo en cada consulta posterior.
+- `SCJ-FRO-01 §IV` (tabla de "casos anticipados") queda desactualizado — falta agregar esta fila:
+  "Saber quién debe aprobar una ausencia" → se resuelve en la aplicación consultando
+  `puesto_permiso`/`asignacion` con `persona_id`, cruzando el organigrama por autorización expresa
+  de Diego en esta decisión (no por el procedimiento formal de sesión conjunta del §IV, que sigue
+  pendiente como el resto de la validación de `SCJ-FRO-01`/`SCJ-ACT-01`).
 
 ---
 

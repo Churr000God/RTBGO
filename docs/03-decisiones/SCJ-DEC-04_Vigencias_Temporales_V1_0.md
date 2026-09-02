@@ -1,8 +1,8 @@
 # SCJ-DEC-04 · ¿Cómo se representan las vigencias temporales y cómo se garantiza que no se traslapen?
 
-**Estado:** Propuesta
-**Fecha de la decisión:** —
-**Última revisión:** —
+**Estado:** Aceptada
+**Fecha de la decisión:** 2026-09-02
+**Última revisión:** 2026-09-02
 
 ---
 
@@ -69,19 +69,40 @@ poder explicarlo.
 
 ## Decisión
 
-*(pendiente)*
+**Opción A — dos columnas de fecha, validado en la aplicación.**
+
+`vigente_desde` y `vigente_hasta` en cada tabla con vigencia (jornada asignada, topes legales,
+tabla de vacaciones por antigüedad). `vigente_hasta` en `NULL` marca la vigencia activa.
+**Convención de borde:** intervalo semiabierto `[vigente_desde, vigente_hasta)` —
+`vigente_hasta` es exclusivo, para no arrastrar la ambigüedad de "¿el último día cuenta o no?".
 
 ---
 
 ## Por qué
 
-*(pendiente)*
+El proyecto ya concentra la lógica de negocio en la aplicación —ver `SCJ-DEC-01`, el cierre de día
+se valida ahí y no en la base—, así que resolver el traslape en el mismo lugar donde ya se procesan
+altas y cambios de vigencia es consistente, y evita depender de una extensión de PostgreSQL
+(`btree_gist`) que la Opción B exigiría. Se prioriza simplicidad y portabilidad sobre la garantía a
+nivel de motor.
 
 ---
 
 ## Consecuencias
 
-*(pendiente)*
+- La aplicación **debe validar antes de insertar o actualizar una vigencia** que no exista otra
+  vigencia traslapada de la misma persona (jornada asignada) o del mismo alcance global (topes
+  legales, tabla de vacaciones).
+- **Riesgo aceptado:** una escritura que no pase por la aplicación —carga directa a la base, script
+  de mantenimiento, corrección manual— puede crear un traslape sin que nada lo impida a nivel de
+  motor.
+- El caso de prueba "intento de insertar una vigencia traslapada debe fallar" (ver *Cómo se
+  verifica*) valida ahora la regla de la aplicación, no una restricción de base de datos.
+- Se mantiene el borde semiabierto `[vigente_desde, vigente_hasta)` como la misma convención que
+  usaría el tipo `daterange` de la Opción B, para no heredar ambigüedad si el proyecto migra a B
+  más adelante.
+- Combinar con la Opción C (congelar el valor en el registro calculado) sigue abierto y no se
+  descarta — puede añadirse después sin conflicto con A.
 
 ---
 

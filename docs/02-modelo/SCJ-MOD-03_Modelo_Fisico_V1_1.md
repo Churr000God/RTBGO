@@ -40,7 +40,7 @@ justificación. Entregable E3 de `SCJ-ESP-01`.
 | Concepto | Tipo elegido | Alternativa descartada | Por qué |
 |---|---|---|---|
 | Instantes | `timestamptz` | `timestamp` | Sin zona no se puede razonar sobre el cambio de horario |
-| Vigencias | `daterange` | Dos columnas de fecha | Permite exclusión declarativa de traslapes |
+| Vigencias | Dos columnas de fecha (`vigente_desde`/`vigente_hasta`) | `daterange` + `EXCLUDE gist` | Simplicidad y portabilidad; traslape validado en la aplicación (`SCJ-DEC-04`, Opción A) |
 | Duraciones | `numeric(6,2)` en horas/minutos | `interval` | Más simple de sumar y comparar contra `tope_legal`; se documenta como desviación de `CONVENCIONES.md §II` |
 | Enumerados | `varchar(N)` + `CHECK` | Tipo `ENUM` nativo | Agregar un valor no requiere `ALTER TYPE`; el `CHECK` es la restricción, no el tipo |
 | Identificadores | `bigint GENERATED ALWAYS AS IDENTITY` | `uuid` | Convención del repo: PK siempre `id`. `tiempo.persona.id` es la única excepción — `uuid`, porque cruza la frontera con `personas.persona` (`SCJ-FRO-01`) |
@@ -54,14 +54,20 @@ Las que se implementan en la base y no en la aplicación, con la decisión que l
 
 | Restricción | Tabla | Tipo | Decisión |
 |---|---|---|---|
-| Paridad de marcas por día | `tramo` | `marca_cierre_id` nulo admitido, sin `CHECK` que bloquee | `SCJ-DEC-01` (sigue propuesta) |
 | Idempotencia por llave de negocio | `marca` | `UNIQUE (evento_id)` | `SCJ-CDT-01 §VIII` |
 | Huecos de secuencia por terminal | `marca` | `UNIQUE` parcial `WHERE origen = 'terminal'` | `SCJ-DEC-09` (aceptada) |
 | Inmutabilidad de la marca | `marca` | Sin `UPDATE`/`DELETE` en ningún flujo de aplicación (no hay restricción de base que lo impida a nivel de permisos todavía) | `SCJ-DEC-03` (aceptada) |
-| No traslape de vigencias | `jornada_asignada` | `EXCLUDE USING gist (persona_id WITH =, vigencia WITH &&)` | `SCJ-DEC-04` (sigue propuesta) |
 | Un día, una fecha, una persona | `dia` | `UNIQUE (persona_id, fecha)` | `SCJ-DEC-06` (aceptada) |
 | Excepción exclusiva marca/día | `excepcion` | `CHECK ((marca_id IS NOT NULL) <> (dia_id IS NOT NULL))` | `SCJ-DEC-07` (aceptada) |
 | Saldo materializado de sólo disparador | `banco_de_horas` | Sin restricción de base que impida `UPDATE` directo — depende de disciplina de aplicación, riesgo anotado en `SCJ-DEC-02` | `SCJ-DEC-02` (aceptada) |
+
+Dos reglas quedaron **fuera de esta tabla a propósito** — se decidieron a nivel de aplicación, no de
+base:
+
+| Regla | Tabla | Validación en aplicación | Decisión |
+|---|---|---|---|
+| Paridad de marcas por día | `tramo` / `dia` | Al cerrar el día: cuenta de marcas par → procesa; impar → excepción pendiente | `SCJ-DEC-01` (aceptada, Opción C) |
+| No traslape de vigencias | `jornada_asignada`, `tope_legal` | Antes de insertar/actualizar una vigencia, valida que no exista otra traslapada | `SCJ-DEC-04` (aceptada, Opción A) |
 
 ---
 
@@ -84,7 +90,7 @@ actualizada.
 
 | Qué cambió | Por qué | Documento actualizado |
 |---|---|---|
-| `marca` usa `id bigint` como PK física, con `evento_id uuid` como llave de negocio aparte | `CONVENCIONES.md` exige PK siempre `id`; `SCJ-DEC-08` (qué debería ser la PK conceptual) sigue sin resolverse | `SCJ-MOD-02 §II.2` |
+| `marca` usa `id bigint` como PK física, con `evento_id uuid` como llave de negocio aparte | `CONVENCIONES.md` exige PK siempre `id`; `SCJ-DEC-08` (Opción B) confirma esto como definitivo | `SCJ-MOD-02 §II.2` |
 | `banco_de_horas.monto`/`.vivo_desde` sólo se escriben por disparador, nunca por `UPDATE` de aplicación | `SCJ-DEC-02` — el total es caché del libro de movimientos, no dato propio | `SCJ-DEC-02` |
 | `tiempo.dia.estado` incluye un cuarto valor, `revisado`, que las opciones de `SCJ-DEC-06` no contemplaban | Un día bloqueado que RH ya revisó necesita distinguirse de uno que nadie ha visto | `SCJ-DEC-06` |
 

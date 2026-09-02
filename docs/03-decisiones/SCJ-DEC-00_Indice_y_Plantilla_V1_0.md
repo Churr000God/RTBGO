@@ -15,14 +15,14 @@ Folio SCJ-DEC-00 · Versión 1.0 · Agosto de 2026
 
 | # | Pregunta | Estado | Última revisión |
 |---|---|---|---|
-| `SCJ-DEC-01` | ¿La paridad se valida con restricción, disparador o aplicación? | Propuesta | — |
+| `SCJ-DEC-01` | ¿La paridad se valida con restricción, disparador o aplicación? | Aceptada | 2026-09-02 |
 | `SCJ-DEC-02` | ¿El saldo del banco de horas se calcula al vuelo o se materializa? | Aceptada | 2026-09-02 |
 | `SCJ-DEC-03` | ¿Versionado, auditoría o eventos para las correcciones? | Aceptada | 2026-09-02 |
-| `SCJ-DEC-04` | ¿Cómo se representan las vigencias y se evita el traslape? | Propuesta | — |
-| `SCJ-DEC-05` | ¿Cómo se modela un flujo de autorización de pasos variables? | Propuesta | — |
+| `SCJ-DEC-04` | ¿Cómo se representan las vigencias y se evita el traslape? | Aceptada | 2026-09-02 |
+| `SCJ-DEC-05` | ¿Cómo se modela un flujo de autorización de pasos variables? | Aceptada | 2026-09-02 |
 | `SCJ-DEC-06` | ¿El día es entidad materializada con estado propio, o estado derivado de sus marcas? | Aceptada | 2026-09-02 |
 | `SCJ-DEC-07` | ¿`requiere_revision`/`motivo_revision` como atributos de la marca, o entidad de excepción? | Aceptada | 2026-09-02 |
-| `SCJ-DEC-08` | ¿`evento_id` es clave primaria de la marca, o alterna junto a una subrogada? | Propuesta | — |
+| `SCJ-DEC-08` | ¿`evento_id` es clave primaria de la marca, o alterna junto a una subrogada? | Aceptada | 2026-09-02 |
 | `SCJ-DEC-09` | ¿Cómo se aplica la unicidad de `terminal_id` + `secuencia_local`, condicional a `origen`? | Aceptada | 2026-09-02 |
 
 ### Estados

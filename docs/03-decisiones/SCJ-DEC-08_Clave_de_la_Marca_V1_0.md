@@ -1,8 +1,8 @@
 # SCJ-DEC-08 · ¿`evento_id` es la clave primaria de la marca, o una clave única alterna junto a una subrogada?
 
-**Estado:** Propuesta
-**Fecha de la decisión:** —
-**Última revisión:** —
+**Estado:** Aceptada
+**Fecha de la decisión:** 2026-09-02
+**Última revisión:** 2026-09-02
 
 ---
 
@@ -49,19 +49,31 @@ de los dos apuntan.
 
 ## Decisión
 
-*(pendiente)*
+**Opción B — subrogada + `evento_id` único.** `marca(id bigint GENERATED ALWAYS AS IDENTITY
+PRIMARY KEY, evento_id uuid UNIQUE NOT NULL, ...)`. Ya estaba implementada así en `02_tiempo.sql`
+como elección física provisional mientras esta decisión seguía abierta; queda confirmada como
+definitiva, sin cambios al DDL.
 
 ---
 
 ## Por qué
 
-*(pendiente)*
+Consistente con la convención universal del repo ("clave primaria siempre `id`", `CONVENCIONES.md
+§II`) y con que `tramo`/`correccion` referencian `marca` con volumen creciente — la PK entera
+secuencial es más compacta para esas claves foráneas que un UUID. El costo de Opción B (dos
+identificadores) se acepta porque `evento_id` sigue siendo `UNIQUE NOT NULL` y resuelve la
+idempotencia igual de bien como llave de negocio.
 
 ---
 
 ## Consecuencias
 
-*(pendiente)*
+- Sin cambios de esquema — el DDL ya implementaba esta opción.
+- Cualquier referencia externa que llegue por `evento_id` (una corrección desde la API, por
+  ejemplo) debe resolverse contra `id` antes de unir con `tramo`/`correccion`/`excepcion`.
+- Queda como convención confirmada para el resto de entidades del proyecto: PK siempre `id`
+  subrogado, llave de negocio externa siempre `UNIQUE` aparte — no hay más entidades con este
+  mismo dilema pendiente.
 
 ---
 

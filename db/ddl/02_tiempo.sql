@@ -3,21 +3,17 @@
 -- Depende de: 00_esquemas.sql, 01_persona_stub.sql
 -- Justificación: SCJ-MOD-03 · Decisiones SCJ-DEC-01 a SCJ-DEC-09
 --
--- Nota de alcance (2026-09-02): SCJ-DEC-01 (mecanismo de validación de paridad), SCJ-DEC-04
--- (congelar el valor calculado de vigencia) y SCJ-DEC-08 (evento_id como PK vs. subrogada) siguen
--- "Propuesta" como documento de decisión completo, pero este DDL sí tenía que elegir algo físico
--- para poder existir:
---   - Vigencias: se implementan como daterange + EXCLUDE gist (Opción A/B de SCJ-DEC-04, ya
---     establecido como tipo estándar en CONVENCIONES.md §II). La Opción C (congelar el valor
---     calculado en cada día) queda pendiente de decidir y no está implementada aquí.
---   - Paridad: no hay restricción que bloquee un número impar de marcas al insertar — un tramo con
---     marca_cierre_id nulo es un tramo abierto, válido. El día queda en estado bloqueado por el
---     proceso de cierre, no por una restricción de la base (consistente con SCJ-DEC-01 Opción D,
---     "no validar: derivar", aunque el documento de decisión sigue sin marcarse como aceptado).
---   - Clave de la marca: se usa id bigint identity como PK (sigue la convención universal de este
---     repo, "clave primaria siempre id") y evento_id uuid como llave de negocio UNIQUE para
---     idempotencia. SCJ-DEC-08 sigue abierto como documento — falta decidir si esto es la
---     respuesta final o si evento_id debería ser la PK.
+-- Nota de alcance (2026-09-02, actualizada): SCJ-DEC-01, SCJ-DEC-04 y SCJ-DEC-08 ya son
+-- Aceptadas y este DDL las refleja:
+--   - Paridad (SCJ-DEC-01, Opción C): no hay restricción que bloquee un número impar de marcas al
+--     insertar — un tramo con marca_cierre_id nulo es un tramo abierto, válido. La cuenta de
+--     marcas por persona/día se valida en la aplicación al cerrar el día, no en la base.
+--   - Vigencias (SCJ-DEC-04, Opción A): `vigente_desde date NOT NULL` + `vigente_hasta date`
+--     (`NULL` = vigente), sin `EXCLUDE GIST`. El traslape se valida en la aplicación antes de
+--     insertar o actualizar una vigencia — ver CONVENCIONES.md §II.
+--   - Clave de la marca (SCJ-DEC-08, Opción B): id bigint identity como PK (convención universal
+--     de este repo, "clave primaria siempre id") y evento_id uuid como llave de negocio UNIQUE
+--     para idempotencia. Confirmada como definitiva, sin cambios de esquema.
 
 -- ============================================================================
 -- Catálogos independientes
@@ -26,14 +22,16 @@
 CREATE TABLE tiempo.tope_legal (
   id               bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   vigente_desde    date NOT NULL,
+  vigente_hasta    date,
   maximo_semanal   numeric(6,2) NOT NULL,
   maximo_extra     numeric(6,2) NOT NULL,
   CONSTRAINT uq_tope_legal_vigente_desde UNIQUE (vigente_desde)
 );
 
 COMMENT ON TABLE tiempo.tope_legal IS
-  'Máximo semanal y de horas extra, con vigencia. El siguiente registro por vigente_desde cierra '
-  'la validez del anterior — no hay columna vigente_hasta. Ver SCJ-ESP-01 §VI.4.';
+  'Máximo semanal y de horas extra, con vigencia. vigente_hasta NULL = vigente actual; el '
+  'traslape entre vigencias se valida en la aplicación (SCJ-DEC-04, Opción A). Ver SCJ-ESP-01 '
+  '§VI.4.';
 
 CREATE TABLE tiempo.dia_festivo (
   id      bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -70,22 +68,23 @@ CREATE TABLE tiempo.jornada_asignada (
   id                              bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   persona_id                      uuid NOT NULL REFERENCES tiempo.persona (id),
   tipo_jornada                    varchar(20) NOT NULL,
-  vigencia                        daterange NOT NULL,
+  vigente_desde                   date NOT NULL,
+  vigente_hasta                   date,
   descuento_comida_fija           boolean NOT NULL DEFAULT false,
   minutos_descuento_comida_fija   int,
   horas_semanales_calculadas      numeric(6,2),
   CONSTRAINT ck_jornada_asignada_tipo
     CHECK (tipo_jornada IN ('normal', 'flexible', 'de_confianza')),
   CONSTRAINT ck_jornada_asignada_descuento_fijo
-    CHECK ((descuento_comida_fija) = (minutos_descuento_comida_fija IS NOT NULL)),
-  EXCLUDE USING gist (persona_id WITH =, vigencia WITH &&)
+    CHECK ((descuento_comida_fija) = (minutos_descuento_comida_fija IS NOT NULL))
 );
 
 COMMENT ON TABLE tiempo.jornada_asignada IS
   'Qué jornada tuvo una persona, con vigencia. normal/flexible siguen el patrón semanal y '
   'registran marca; de_confianza no pasa por terminal, no maneja horas extra ni banco de horas, '
-  'sólo primas dominical/festivo cuando aplique. EXCLUDE evita vigencias traslapadas por persona '
-  '(SCJ-DEC-04).';
+  'sólo primas dominical/festivo cuando aplique. vigente_hasta NULL = vigente actual; el '
+  'traslape entre vigencias de la misma persona se valida en la aplicación, no con EXCLUDE '
+  '(SCJ-DEC-04, Opción A).';
 COMMENT ON COLUMN tiempo.jornada_asignada.horas_semanales_calculadas IS
   'Derivado de patron_semanal — se recalcula al modificar el patrón. No es fuente de verdad.';
 
@@ -139,8 +138,8 @@ COMMENT ON TABLE tiempo.marca IS
   '(SCJ-DEC-03). Nunca guarda huella ni plantilla biométrica — sólo el identificador ya resuelto '
   'a persona_id.';
 COMMENT ON COLUMN tiempo.marca.evento_id IS
-  'Llave de negocio para idempotencia global de reintentos de envío. No es la PK física — ver '
-  'nota de alcance al inicio del archivo (SCJ-DEC-08 sigue abierto).';
+  'Llave de negocio para idempotencia global de reintentos de envío. No es la PK física, por '
+  'decisión confirmada — ver SCJ-DEC-08, Opción B.';
 COMMENT ON COLUMN tiempo.marca.secuencia_local IS
   'Contador del terminal, nulo salvo origen = terminal. Sirve para detectar huecos: si llegan 1, '
   '2 y 4, se perdió la 3. Ver SCJ-DEC-09.';

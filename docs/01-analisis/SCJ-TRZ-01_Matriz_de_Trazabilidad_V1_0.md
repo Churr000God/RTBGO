@@ -33,8 +33,8 @@ que lo demuestra.
 | III.2 | Un día impar se rellena con la jornada pactada de esa persona ese día | *(pendiente de programar — el disparador de cierre no existe todavía)* | | | Pendiente |
 | III.2 | Un día impar queda bloqueado y entra a la cola de excepciones | `dia.estado = 'bloqueado'`, `tiempo.excepcion` | Aplicación (proceso de cierre diario) | | Implementado (estructura) |
 | III.2 | Contar marcas incompletas por persona y periodo | `tiempo.tramo` filtrado por `marca_cierre_id IS NULL` | | | Pendiente (consulta) |
-| III.3 | La jornada asignada tiene vigencia, no es atributo fijo | `jornada_asignada.vigencia` | `daterange` | | Implementado |
-| III.3 | **Un cálculo pasado da el mismo resultado indefinidamente** | `jornada_asignada`, `tope_legal` | Sin `UPDATE` sobre vigencias pasadas (convención, no restricción de base todavía) | `03_calculo_historico.sql` | Pendiente (SCJ-DEC-04 sigue propuesta) |
+| III.3 | La jornada asignada tiene vigencia, no es atributo fijo | `jornada_asignada.vigente_desde`/`vigente_hasta` | Dos columnas de fecha, traslape validado en aplicación (`SCJ-DEC-04`, Opción A) | | Implementado |
+| III.3 | **Un cálculo pasado da el mismo resultado indefinidamente** | `jornada_asignada`, `tope_legal` | Sin `UPDATE` sobre vigencias pasadas (convención, no restricción de base) | `03_calculo_historico.sql` | Pendiente (consulta) |
 | III.3 | El patrón semanal admite horario distinto por día | `patron_semanal` (una fila por `dia_semana`) | | | Implementado |
 | III.3 | El patrón semanal admite jornada partida en varios bloques | `patron_semanal` (varias filas por `dia_semana`) | Aplicación — sin restricción que límite filas por día | | Implementado |
 | III.4 | Los topes legales viven en tabla de vigencias, no como constantes | `tope_legal` | `UNIQUE (vigente_desde)` | | Implementado |

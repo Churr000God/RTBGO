@@ -3,8 +3,6 @@
 -- Depende de: nada
 -- Justificación: SCJ-FRO-01 §II · SCJ-MOD-03 §II
 
-CREATE EXTENSION IF NOT EXISTS btree_gist;
-
 CREATE SCHEMA IF NOT EXISTS personas;
 CREATE SCHEMA IF NOT EXISTS tiempo;
 

@@ -1,8 +1,8 @@
 # SCJ-DEC-01 · ¿La paridad se valida con restricción declarativa, con disparador o en la aplicación?
 
-**Estado:** Propuesta
-**Fecha de la decisión:** —
-**Última revisión:** —
+**Estado:** Aceptada
+**Fecha de la decisión:** 2026-09-02
+**Última revisión:** 2026-09-02
 
 ---
 
@@ -54,19 +54,38 @@ lectura, no hay restricción que imponer.
 
 ## Decisión
 
-*(pendiente)*
+**Opción C — validación en la aplicación, dentro del proceso de cierre del día.**
+
+Al cerrar el día, el sistema cuenta las marcas de la persona en ese día:
+
+- Si el conteo es par (`n % 2 == 0`), el día **procede a carga y cálculo**: emparejamiento de
+  marcas, cómputo de tramos y clasificación de tiempo.
+- Si el conteo es impar (`n % 2 != 0`), el sistema **no calcula**: genera una **excepción
+  pendiente de resolver**, conforme a `SCJ-ESP-01 §VI.2` (rellenar, bloquear, encolar).
 
 ---
 
 ## Por qué
 
-*(pendiente)*
+La paridad no es propiedad de una fila, es de un conjunto, y sólo aplica a día cerrado. Validarla
+en el mismo paso donde ya se procesa el día —emparejar marcas, calcular tramos— evita duplicar
+lógica en otro lugar, es fácil de probar, y no exige forzar un `CHECK` sobre agregados que
+PostgreSQL no soporta de forma declarativa (Opción A) ni esconder la regla en un disparador
+(Opción B). Es la misma lectura de fondo que la Opción D —el día impar no es un error sino un dato
+a resolver por excepción—, sólo que aquí queda como un paso explícito y verificable del proceso de
+cierre, no implícito.
 
 ---
 
 ## Consecuencias
 
-*(pendiente)*
+- El cierre de día queda en tres pasos: (1) contar marcas de la persona en el día, (2) si es par,
+  procesar —emparejar, calcular tramos, clasificar tiempo—, (3) si es impar, crear la excepción y
+  bloquear/encolar sin calcular.
+- Cualquier escritura que no pase por el proceso de cierre de la aplicación queda sin esta
+  validación — riesgo aceptado, ya señalado en el "en contra" de la Opción C.
+- `db/consultas/validacion/01_paridad.sql` queda como auditoría de segunda línea, fuera del flujo
+  normal de cierre.
 
 ---
 
