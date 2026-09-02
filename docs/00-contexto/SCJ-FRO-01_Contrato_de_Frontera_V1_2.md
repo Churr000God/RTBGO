@@ -1,8 +1,15 @@
 # Contrato de frontera entre subsistemas
 
 **Sistema de Control de Jornada**
-Folio SCJ-FRO-01 · Versión 1.1 · 29 de agosto de 2026
+Folio SCJ-FRO-01 · Versión 1.2 · 2 de septiembre de 2026
 
+> **Cambio de la V1.2.** Sesión conjunta con Efren Gómez (Personas) y Luis Picasso (Tiempo):
+> se acepta el §VI, cerrando formalmente la V1.1. Se agrega un caso nuevo a la tabla del §IV —
+> `SCJ-DEC-05` necesita consultar el organigrama de Personas para resolver quién aprueba una
+> ausencia — resuelto en la capa de aplicación con `persona_id`, sin agregar ninguna columna de
+> identidad al esquema de Tiempo, así que no es una excepción nueva al §I, sólo un caso más
+> anticipado y resuelto por el procedimiento del §IV.
+>
 > **Cambio de la V1.1.** Se resuelve §V: `fecha_ingreso` se replica en el subsistema de Tiempo,
 > de sólo lectura, como única excepción a la regla del §I. Motivo y alcance de la excepción en
 > §V. Precisa la regla de §I sin contradecirla en espíritu: sigue siendo cierto que ningún
@@ -97,7 +104,7 @@ El procedimiento:
 | Calcular el descuento por horas no repuestas | El subsistema de Tiempo entrega **horas**. El monto lo calcula quien tiene el salario |
 | Agrupar por área para detectar traslapes de vacaciones | El subsistema de Tiempo tiene un **grupo** propio, sin relación con el organigrama |
 | Saber la antigüedad para calcular días de vacaciones | La **fecha de ingreso** es el único candidato a excepción → ver §V |
-| Saber quién debe aprobar una ausencia (`SCJ-DEC-05`, Opción C) | **Nuevo caso, resuelto 2026-09-02, aún sin validación conjunta.** Se resuelve en la aplicación, consultando `puesto_permiso`/`asignacion` de Personas con `persona_id` — el organigrama y los permisos heredables (RH/responsable hacia arriba en la jerarquía) sí se consultan para esto, a diferencia del caso de "agrupar por área" de arriba. No se replica ningún atributo de identidad en el esquema de Tiempo; la consulta cruza en la capa de aplicación, igual patrón que "mostrar el nombre en un reporte". Autorizado por Diego al cerrar `SCJ-DEC-05`; **falta el mismo paso pendiente que el resto de este documento: sesión conjunta y firma (§VI)** |
+| Saber quién debe aprobar una ausencia (`SCJ-DEC-05`, Opción C) | **Nuevo caso, resuelto y validado en sesión conjunta el 2026-09-02.** Se resuelve en la aplicación, consultando `puesto_permiso`/`asignacion` de Personas con `persona_id` — el organigrama y los permisos heredables (RH/responsable hacia arriba en la jerarquía) sí se consultan para esto, a diferencia del caso de "agrupar por área" de arriba. No se replica ningún atributo de identidad en el esquema de Tiempo; la consulta cruza en la capa de aplicación, igual patrón que "mostrar el nombre en un reporte". Aceptado por ambos subsistemas — ver §VI |
 
 ---
 
@@ -134,8 +141,7 @@ COMMENT ON COLUMN tiempo.persona.fecha_ingreso IS
    Único atributo de identidad que cruza. Ver SCJ-FRO-01 §V.';
 ```
 
-**Estado:** decidido en preparación de la sesión `J1.2`. Pendiente de validación conjunta con el
-compañero del subsistema de Personas antes de darse por aceptado — ver §VI.
+**Estado:** validado en sesión conjunta el 2 de septiembre de 2026 — ver §VI.
 
 ---
 
@@ -143,11 +149,12 @@ compañero del subsistema de Personas antes de darse por aceptado — ver §VI.
 
 | | Nombre | Fecha |
 |---|---|---|
-| Subsistema de Personas | | |
-| Subsistema de Tiempo | | |
+| Subsistema de Personas | Efren Gómez | 2 de septiembre de 2026 |
+| Subsistema de Tiempo | Luis Picasso | 2 de septiembre de 2026 |
 
-Ambos aceptan la regla del §I y el procedimiento del §IV.
+Ambos aceptan la regla del §I y el procedimiento del §IV, incluida la excepción de `SCJ-DEC-05`
+agregada en esta misma sesión.
 
 ---
 
-*Contrato de frontera · Folio SCJ-FRO-01 · V1.1*
+*Contrato de frontera · Folio SCJ-FRO-01 · V1.2*

@@ -111,11 +111,9 @@ Personas ya resuelve.
   vigente al crearse** — no se recalcula contra el permiso actual. Consistente con `SCJ-DEC-04`
   (vigencias): la aplicación debe resolver y **congelar** el aprobador/cadena de aprobación en el
   momento de crear la solicitud, no re-resolverlo en cada consulta posterior.
-- `SCJ-FRO-01 §IV` (tabla de "casos anticipados") queda desactualizado — falta agregar esta fila:
-  "Saber quién debe aprobar una ausencia" → se resuelve en la aplicación consultando
-  `puesto_permiso`/`asignacion` con `persona_id`, cruzando el organigrama por autorización expresa
-  de Diego en esta decisión (no por el procedimiento formal de sesión conjunta del §IV, que sigue
-  pendiente como el resto de la validación de `SCJ-FRO-01`/`SCJ-ACT-01`).
+- `SCJ-FRO-01` sube a **V1.2**: se agregó la fila "Saber quién debe aprobar una ausencia" en su
+  §IV, y quedó validada en la misma sesión conjunta del 2 de septiembre de 2026 (Efren Gómez,
+  Personas; Luis Picasso, Tiempo) que también cerró `SCJ-ACT-01` (J1.1/J1.2).
 
 ---
 
