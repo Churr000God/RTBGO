@@ -1,0 +1,20 @@
+:root {
+  --teal: #159895;
+  --teal-claro: #57c5b6;
+  --blanco: #ffffff;
+  --superficie: #eef8f7;
+  --navy-medio: #1a5f7a;
+  --navy: #002b5b;
+  --oro: #ad9551;
+  --font-titulo: "Playfair Display", serif;
+  --font-cuerpo: "Inter", system-ui, sans-serif;
+  --radio-tarjeta: 14px;
+  --sombra-tarjeta: 0 2px 10px rgba(0, 43, 91, 0.05);
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-cuerpo);
+  color: var(--navy);
+  background: var(--superficie);
+}
