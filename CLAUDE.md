@@ -28,7 +28,9 @@ backend y un frontend que lo exponen. Ver `README.md` y `docs/00-contexto/SCJ-CT
 - **Frontend:** Vite + React + TypeScript, en `frontend/src/` (pages/layouts/router). Manual:
   `cd frontend && npm run dev` (puerto 5173). Tests: `npm test`. `diseno_paginas/` guarda el
   diseño de pantallas (mockups "Kairos") previo a implementarlas — sigue siendo la referencia
-  visual mientras dure el QA módulo por módulo.
+  visual mientras dure el QA módulo por módulo. `lucide-react` es la única librería de iconos del
+  proyecto (sumada en el QA de auth de 2026-09-03 para replicar la capa decorativa de los
+  mockups de login/2FA/recuperación de contraseña).
 - **Docker:** `./scripts/desplegar.sh [dev|prod] <levantar|bajar|reconstruir|registros|pruebas|estado>`
   levanta backend + frontend con `docker compose` (dev con hot reload, prod con nginx sirviendo el
   build). No hay contenedor de base de datos — sigue siendo Supabase remoto. Las `VITE_*` del
