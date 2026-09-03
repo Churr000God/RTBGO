@@ -11,8 +11,10 @@ app.add_middleware(
 )
 
 from app.routers import personas  # noqa: E402
+from app.routers import usuarios  # noqa: E402
 
 app.include_router(personas.router)
+app.include_router(usuarios.router)
 
 
 @app.get("/salud")

@@ -7,6 +7,7 @@ dependencies = [
   "uvicorn[standard]>=0.30",
   "supabase>=2.9",
   "pydantic-settings>=2.5",
+  "email-validator>=2.3.0",
 ]
 
 [dependency-groups]
