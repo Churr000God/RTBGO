@@ -568,6 +568,12 @@ def get_caller_client(
     return client
 ```
 
+Nota para quien implemente: todos los routers de este plan (Tasks 7-10) llaman
+`db.postgrest.schema("personas").table(...)`. Si la versión instalada de `supabase-py` expone el
+atajo `db.schema("personas").table(...)` directo en vez de bajo `.postgrest`, son equivalentes —
+usar el que exista en la librería instalada, reportarlo como concern en el reporte de este task si
+difiere de lo escrito aquí, para ajustar consistentemente en los tasks siguientes.
+
 - [ ] **Step 4: `app/main.py`**
 
 ```python
@@ -687,7 +693,8 @@ from app.main import app
 
 def test_alta_persona_inserta_persona_y_expediente():
     fake_client = MagicMock()
-    fake_client.table.return_value.insert.return_value.execute.return_value.data = [
+    tabla_mock = fake_client.postgrest.schema.return_value.table
+    tabla_mock.return_value.insert.return_value.execute.return_value.data = [
         {
             "id": "11111111-1111-1111-1111-111111111111",
             "primer_nombre": "Mariana",
@@ -724,8 +731,8 @@ def test_alta_persona_inserta_persona_y_expediente():
     app.dependency_overrides.clear()
     assert response.status_code == 201
     assert response.json()["curp"] == "AARM910427MDFLVR03"
-    assert fake_client.table.call_args_list[0].args[0] == "persona"
-    assert fake_client.table.call_args_list[1].args[0] == "expediente"
+    assert tabla_mock.call_args_list[0].args[0] == "persona"
+    assert tabla_mock.call_args_list[1].args[0] == "expediente"
 ```
 
 - [ ] **Step 3: Correr el test y verificar que falla**
@@ -753,7 +760,8 @@ router = APIRouter(prefix="/api/personas", tags=["personas"])
 def alta_persona(datos: PersonaCreate, db: Client = Depends(get_caller_client)) -> dict:
     """SCJ-PRO-01 paso A1: persona + expediente en una misma operación, en ese orden por la FK."""
     persona = (
-        db.table("persona")
+        db.postgrest.schema("personas")
+        .table("persona")
         .insert(
             {
                 "primer_nombre": datos.primer_nombre,
@@ -771,7 +779,7 @@ def alta_persona(datos: PersonaCreate, db: Client = Depends(get_caller_client)) 
         .data[0]
     )
 
-    db.table("expediente").insert(
+    db.postgrest.schema("personas").table("expediente").insert(
         {
             "persona_id": persona["id"],
             "tipo_contrato": datos.tipo_contrato,
@@ -782,7 +790,7 @@ def alta_persona(datos: PersonaCreate, db: Client = Depends(get_caller_client)) 
     return persona
 ```
 
-- [ ] **Step 5: Montar el router y correr `postgrest.schema`**
+- [ ] **Step 5: Montar el router**
 
 ```python
 # backend/app/main.py — agregar tras crear `app`
@@ -792,11 +800,10 @@ app.include_router(personas.router)
 ```
 
 Nota: `supabase-py` apunta por default al esquema `public` de PostgREST. Este proyecto usa el
-esquema `personas` — exponerlo en PostgREST vía Dashboard → **Settings → API → Exposed schemas**,
-agregar `personas` a la lista (junto a `public`), y en cada llamada usar
-`db.postgrest.schema("personas").table(...)` en vez de `db.table(...)` directo. Ajustar
-`alta_persona` para usar `db.postgrest.schema("personas").table("persona")` (y lo mismo en todos
-los routers de los tasks siguientes) antes de probar contra Supabase real.
+esquema `personas` — hay que exponerlo en PostgREST vía Dashboard → **Settings → API → Exposed
+schemas**, agregando `personas` a la lista (junto a `public`), antes de que esto funcione contra
+Supabase real. El código ya usa `db.postgrest.schema("personas").table(...)` en vez de
+`db.table(...)` directo — no hace falta ajustar nada más aquí, solo la configuración del dashboard.
 
 - [ ] **Step 6: Correr el test y verificar que pasa**
 
@@ -865,7 +872,7 @@ def test_alta_usuario_invita_y_crea_fila_usuario():
     fake_invite = MagicMock()
     fake_invite.user.id = "22222222-2222-2222-2222-222222222222"
     fake_client.auth.admin.invite_user_by_email.return_value = fake_invite
-    fake_client.table.return_value.insert.return_value.execute.return_value.data = [
+    fake_client.postgrest.schema.return_value.table.return_value.insert.return_value.execute.return_value.data = [
         {
             "auth_user_id": "22222222-2222-2222-2222-222222222222",
             "persona_id": "11111111-1111-1111-1111-111111111111",
