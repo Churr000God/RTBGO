@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from "react";
 
 import { apiFetch } from "../lib/apiClient";
+import { AppShell } from "../layouts/AppShell";
 
 export function AltaPersonaPage() {
   const [error, setError] = useState<string | null>(null);
@@ -34,43 +35,45 @@ export function AltaPersonaPage() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="contenedor-pagina">
-      <h1>Alta de persona</h1>
-      <label htmlFor="primer_nombre">Primer nombre</label>
-      <input id="primer_nombre" name="primer_nombre" required />
-      <label htmlFor="segundo_nombre">Segundo nombre</label>
-      <input id="segundo_nombre" name="segundo_nombre" />
-      <label htmlFor="apellido_paterno">Apellido paterno</label>
-      <input id="apellido_paterno" name="apellido_paterno" required />
-      <label htmlFor="apellido_materno">Apellido materno</label>
-      <input id="apellido_materno" name="apellido_materno" />
-      <label htmlFor="curp">CURP</label>
-      <input id="curp" name="curp" required maxLength={18} />
-      <label htmlFor="rfc">RFC</label>
-      <input id="rfc" name="rfc" required maxLength={13} />
-      <label htmlFor="nss">NSS</label>
-      <input id="nss" name="nss" required maxLength={11} />
-      <label htmlFor="fecha_nacimiento">Fecha de nacimiento</label>
-      <input id="fecha_nacimiento" name="fecha_nacimiento" type="date" required />
-      <label htmlFor="fecha_ingreso">Fecha de ingreso</label>
-      <input id="fecha_ingreso" name="fecha_ingreso" type="date" required />
-      <fieldset>
-        <legend>Tipo de contrato</legend>
-        <label>
-          <input type="radio" name="tipo_contrato" value="indefinido" defaultChecked /> Indefinido
-        </label>
-        <label>
-          <input type="radio" name="tipo_contrato" value="prestacion_servicios" /> Prestación de
-          servicios
-        </label>
-        <label>
-          <input type="radio" name="tipo_contrato" value="por_proyecto" /> Por proyecto
-        </label>
-      </fieldset>
-      <label htmlFor="documento_ref">documento_ref</label>
-      <input id="documento_ref" name="documento_ref" placeholder="RTB-__-__" required />
-      {error && <p role="alert">{error}</p>}
-      <button type="submit">Registrar alta</button>
-    </form>
+    <AppShell>
+      <form onSubmit={handleSubmit} className="contenedor-pagina">
+        <h1>Alta de persona</h1>
+        <label htmlFor="primer_nombre">Primer nombre</label>
+        <input id="primer_nombre" name="primer_nombre" required />
+        <label htmlFor="segundo_nombre">Segundo nombre</label>
+        <input id="segundo_nombre" name="segundo_nombre" />
+        <label htmlFor="apellido_paterno">Apellido paterno</label>
+        <input id="apellido_paterno" name="apellido_paterno" required />
+        <label htmlFor="apellido_materno">Apellido materno</label>
+        <input id="apellido_materno" name="apellido_materno" />
+        <label htmlFor="curp">CURP</label>
+        <input id="curp" name="curp" required maxLength={18} />
+        <label htmlFor="rfc">RFC</label>
+        <input id="rfc" name="rfc" required maxLength={13} />
+        <label htmlFor="nss">NSS</label>
+        <input id="nss" name="nss" required maxLength={11} />
+        <label htmlFor="fecha_nacimiento">Fecha de nacimiento</label>
+        <input id="fecha_nacimiento" name="fecha_nacimiento" type="date" required />
+        <label htmlFor="fecha_ingreso">Fecha de ingreso</label>
+        <input id="fecha_ingreso" name="fecha_ingreso" type="date" required />
+        <fieldset>
+          <legend>Tipo de contrato</legend>
+          <label>
+            <input type="radio" name="tipo_contrato" value="indefinido" defaultChecked /> Indefinido
+          </label>
+          <label>
+            <input type="radio" name="tipo_contrato" value="prestacion_servicios" /> Prestación de
+            servicios
+          </label>
+          <label>
+            <input type="radio" name="tipo_contrato" value="por_proyecto" /> Por proyecto
+          </label>
+        </fieldset>
+        <label htmlFor="documento_ref">documento_ref</label>
+        <input id="documento_ref" name="documento_ref" placeholder="RTB-__-__" required />
+        {error && <p role="alert">{error}</p>}
+        <button type="submit">Registrar alta</button>
+      </form>
+    </AppShell>
   );
 }

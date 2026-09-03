@@ -31,6 +31,9 @@ export function LoginPage() {
         <input id="correo" name="correo" type="email" required />
         <label htmlFor="contrasena">Contraseña</label>
         <input id="contrasena" name="contrasena" type="password" required />
+        <a href="/olvide-contrasena" style={{ fontSize: "0.85rem", alignSelf: "flex-end" }}>
+          ¿Olvidaste tu contraseña?
+        </a>
         {error && <p role="alert">{error}</p>}
         <button type="submit">Iniciar sesión</button>
       </form>

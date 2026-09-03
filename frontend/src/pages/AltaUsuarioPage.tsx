@@ -1,6 +1,7 @@
 import { type FormEvent, useEffect, useState } from "react";
 
 import { apiFetch } from "../lib/apiClient";
+import { AppShell } from "../layouts/AppShell";
 
 type PersonaOpcion = { id: string; primer_nombre: string; apellido_paterno: string };
 
@@ -36,30 +37,34 @@ export function AltaUsuarioPage() {
 
   if (enviado) {
     return (
-      <p className="contenedor-pagina" style={{ marginTop: "2.5rem" }}>
-        Invitación enviada.
-      </p>
+      <AppShell>
+        <p className="contenedor-pagina" style={{ marginTop: "2.5rem" }}>
+          Invitación enviada.
+        </p>
+      </AppShell>
     );
   }
 
   return (
-    <form onSubmit={handleSubmit} className="contenedor-pagina">
-      <h1>Alta de usuario</h1>
-      <label htmlFor="persona_id">Persona</label>
-      <select id="persona_id" name="persona_id" required>
-        <option value="">Selecciona una persona</option>
-        {personas.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.primer_nombre} {p.apellido_paterno}
-          </option>
-        ))}
-      </select>
-      <label htmlFor="correo">Correo</label>
-      <input id="correo" name="correo" type="email" required />
-      <label htmlFor="nombre_usuario">Nombre de usuario</label>
-      <input id="nombre_usuario" name="nombre_usuario" required />
-      {error && <p role="alert">{error}</p>}
-      <button type="submit">Enviar invitación</button>
-    </form>
+    <AppShell>
+      <form onSubmit={handleSubmit} className="contenedor-pagina">
+        <h1>Alta de usuario</h1>
+        <label htmlFor="persona_id">Persona</label>
+        <select id="persona_id" name="persona_id" required>
+          <option value="">Selecciona una persona</option>
+          {personas.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.primer_nombre} {p.apellido_paterno}
+            </option>
+          ))}
+        </select>
+        <label htmlFor="correo">Correo</label>
+        <input id="correo" name="correo" type="email" required />
+        <label htmlFor="nombre_usuario">Nombre de usuario</label>
+        <input id="nombre_usuario" name="nombre_usuario" required />
+        {error && <p role="alert">{error}</p>}
+        <button type="submit">Enviar invitación</button>
+      </form>
+    </AppShell>
   );
 }
