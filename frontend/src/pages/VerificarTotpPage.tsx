@@ -39,6 +39,9 @@ export function VerificarTotpPage({ factorId }: Props) {
         {error && <p role="alert">{error}</p>}
         <button type="submit">Verificar</button>
       </form>
+      <a href="/" style={{ fontSize: "0.85rem" }}>
+        Volver al inicio de sesión
+      </a>
     </AuthLayout>
   );
 }

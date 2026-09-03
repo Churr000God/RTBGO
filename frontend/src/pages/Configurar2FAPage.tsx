@@ -8,13 +8,28 @@ export function Configurar2FAPage() {
   const [qr, setQr] = useState<string | null>(null);
   const [factorId, setFactorId] = useState<string | null>(null);
   const [listoParaVerificar, setListoParaVerificar] = useState(false);
+  const [yaConfigurado, setYaConfigurado] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase.auth.mfa.enroll({ factorType: "totp" }).then(({ data, error }) => {
-      if (!error && data) {
-        setQr(data.totp.qr_code);
-        setFactorId(data.id);
+    supabase.auth.mfa.listFactors().then(({ data, error: errorListado }) => {
+      if (errorListado) {
+        setError("No se pudo comprobar el estado de tu verificación en dos pasos.");
+        return;
       }
+      const yaTieneTotp = data?.totp.some((factor) => factor.status === "verified");
+      if (yaTieneTotp) {
+        setYaConfigurado(true);
+        return;
+      }
+      supabase.auth.mfa.enroll({ factorType: "totp" }).then(({ data: enrolado, error: errorEnroll }) => {
+        if (errorEnroll || !enrolado) {
+          setError("No se pudo generar el código. Intenta de nuevo.");
+          return;
+        }
+        setQr(enrolado.totp.qr_code);
+        setFactorId(enrolado.id);
+      });
     });
   }, []);
 
@@ -22,9 +37,19 @@ export function Configurar2FAPage() {
     return <VerificarTotpPage factorId={factorId} />;
   }
 
+  if (yaConfigurado) {
+    return (
+      <AuthLayout titulo="Protege tu cuenta" bajada="Escanea el código con tu app autenticadora.">
+        <p>Tu cuenta ya tiene la verificación en dos pasos activa.</p>
+        <a href="/personas">Ir a Personas</a>
+      </AuthLayout>
+    );
+  }
+
   return (
     <AuthLayout titulo="Protege tu cuenta" bajada="Escanea el código con tu app autenticadora.">
-      {qr ? (
+      {error && <p role="alert">{error}</p>}
+      {!error && (qr ? (
         <>
           <img src={qr} alt="Código QR para configurar 2FA" />
           <button type="button" onClick={() => setListoParaVerificar(true)}>
@@ -33,7 +58,7 @@ export function Configurar2FAPage() {
         </>
       ) : (
         <p>Generando código…</p>
-      )}
+      ))}
     </AuthLayout>
   );
 }

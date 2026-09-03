@@ -5,6 +5,7 @@ import { AuthLayout } from "../layouts/AuthLayout";
 
 export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
+  const [mostrarContrasena, setMostrarContrasena] = useState(false);
 
   async function handleSubmit(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
@@ -40,7 +41,19 @@ export function LoginPage() {
         <label htmlFor="correo">Correo electrónico</label>
         <input id="correo" name="correo" type="email" required />
         <label htmlFor="contrasena">Contraseña</label>
-        <input id="contrasena" name="contrasena" type="password" required />
+        <input
+          id="contrasena"
+          name="contrasena"
+          type={mostrarContrasena ? "text" : "password"}
+          required
+        />
+        <button
+          type="button"
+          onClick={() => setMostrarContrasena((v) => !v)}
+          style={{ alignSelf: "flex-end" }}
+        >
+          {mostrarContrasena ? "Ocultar" : "Mostrar"}
+        </button>
         <a href="/olvide-contrasena" style={{ fontSize: "0.85rem", alignSelf: "flex-end" }}>
           ¿Olvidaste tu contraseña?
         </a>
