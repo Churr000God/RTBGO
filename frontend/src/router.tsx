@@ -1,5 +1,7 @@
 import { createBrowserRouter } from "react-router-dom";
 
+import { AltaPersonaPage } from "./pages/AltaPersonaPage";
+import { AltaUsuarioPage } from "./pages/AltaUsuarioPage";
 import { CompletarInvitacionPage } from "./pages/CompletarInvitacionPage";
 import { Configurar2FAPage } from "./pages/Configurar2FAPage";
 import { CuentaSuspendidaPage } from "./pages/CuentaSuspendidaPage";
@@ -16,4 +18,6 @@ export const router = createBrowserRouter([
   { path: "/restablecer-contrasena", element: <RestablecerContrasenaPage /> },
   { path: "/completar-invitacion", element: <CompletarInvitacionPage /> },
   { path: "/personas", element: <DirectorioPersonasPage /> },
+  { path: "/personas/nueva", element: <AltaPersonaPage /> },
+  { path: "/usuarios/nuevo", element: <AltaUsuarioPage /> },
 ]);
