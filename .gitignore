@@ -45,3 +45,7 @@ npm-debug.log*
 # Estado local de skills/agentes (no es parte del código del proyecto)
 .impeccable/
 .superpowers/
+
+# Capturas de QA manual (sólo el reporte .md se versiona)
+qa/capturas/*
+!qa/capturas/.gitkeep
