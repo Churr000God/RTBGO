@@ -29,3 +29,8 @@ class PersonaOut(BaseModel):
     fecha_nacimiento: date
     fecha_ingreso: date
     estado: str
+
+
+class PersonaConExpediente(PersonaOut):
+    tipo_contrato: str
+    documento_ref: str

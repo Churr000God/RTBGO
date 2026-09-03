@@ -48,3 +48,59 @@ def test_alta_persona_inserta_persona_y_expediente():
     assert response.json()["curp"] == "AARM910427MDFLVR03"
     assert tabla_mock.call_args_list[0].args[0] == "persona"
     assert tabla_mock.call_args_list[1].args[0] == "expediente"
+
+
+def test_listar_personas():
+    fake_client = MagicMock()
+    fake_client.postgrest.schema.return_value.table.return_value.select.return_value.execute.return_value.data = [
+        {
+            "id": "11111111-1111-1111-1111-111111111111",
+            "primer_nombre": "Mariana",
+            "segundo_nombre": None,
+            "apellido_paterno": "Alcántara",
+            "apellido_materno": None,
+            "curp": "AARM910427MDFLVR03",
+            "rfc": "AARM910427H8A",
+            "nss": "62119145338",
+            "fecha_nacimiento": "1991-04-27",
+            "fecha_ingreso": "2026-01-01",
+            "estado": "activo",
+        }
+    ]
+    app.dependency_overrides[get_caller_client] = lambda: fake_client
+
+    client = TestClient(app)
+    response = client.get("/api/personas", headers={"Authorization": "Bearer fake-token"})
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200
+    assert len(response.json()) == 1
+
+
+def test_ficha_persona_incluye_expediente():
+    fake_client = MagicMock()
+    fake_client.postgrest.schema.return_value.table.return_value.select.return_value.eq.return_value.single.return_value.execute.return_value.data = {
+        "id": "11111111-1111-1111-1111-111111111111",
+        "primer_nombre": "Mariana",
+        "segundo_nombre": None,
+        "apellido_paterno": "Alcántara",
+        "apellido_materno": None,
+        "curp": "AARM910427MDFLVR03",
+        "rfc": "AARM910427H8A",
+        "nss": "62119145338",
+        "fecha_nacimiento": "1991-04-27",
+        "fecha_ingreso": "2026-01-01",
+        "estado": "activo",
+        "expediente": {"tipo_contrato": "indefinido", "documento_ref": "RTB-2026-001"},
+    }
+    app.dependency_overrides[get_caller_client] = lambda: fake_client
+
+    client = TestClient(app)
+    response = client.get(
+        "/api/personas/11111111-1111-1111-1111-111111111111",
+        headers={"Authorization": "Bearer fake-token"},
+    )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200
+    assert response.json()["documento_ref"] == "RTB-2026-001"

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from supabase import Client
 
 from app.deps import get_caller_client
-from app.schemas.personas import PersonaCreate, PersonaOut
+from app.schemas.personas import PersonaConExpediente, PersonaCreate, PersonaOut
 
 router = APIRouter(prefix="/api/personas", tags=["personas"])
 
@@ -39,3 +39,23 @@ def alta_persona(datos: PersonaCreate, db: Client = Depends(get_caller_client)) 
     ).execute()
 
     return persona
+
+
+@router.get("", response_model=list[PersonaOut])
+def listar_personas(db: Client = Depends(get_caller_client)) -> list[dict]:
+    return db.postgrest.schema("personas").table("persona").select("*").execute().data
+
+
+@router.get("/{persona_id}", response_model=PersonaConExpediente)
+def ficha_persona(persona_id: str, db: Client = Depends(get_caller_client)) -> dict:
+    fila = (
+        db.postgrest.schema("personas")
+        .table("persona")
+        .select("*, expediente(tipo_contrato, documento_ref)")
+        .eq("id", persona_id)
+        .single()
+        .execute()
+        .data
+    )
+    expediente = fila.pop("expediente")
+    return {**fila, **expediente}
