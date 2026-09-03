@@ -16,9 +16,14 @@
 #   scripts/desplegar.sh prod levantar     # producción, nginx + uvicorn sin --reload
 #   scripts/desplegar.sh dev pruebas       # corre pytest y vitest dentro de los contenedores
 #   scripts/desplegar.sh dev registros     # sigue los logs de ambos servicios
+#
+# 'prod pruebas' no existe: la imagen prod del backend no tiene pytest
+# (--no-dev) y el frontend prod es nginx sin npm. Pruebas siempre corren
+# contra las imágenes dev.
 
 set -euo pipefail
 
+SCRIPT_ABSOLUTO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$RAIZ"
 
@@ -26,7 +31,7 @@ ENTORNOS_VALIDOS=("dev" "prod")
 ACCIONES_VALIDAS=("levantar" "bajar" "reconstruir" "registros" "pruebas" "estado")
 
 uso() {
-  sed -n '2,20p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '2,22p' "$SCRIPT_ABSOLUTO" | sed 's/^# \{0,1\}//'
   exit 1
 }
 
@@ -158,6 +163,13 @@ case "$ACCION" in
     ;;
 
   pruebas)
+    if [[ "$ENTORNO" == "prod" ]]; then
+      echo "Error: 'prod pruebas' no es soportado." >&2
+      echo "  La imagen prod del backend se instala con --no-dev (sin pytest) y el" >&2
+      echo "  frontend prod es nginx sirviendo el bundle compilado (sin npm/node)." >&2
+      echo "  Corre las pruebas con: scripts/desplegar.sh dev pruebas" >&2
+      exit 1
+    fi
     echo "== Backend (pytest) =="
     compose exec backend uv run pytest
     echo
