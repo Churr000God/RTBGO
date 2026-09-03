@@ -35,11 +35,15 @@ export function AltaUsuarioPage() {
   }
 
   if (enviado) {
-    return <p>Invitación enviada.</p>;
+    return (
+      <p className="contenedor-pagina" style={{ marginTop: "2.5rem" }}>
+        Invitación enviada.
+      </p>
+    );
   }
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form onSubmit={handleSubmit} className="contenedor-pagina">
       <h1>Alta de usuario</h1>
       <label htmlFor="persona_id">Persona</label>
       <select id="persona_id" name="persona_id" required>

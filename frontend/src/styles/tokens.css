@@ -18,3 +18,136 @@ body {
   color: var(--navy);
   background: var(--superficie);
 }
+
+/* Estilo base: cubre todas las pantallas sin que cada página repita clases propias. */
+
+h1, h2, h3 {
+  font-family: var(--font-titulo);
+  margin: 0 0 0.5rem;
+}
+
+p {
+  margin: 0 0 1rem;
+  line-height: 1.5;
+}
+
+a {
+  color: var(--teal);
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--navy-medio);
+  margin-bottom: 0.35rem;
+}
+
+input, select, textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid rgba(0, 43, 91, 0.15);
+  border-radius: 10px;
+  font-family: var(--font-cuerpo);
+  font-size: 0.95rem;
+  color: var(--navy);
+  background: var(--blanco);
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--teal);
+  box-shadow: 0 0 0 3px rgba(21, 152, 149, 0.15);
+}
+
+textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+fieldset {
+  border: 1px solid rgba(0, 43, 91, 0.15);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+}
+
+fieldset label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 400;
+  color: var(--navy);
+  margin-bottom: 0.5rem;
+}
+
+fieldset label:last-child {
+  margin-bottom: 0;
+}
+
+fieldset input[type="radio"] {
+  width: auto;
+}
+
+button {
+  font-family: var(--font-cuerpo);
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding: 0.75rem 1.25rem;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+}
+
+button[type="submit"] {
+  background: var(--teal);
+  color: var(--blanco);
+}
+
+button[type="submit"]:hover {
+  background: var(--navy-medio);
+}
+
+p[role="alert"] {
+  color: #b3261e;
+  background: #fdecea;
+  border-radius: 8px;
+  padding: 0.6rem 0.85rem;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--blanco);
+  border-radius: var(--radio-tarjeta);
+  overflow: hidden;
+}
+
+th, td {
+  text-align: left;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgba(0, 43, 91, 0.08);
+}
+
+th {
+  color: var(--navy-medio);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* Contenedor para las páginas internas (directorio, fichas, formularios de alta) — las
+   pantallas de autenticación no lo usan, tienen su propio layout de pantalla completa. */
+.contenedor-pagina {
+  max-width: 720px;
+  margin: 2.5rem auto;
+  padding: 0 1.5rem;
+}

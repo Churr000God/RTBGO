@@ -26,7 +26,7 @@ export function CambiarEstadoPage() {
   }
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form onSubmit={handleSubmit} className="contenedor-pagina">
       <h1>Cambio de estado</h1>
       <fieldset>
         <legend>Nuevo estado</legend>

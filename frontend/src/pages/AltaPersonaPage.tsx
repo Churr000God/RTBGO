@@ -34,7 +34,7 @@ export function AltaPersonaPage() {
   }
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form onSubmit={handleSubmit} className="contenedor-pagina">
       <h1>Alta de persona</h1>
       <label htmlFor="primer_nombre">Primer nombre</label>
       <input id="primer_nombre" name="primer_nombre" required />

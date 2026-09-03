@@ -19,7 +19,7 @@ export function DirectorioPersonasPage() {
   }, []);
 
   return (
-    <div>
+    <div className="contenedor-pagina">
       <h1>Personas</h1>
       <table>
         <thead>

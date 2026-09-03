@@ -34,10 +34,16 @@ export function FichaPersonaPage() {
       .then(setMovimientos);
   }, [id]);
 
-  if (!persona) return <p>Cargando…</p>;
+  if (!persona) {
+    return (
+      <p className="contenedor-pagina" style={{ marginTop: "2.5rem" }}>
+        Cargando…
+      </p>
+    );
+  }
 
   return (
-    <div>
+    <div className="contenedor-pagina">
       <h1>
         {persona.primer_nombre} {persona.apellido_paterno}
       </h1>
