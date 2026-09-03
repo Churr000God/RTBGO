@@ -34,6 +34,7 @@ def test_alta_usuario_invita_y_crea_fila_usuario():
     app.dependency_overrides.clear()
     assert response.status_code == 201
     fake_client.auth.admin.invite_user_by_email.assert_called_once_with(
-        "mariana.alcantara@example.com"
+        "mariana.alcantara@example.com",
+        {"redirect_to": "http://localhost:5173/completar-invitacion"},
     )
     assert response.json()["auth_user_id"] == "22222222-2222-2222-2222-222222222222"
