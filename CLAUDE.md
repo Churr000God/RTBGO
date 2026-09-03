@@ -33,7 +33,10 @@ backend y un frontend que lo exponen. Ver `README.md` y `docs/00-contexto/SCJ-CT
   levanta backend + frontend con `docker compose` (dev con hot reload, prod con nginx sirviendo el
   build). No hay contenedor de base de datos — sigue siendo Supabase remoto. Las `VITE_*` del
   frontend son variables de **build**, no de runtime: cambiarlas en prod exige `--build`, no basta
-  reiniciar el contenedor.
+  reiniciar el contenedor. `prod pruebas` **no existe** — la imagen prod del backend se instala con
+  `--no-dev` (sin pytest) y el frontend prod es nginx sirviendo el bundle (sin npm/node); el script
+  corta con un mensaje explícito en vez de fallar con un error de `docker exec`. Las pruebas
+  siempre corren con `dev pruebas`.
 - **Tests:** backend `uv run pytest` (7 casos), frontend `npm test` (9 casos). Ambos corren igual
   dentro de los contenedores (`./scripts/desplegar.sh <entorno> pruebas`).
 - **Módulo Personas y Usuarios (`SCJ-PRO-01`/`SCJ-PRO-02`):** entregado el 3 de septiembre de 2026,

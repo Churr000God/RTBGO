@@ -75,8 +75,9 @@ Levanta backend (`http://localhost:8000`, hot reload) y frontend (`http://localh
 reload). Sin base de datos local — los dos contenedores le hablan a Supabase remoto con las
 credenciales del paso 0. Otras acciones: `bajar`, `reconstruir`, `registros`, `pruebas`, `estado`.
 Para producción (nginx sirviendo el build en `:8080`): `./scripts/desplegar.sh prod levantar` — las
-`VITE_*` son variables de *build*, cambiarlas exige `--build`, no basta reiniciar. Detalle completo
-en `CLAUDE.md` §"Stack y cómo correrlo".
+`VITE_*` son variables de *build*, cambiarlas exige `--build`, no basta reiniciar. `prod pruebas` no
+existe (la imagen prod no tiene pytest ni npm) — las pruebas siempre corren con `dev pruebas`. Detalle
+completo en `CLAUDE.md` §"Stack y cómo correrlo".
 
 ### Vía B — manual, sin Docker
 
