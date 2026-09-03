@@ -13,6 +13,7 @@ sin pasar por esta lista es una pregunta que nadie va a recordar en octubre.**
 | # | Pregunta | Levantada en | Fecha | Bloquea a |
 |---|---|---|---|---|
 | 01 | `ausencia.estado_autorizacion` se implementó como un solo campo (`pendiente`/`autorizada`/`rechazada`) para poder programar algo — pero `SCJ-DEC-05` exige un flujo de pasos variables configurable. ¿Se sustituye esa columna cuando DEC-05 se resuelva, y qué pasa con las filas ya cargadas? | Sesión 2026-09-02, al implementar `db/ddl/02_tiempo.sql` | 2 sep | `SCJ-DEC-05` |
+| 02 | `POST /api/usuarios` (`backend/app/routers/usuarios.py:11`) usa `get_service_client` (service_role) sin ningún chequeo de autenticación ni autorización — cualquiera que alcance el endpoint puede invitar un usuario y atarlo al `persona_id` que quiera. Además, `personas.fn_caller_activo()` (la única RLS de `personas`) sólo valida "el caller tiene una persona activa detrás", sin distinción de rol — no existe en el proyecto ningún concepto de permiso/rol todavía (`puesto`/`área`/`permiso` quedaron fuera de alcance de `SCJ-PRO-01`). ¿Se gatea `alta_usuario` a `get_caller_client` + una RLS con rol admin explícito, o se introduce un modelo de permisos antes? Auditoría completa en bitácora de la sesión de QA de auth (2026-09-03). | Auditoría de seguridad, sesión `security` (rol) | 3 sep | ninguna decisión previa — abre una nueva |
 
 ---
 
