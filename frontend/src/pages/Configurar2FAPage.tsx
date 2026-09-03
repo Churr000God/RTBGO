@@ -7,6 +7,7 @@ import { VerificarTotpPage } from "./VerificarTotpPage";
 export function Configurar2FAPage() {
   const [qr, setQr] = useState<string | null>(null);
   const [factorId, setFactorId] = useState<string | null>(null);
+  const [listoParaVerificar, setListoParaVerificar] = useState(false);
 
   useEffect(() => {
     supabase.auth.mfa.enroll({ factorType: "totp" }).then(({ data, error }) => {
@@ -17,13 +18,22 @@ export function Configurar2FAPage() {
     });
   }, []);
 
-  if (factorId) {
+  if (factorId && listoParaVerificar) {
     return <VerificarTotpPage factorId={factorId} />;
   }
 
   return (
     <AuthLayout titulo="Protege tu cuenta" bajada="Escanea el código con tu app autenticadora.">
-      {qr ? <img src={qr} alt="Código QR para configurar 2FA" /> : <p>Generando código…</p>}
+      {qr ? (
+        <>
+          <img src={qr} alt="Código QR para configurar 2FA" />
+          <button type="button" onClick={() => setListoParaVerificar(true)}>
+            Ya la agregué, continuar
+          </button>
+        </>
+      ) : (
+        <p>Generando código…</p>
+      )}
     </AuthLayout>
   );
 }
