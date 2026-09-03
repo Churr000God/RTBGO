@@ -10,6 +10,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from app.routers import personas  # noqa: E402
+
+app.include_router(personas.router)
+
 
 @app.get("/salud")
 def salud() -> dict:
