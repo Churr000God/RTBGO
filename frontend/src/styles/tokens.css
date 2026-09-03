@@ -151,3 +151,213 @@ th {
   margin: 2.5rem auto;
   padding: 0 1.5rem;
 }
+
+/* Capa decorativa de las pantallas de autenticación — iconos en campos, badges,
+   medidor de fuerza, tarjeta de error — replicada de diseno_paginas/personas/. */
+
+.campo-con-icono {
+  position: relative;
+}
+
+.campo-con-icono svg.icono-campo {
+  position: absolute;
+  left: 0.85rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--teal);
+  pointer-events: none;
+}
+
+.campo-con-icono input {
+  padding-left: 2.6rem;
+}
+
+.campo-con-icono button.boton-ojo {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  padding: 0.35rem;
+  color: var(--navy-medio);
+  cursor: pointer;
+  display: flex;
+}
+
+.wordmark {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.wordmark .icono-reloj {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.12);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.insignia {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  width: fit-content;
+}
+
+.insignia--clara {
+  background: rgba(255, 255, 255, 0.12);
+  color: white;
+}
+
+.insignia--exito {
+  background: rgba(21, 152, 149, 0.12);
+  color: var(--teal);
+  margin-bottom: 1rem;
+}
+
+.tarjeta-error {
+  background: #fdecea;
+  border: 1px solid rgba(179, 38, 30, 0.2);
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+  color: #b3261e;
+}
+
+.tarjeta-error strong {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.35rem;
+}
+
+.tarjeta-error p {
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.tarjeta-error .intentos-restantes {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(179, 38, 30, 0.15);
+  font-size: 0.82rem;
+  opacity: 0.85;
+}
+
+.tarjeta-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  background: var(--superficie);
+  border-radius: 8px;
+  padding: 0.7rem 0.85rem;
+  font-size: 0.85rem;
+  color: var(--navy-medio);
+}
+
+.tarjeta-info svg {
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+  color: var(--teal);
+}
+
+.texto-ayuda {
+  border-top: 1px solid rgba(0, 43, 91, 0.08);
+  margin-top: 0.5rem;
+  padding-top: 1rem;
+  font-size: 0.85rem;
+  color: var(--navy-medio);
+  text-align: center;
+}
+
+button.boton-con-icono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.medidor-fuerza {
+  margin: -0.5rem 0 0;
+}
+
+.medidor-fuerza .barras {
+  display: flex;
+  gap: 0.3rem;
+  margin: 0.35rem 0;
+}
+
+.medidor-fuerza .barra {
+  height: 4px;
+  flex: 1;
+  border-radius: 2px;
+  background: rgba(0, 43, 91, 0.12);
+}
+
+.medidor-fuerza .barra.activa-debil {
+  background: #b3261e;
+}
+
+.medidor-fuerza .barra.activa-media {
+  background: var(--oro);
+}
+
+.medidor-fuerza .barra.activa-fuerte {
+  background: var(--teal);
+}
+
+.medidor-fuerza .etiqueta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  color: var(--navy-medio);
+}
+
+.lista-requisitos {
+  list-style: none;
+  margin: 0;
+  padding: 0.75rem;
+  background: var(--superficie);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.lista-requisitos li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--navy-medio);
+}
+
+.lista-requisitos li.cumplido {
+  color: var(--navy);
+}
+
+.lista-requisitos li.cumplido svg {
+  color: var(--teal);
+}
+
+.lista-requisitos li svg {
+  color: rgba(0, 43, 91, 0.25);
+  flex-shrink: 0;
+}
+
+@keyframes girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.icono-girando {
+  animation: girar 1s linear infinite;
+}

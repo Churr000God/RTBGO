@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
+import { AlertCircle, ArrowRight, Loader2, ShieldCheck } from "lucide-react";
 
 import { AuthLayout } from "../layouts/AuthLayout";
 import { supabase } from "../lib/supabaseClient";
 import { VerificarTotpPage } from "./VerificarTotpPage";
+
+const INSIGNIA_PASO = { icono: ShieldCheck, texto: "Paso 2 de 3 · Seguridad" };
 
 export function Configurar2FAPage() {
   const [qr, setQr] = useState<string | null>(null);
@@ -39,25 +42,51 @@ export function Configurar2FAPage() {
 
   if (yaConfigurado) {
     return (
-      <AuthLayout titulo="Protege tu cuenta" bajada="Escanea el código con tu app autenticadora.">
-        <p>Tu cuenta ya tiene la verificación en dos pasos activa.</p>
-        <a href="/personas">Ir a Personas</a>
+      <AuthLayout
+        titulo="Protege tu cuenta"
+        bajada="Escanea el código con tu app autenticadora."
+        insignia={INSIGNIA_PASO}
+      >
+        <p className="tarjeta-info">
+          <ShieldCheck size={16} aria-hidden="true" />
+          Tu cuenta ya tiene la verificación en dos pasos activa.
+        </p>
+        <a href="/personas" className="boton-con-icono">
+          Ir a Personas
+          <ArrowRight size={14} aria-hidden="true" />
+        </a>
       </AuthLayout>
     );
   }
 
   return (
-    <AuthLayout titulo="Protege tu cuenta" bajada="Escanea el código con tu app autenticadora.">
-      {error && <p role="alert">{error}</p>}
+    <AuthLayout
+      titulo="Protege tu cuenta"
+      bajada="Escanea el código con tu app autenticadora."
+      insignia={INSIGNIA_PASO}
+    >
+      {error && (
+        <div className="tarjeta-error" role="alert">
+          <strong>
+            <AlertCircle size={16} aria-hidden="true" />
+            No se pudo continuar
+          </strong>
+          <p>{error}</p>
+        </div>
+      )}
       {!error && (qr ? (
         <>
           <img src={qr} alt="Código QR para configurar 2FA" />
-          <button type="button" onClick={() => setListoParaVerificar(true)}>
+          <button type="button" className="boton-con-icono" onClick={() => setListoParaVerificar(true)}>
             Ya la agregué, continuar
+            <ArrowRight size={16} aria-hidden="true" />
           </button>
         </>
       ) : (
-        <p>Generando código…</p>
+        <p className="boton-con-icono">
+          <Loader2 size={16} className="icono-girando" aria-hidden="true" />
+          Generando código…
+        </p>
       ))}
     </AuthLayout>
   );

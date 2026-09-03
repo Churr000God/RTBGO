@@ -1,12 +1,21 @@
 import type { ReactNode } from "react";
+import { Clock } from "lucide-react";
+
+type Insignia = {
+  icono: typeof Clock;
+  texto: string;
+};
 
 type Props = {
   titulo: string;
   bajada: string;
+  insignia?: Insignia;
   children: ReactNode;
 };
 
-export function AuthLayout({ titulo, bajada, children }: Props) {
+export function AuthLayout({ titulo, bajada, insignia, children }: Props) {
+  const IconoInsignia = insignia?.icono;
+
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
       <aside
@@ -21,8 +30,19 @@ export function AuthLayout({ titulo, bajada, children }: Props) {
           justifyContent: "space-between",
         }}
       >
-        <strong style={{ fontFamily: "var(--font-titulo)", fontSize: "1.5rem" }}>Kairos</strong>
+        <span className="wordmark">
+          <span className="icono-reloj">
+            <Clock size={18} color="white" aria-hidden="true" />
+          </span>
+          <strong style={{ fontFamily: "var(--font-titulo)", fontSize: "1.5rem" }}>Kairos</strong>
+        </span>
         <div>
+          {insignia && IconoInsignia && (
+            <span className="insignia insignia--clara">
+              <IconoInsignia size={14} aria-hidden="true" />
+              {insignia.texto}
+            </span>
+          )}
           <h1 style={{ fontFamily: "var(--font-titulo)", fontSize: "2.5rem" }}>{titulo}</h1>
           <p>{bajada}</p>
         </div>

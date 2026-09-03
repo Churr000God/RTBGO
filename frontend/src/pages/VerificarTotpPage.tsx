@@ -1,4 +1,5 @@
 import { type FormEvent, useState } from "react";
+import { ArrowLeft, ArrowRight, ShieldCheck } from "lucide-react";
 
 import { AuthLayout } from "../layouts/AuthLayout";
 import { supabase } from "../lib/supabaseClient";
@@ -33,13 +34,22 @@ export function VerificarTotpPage({ factorId }: Props) {
 
   return (
     <AuthLayout titulo="Verifica tu identidad" bajada="Ingresa el código de tu app autenticadora.">
+      <span className="insignia insignia--exito">
+        <ShieldCheck size={14} aria-hidden="true" />
+      </span>
+      <h2>Verificación en dos pasos</h2>
+      <p>Abre tu app autenticadora e ingresa el código de 6 dígitos que aparece para Kairos.</p>
       <form onSubmit={handleSubmit}>
         <label htmlFor="codigo">Código de verificación</label>
         <input id="codigo" name="codigo" inputMode="numeric" maxLength={6} required />
         {error && <p role="alert">{error}</p>}
-        <button type="submit">Verificar</button>
+        <button type="submit" className="boton-con-icono">
+          Verificar
+          <ArrowRight size={16} aria-hidden="true" />
+        </button>
       </form>
-      <a href="/" style={{ fontSize: "0.85rem" }}>
+      <a href="/" className="boton-con-icono" style={{ fontSize: "0.85rem" }}>
+        <ArrowLeft size={14} aria-hidden="true" />
         Volver al inicio de sesión
       </a>
     </AuthLayout>
