@@ -43,23 +43,47 @@ el subsistema de Tiempo referencia a las personas **exclusivamente por un identi
 ## Cómo levantar el proyecto
 
 La base de datos vive en **Supabase** (Postgres administrado). No hay Postgres local ni
-contenedor de base de datos: el DDL corre contra el proyecto de Supabase, directo.
+contenedor de base de datos: el DDL corre contra el proyecto de Supabase, directo. Backend y
+frontend sí se pueden levantar en contenedores.
 
 ### Requisitos
 
 - Una cuenta y un proyecto de Supabase (gratis para desarrollo), **propio de este proyecto** — no
   se comparte con ningún entorno operativo
-- Python 3.11 o superior, gestionado con `uv` *(sólo para el generador de datos sintéticos)*
+- Python 3.11 o superior, gestionado con `uv` *(sólo para el generador de datos sintéticos y para
+  correr el backend manualmente)*
+- Docker + Docker Compose *(vía A, recomendada)*, o Node.js 22+ *(vía B, manual)*
 
 ### 0. Configurar la conexión
 
 ```bash
 cp .env.example .env
+cp frontend/.env.example frontend/.env
 ```
 
 Llena `DATABASE_URL` con la cadena de conexión del proyecto (Dashboard → Project Settings →
-Database → Connection string) y las dos llaves de API (Project Settings → API). `.env` ya está en
-`.gitignore`.
+Database → Connection string), las dos llaves de API (Project Settings → API) en `.env`, y las
+mismas llaves con prefijo `VITE_` en `frontend/.env`. Ambos `.env` ya están en `.gitignore`.
+
+### Vía A — Docker (recomendada, un comando)
+
+```bash
+./scripts/desplegar.sh dev levantar
+```
+
+Levanta backend (`http://localhost:8000`, hot reload) y frontend (`http://localhost:5173`, hot
+reload). Sin base de datos local — los dos contenedores le hablan a Supabase remoto con las
+credenciales del paso 0. Otras acciones: `bajar`, `reconstruir`, `registros`, `pruebas`, `estado`.
+Para producción (nginx sirviendo el build en `:8080`): `./scripts/desplegar.sh prod levantar` — las
+`VITE_*` son variables de *build*, cambiarlas exige `--build`, no basta reiniciar. Detalle completo
+en `CLAUDE.md` §"Stack y cómo correrlo".
+
+### Vía B — manual, sin Docker
+
+```bash
+cd backend && uv run uvicorn app.main:app --reload --port 8000    # terminal 1
+cd frontend && npm install && npm run dev                          # terminal 2
+```
 
 ### 1. Crear los esquemas
 
@@ -118,14 +142,15 @@ bitacora/            Una nota por sesión de trabajo
 db/                  DDL, migraciones, consultas e índices
 tools/generador/     Generador de datos sintéticos
 diagramas/           Fuente en texto (Mermaid/PlantUML) e imágenes exportadas
-backend/             API del sistema completo (TODO: framework por decidir)
-frontend/            Interfaz web, React
-diseno_paginas/      Diseño de pantallas, previo a implementarlas en frontend/
+backend/             API en FastAPI (módulo Personas y Usuarios implementado, ver CLAUDE.md)
+frontend/            Interfaz web en Vite + React + TypeScript (módulo Personas y Usuarios)
+diseno_paginas/      Diseño de pantallas ("Kairos"), referencia visual del frontend
+scripts/             desplegar.sh — levanta backend + frontend con Docker Compose
 ```
 
-> Este repositorio documenta sólo la vía de diseño de base de datos. `backend/` y `frontend/` son el
-> resto del proyecto y no tienen documento `SCJ-` propio todavía. La base de datos es Supabase, no
-> hay servicio de base de datos local que levantar.
+> Este repositorio documenta la vía de diseño de base de datos y ahora también el backend y
+> frontend que la exponen. La base de datos sigue siendo Supabase remoto — no hay servicio de
+> base de datos local que levantar, ni en Docker ni fuera de él.
 
 ---
 
@@ -135,6 +160,7 @@ diseno_paginas/      Diseño de pantallas, previo a implementarlas en frontend/
 |---|---|---|
 | Modelo conceptual y frontera acordados | 22 ago 2026 | **Vencido, sin evidencia registrada** — bitácora y `SCJ-ACT-01` sin llenar |
 | Modelo lógico y decisiones de diseño | 28 ago 2026 | Pendiente — bloqueado por el hito anterior |
+| Módulo Personas y Usuarios (backend + frontend) | — | Entregado 3 sep 2026 — **QA manual contra los 14 mockups pendiente** |
 | Modelo físico y generador de datos | 8 sep 2026 | Pendiente |
 | Consultas de validación | 11 sep 2026 | Pendiente |
 | Vacaciones, reporte, volumen, índices | 25 sep 2026 | Pendiente |

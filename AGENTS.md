@@ -16,9 +16,17 @@ Guía maestra de trabajo para agentes en `sistema-control-jornada`.
 ## Módulos activos vs. legado
 
 - **Activos:** todo `docs/`, `db/ddl/`, `db/indices/`, `diagramas/`, `bitacora/`,
-  `tools/generador/`.
-- **Vacíos, en construcción:** `backend/`, `frontend/`, `diseno_paginas/`, `db/migraciones/`,
-  `db/seeds/`. No asumir contenido ni convenciones de estos hasta que exista código.
+  `tools/generador/`, `backend/`, `frontend/`, `diseno_paginas/`, `scripts/`.
+  - `backend/app/` (routers/schemas/deps/config, FastAPI + `supabase-py`) y `frontend/src/`
+    (pages/layouts/router, Vite + React + TypeScript) tienen el módulo Personas y Usuarios
+    (`SCJ-PRO-01`/`SCJ-PRO-02`) completo, con sus pruebas (`backend/tests/`,
+    `frontend/src/**/*.test.tsx`). Antes de tocarlos, leer las convenciones que ya establecieron:
+    los routers usan `db.postgrest.schema("personas").table(...)`, no `db.table(...)` directo; los
+    endpoints devuelven los esquemas de `app/schemas/`, no dicts sueltos.
+  - `diseno_paginas/personas/` son los 14 mockups (marca ficticia "Kairos") contra los que el
+    frontend todavía no pasó QA manual completo — ver `bitacora/2026-09-03_dockerizacion.md`.
+- **Vacíos, en construcción:** `db/migraciones/`, `db/seeds/`. No asumir contenido ni
+  convenciones de estos hasta que exista algo.
 
 ## Reglas de implementación
 

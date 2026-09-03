@@ -41,3 +41,7 @@ dist/
 build/
 .vite/
 npm-debug.log*
+
+# Estado local de skills/agentes (no es parte del código del proyecto)
+.impeccable/
+.superpowers/
