@@ -11,11 +11,13 @@ import { FichaPersonaPage } from "./pages/FichaPersonaPage";
 import { LoginPage } from "./pages/LoginPage";
 import { OlvideContrasenaPage } from "./pages/OlvideContrasenaPage";
 import { RestablecerContrasenaPage } from "./pages/RestablecerContrasenaPage";
+import { VerificarTotpRoute } from "./pages/VerificarTotpRoute";
 
 export const router = createBrowserRouter([
   { path: "/", element: <LoginPage /> },
   { path: "/cuenta-suspendida", element: <CuentaSuspendidaPage /> },
   { path: "/configurar-2fa", element: <Configurar2FAPage /> },
+  { path: "/verificar-totp", element: <VerificarTotpRoute /> },
   { path: "/olvide-contrasena", element: <OlvideContrasenaPage /> },
   { path: "/restablecer-contrasena", element: <RestablecerContrasenaPage /> },
   { path: "/completar-invitacion", element: <CompletarInvitacionPage /> },

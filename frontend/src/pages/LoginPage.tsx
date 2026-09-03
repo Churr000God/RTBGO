@@ -16,6 +16,16 @@ export function LoginPage() {
     });
     if (errorLogin) {
       setError("Correo o contraseña incorrectos.");
+      return;
+    }
+
+    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (aal?.nextLevel === "aal2" && aal.currentLevel !== aal.nextLevel) {
+      window.location.href = "/verificar-totp";
+    } else if (aal?.nextLevel === "aal1") {
+      window.location.href = "/configurar-2fa";
+    } else {
+      window.location.href = "/personas";
     }
   }
 

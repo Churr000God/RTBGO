@@ -26,7 +26,9 @@ export function VerificarTotpPage({ factorId }: Props) {
     });
     if (errorVerify) {
       setError("Código incorrecto.");
+      return;
     }
+    window.location.href = "/personas";
   }
 
   return (
