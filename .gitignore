@@ -19,6 +19,9 @@ __pycache__/
 .venv/
 venv/
 
+# Worktrees de trabajo aislado (superpowers:using-git-worktrees)
+.worktrees/
+
 # Sistema
 .DS_Store
 Thumbs.db
