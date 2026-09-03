@@ -1,3 +1,7 @@
+import { RouterProvider } from "react-router-dom";
+
+import { router } from "./router";
+
 export function App() {
-  return <main>Kairos</main>;
+  return <RouterProvider router={router} />;
 }

@@ -4,8 +4,8 @@ import { describe, expect, it } from "vitest";
 import { App } from "./App";
 
 describe("App", () => {
-  it("renderiza el nombre de la app", () => {
+  it("muestra el login en la ruta raíz", () => {
     render(<App />);
-    expect(screen.getByText("Kairos")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Iniciar sesión" })).toBeInTheDocument();
   });
 });
