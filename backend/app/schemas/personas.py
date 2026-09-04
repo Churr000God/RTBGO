@@ -43,3 +43,4 @@ class PersonaOut(BaseModel):
 class PersonaConExpediente(PersonaOut):
     tipo_contrato: str | None = None
     documento_ref: str | None = None
+    tiene_usuario: bool = False
