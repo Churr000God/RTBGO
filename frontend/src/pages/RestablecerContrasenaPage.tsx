@@ -211,19 +211,19 @@ export function RestablecerContrasenaPage({ modo = "restablecer" }: Props) {
   return (
     <AuthLayout titulo={tituloPanel} bajada="">
       {estado === "cargando" && (
-        <span className="insignia insignia--neutra">
+        <span className="insignia insignia--neutra insignia--bloque">
           <Loader2 size={14} className="icono-girando" aria-hidden="true" />
           Comprobando el enlace…
         </span>
       )}
       {estado === "necesita-totp" && (
-        <span className="insignia insignia--aviso">
+        <span className="insignia insignia--aviso insignia--bloque">
           <ShieldAlert size={14} aria-hidden="true" />
           Falta confirmar el segundo paso
         </span>
       )}
       {estado === "listo" && (
-        <span className="insignia insignia--exito">
+        <span className="insignia insignia--exito insignia--bloque">
           <ShieldCheck size={14} aria-hidden="true" />
           Enlace verificado
         </span>

@@ -249,18 +249,27 @@ th {
 .insignia--exito {
   background: rgba(21, 152, 149, 0.12);
   color: var(--teal);
-  margin-bottom: 1rem;
 }
 
 .insignia--neutra {
   background: rgba(0, 43, 91, 0.08);
   color: var(--navy-medio);
-  margin-bottom: 1rem;
 }
 
 .insignia--aviso {
   background: rgba(173, 149, 81, 0.15);
   color: var(--oro);
+}
+
+.insignia--peligro {
+  background: rgba(179, 38, 30, 0.1);
+  color: #b3261e;
+}
+
+/* Modificador aparte (no embebido en --exito/--aviso/--neutra): una insignia en una celda de
+   tabla (DirectorioPersonasPage) no puede llevar este margen o desalinea las filas — sólo lo
+   llevan los usos "de pie" como los badges de RestablecerContrasenaPage. */
+.insignia--bloque {
   margin-bottom: 1rem;
 }
 
@@ -318,11 +327,29 @@ th {
   text-align: center;
 }
 
-button.boton-con-icono {
+button.boton-con-icono,
+a.boton-con-icono {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+}
+
+a.boton-con-icono {
+  text-decoration: none;
+}
+
+.boton-primario {
+  background: var(--teal);
+  color: var(--blanco);
+  padding: 0.65rem 1.1rem;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.boton-primario:hover {
+  background: var(--navy-medio);
 }
 
 .medidor-fuerza {
@@ -935,4 +962,108 @@ button.boton-con-icono {
   color: var(--navy);
   font-size: 0.85rem;
   text-align: right;
+}
+
+/* ─── §directorio (mockup 09) ─── */
+
+.contenedor-pagina--ancho {
+  max-width: 1200px;
+}
+
+.encabezado-pagina {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.encabezado-pagina .boton-con-icono {
+  flex-shrink: 0;
+}
+
+.banda-metricas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2rem;
+  background: var(--blanco);
+  border-radius: var(--radio-tarjeta);
+  box-shadow: var(--sombra-tarjeta);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.metrica {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.metrica strong {
+  font-family: var(--font-titulo);
+  font-size: 1.6rem;
+  color: var(--navy);
+}
+
+.etiqueta-metrica {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--navy-medio);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.detalle-metrica {
+  font-size: 0.78rem;
+  color: var(--navy-medio);
+}
+
+.punto {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.punto--exito {
+  background: var(--teal);
+}
+
+.punto--aviso {
+  background: var(--oro);
+}
+
+.punto--peligro {
+  background: #b3261e;
+}
+
+.barra-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.barra-filtros .campo-con-icono {
+  flex: 1 1 16rem;
+}
+
+.barra-filtros select {
+  width: auto;
+  min-width: 10rem;
+}
+
+.persona-celda {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  font-weight: 600;
+}
+
+.pie-tabla {
+  margin-top: 0.85rem;
+  font-size: 0.85rem;
+  color: var(--navy-medio);
 }
