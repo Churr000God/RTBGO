@@ -102,9 +102,13 @@ flowchart TD
   (`db/ddl/05_personas_estructura.sql:109`) sincroniza `persona.estado`/`fecha_baja` en cada
   `INSERT`. Además, desde `db/ddl/09_personas_bitacora_inmutable.sql` la bitácora es de solo
   inserción de verdad (`UPDATE`/`DELETE` bloqueados incluso para `service_role`).
-- **RLS, TTL de 15 min y "Enforce single session per user" no están configurados todavía** en el
-  proyecto Supabase real — quedan pendientes de aplicar antes de que este proceso sea efectivo en
-  producción.
+- **RLS ya está configurado**: `06_personas_rls.sql` (política `solo_caller_activo` vía
+  `fn_caller_activo()`) está aplicado en el proyecto Supabase real.
+- **TTL de 15 min ya está configurado**: Authentication → Sessions → Access token expiry = 900
+  segundos.
+- **"Enforce single session per user" sigue apagado — y no es sólo un pendiente**: el proyecto está
+  en el plan Free de Supabase, que no permite activar esa opción (requiere plan Pro o superior).
+  Queda bloqueado hasta que se actualice el plan, no es una simple casilla por marcar.
 
 ---
 
