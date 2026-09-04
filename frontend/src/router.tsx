@@ -2,6 +2,7 @@ import { createBrowserRouter } from "react-router-dom";
 
 import { AltaPersonaPage } from "./pages/AltaPersonaPage";
 import { AltaUsuarioPage } from "./pages/AltaUsuarioPage";
+import { BitacoraMovimientosPage } from "./pages/BitacoraMovimientosPage";
 import { CambiarEstadoPage } from "./pages/CambiarEstadoPage";
 import { CompletarInvitacionPage } from "./pages/CompletarInvitacionPage";
 import { Configurar2FAPage } from "./pages/Configurar2FAPage";
@@ -25,5 +26,6 @@ export const router = createBrowserRouter([
   { path: "/personas/nueva", element: <AltaPersonaPage /> },
   { path: "/personas/:id", element: <FichaPersonaPage /> },
   { path: "/personas/:id/movimiento", element: <CambiarEstadoPage /> },
+  { path: "/personas/:id/bitacora", element: <BitacoraMovimientosPage /> },
   { path: "/usuarios/nuevo", element: <AltaUsuarioPage /> },
 ]);
