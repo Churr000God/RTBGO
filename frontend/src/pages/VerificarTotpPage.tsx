@@ -1,53 +1,124 @@
-import { type FormEvent, useState } from "react";
-import { ArrowLeft, ArrowRight, ShieldCheck } from "lucide-react";
+import { type FormEvent, useEffect, useState } from "react";
+import { AlertCircle, ArrowLeft, ArrowRight, ShieldCheck } from "lucide-react";
 
 import { AuthLayout } from "../layouts/AuthLayout";
 import { supabase } from "../lib/supabaseClient";
+import { verificarTotp } from "../lib/mfa";
+import { CasilleroCodigo } from "../components/CasilleroCodigo";
+import { TemporizadorTotp } from "../components/TemporizadorTotp";
 
-type Props = { factorId: string };
+type Insignia = { icono: typeof ShieldCheck; texto: string };
 
-export function VerificarTotpPage({ factorId }: Props) {
+type Props = {
+  factorId: string;
+  tituloPanel?: string;
+  bajadaPanel?: string;
+  insignia?: Insignia;
+  correo?: string;
+};
+
+const DESCRIPCION_TEMPORIZADOR_ID = "temporizador-totp-descripcion";
+
+function mensajeErrorTotp(error: unknown): string {
+  const codigo = (error as { code?: string } | null)?.code;
+  const status = (error as { status?: number } | null)?.status;
+  if (codigo === "mfa_challenge_expired") {
+    return "El código expiró antes de verificarse. Ingresá uno nuevo.";
+  }
+  if (status === 429 || codigo === "over_request_rate_limit") {
+    return "Demasiados intentos. Esperá unos minutos antes de volver a intentar.";
+  }
+  if (codigo === "mfa_verification_failed") {
+    return "El código no coincide. Verificá los 6 dígitos e intentá de nuevo.";
+  }
+  return "No se pudo verificar el código. Intentá de nuevo.";
+}
+
+export function VerificarTotpPage({
+  factorId,
+  tituloPanel = "Verifica tu identidad",
+  bajadaPanel = "Un paso más para proteger tu jornada.",
+  insignia,
+  correo: correoProp,
+}: Props) {
+  const [codigo, setCodigo] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
+  const [intento, setIntento] = useState(0);
+  const [correo, setCorreo] = useState<string | null>(correoProp ?? null);
+
+  useEffect(() => {
+    if (correoProp) return;
+    supabase.auth.getSession().then(({ data }) => {
+      setCorreo(data.session?.user.email ?? null);
+    });
+  }, [correoProp]);
+
+  async function cambiarCuenta() {
+    await supabase.auth.signOut();
+    window.location.href = "/";
+  }
 
   async function handleSubmit(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
-    setError(null);
-    const codigo = String(new FormData(evento.currentTarget).get("codigo"));
-    const { data: challenge, error: errorChallenge } = await supabase.auth.mfa.challenge({
-      factorId,
-    });
-    if (errorChallenge || !challenge) {
-      setError("No se pudo iniciar la verificación.");
-      return;
-    }
-    const { error: errorVerify } = await supabase.auth.mfa.verify({
-      factorId,
-      challengeId: challenge.id,
-      code: codigo,
-    });
-    if (errorVerify) {
-      setError("Código incorrecto.");
+    if (codigo.length < 6 || enviando) return;
+    setEnviando(true);
+    const { error: errorVerificar } = await verificarTotp(factorId, codigo);
+    setEnviando(false);
+    if (errorVerificar) {
+      console.error("VerificarTotpPage.verificar", errorVerificar);
+      setError(mensajeErrorTotp(errorVerificar));
+      setCodigo("");
+      setIntento((n) => n + 1);
       return;
     }
     window.location.href = "/personas";
   }
 
   return (
-    <AuthLayout titulo="Verifica tu identidad" bajada="Ingresa el código de tu app autenticadora.">
-      <span className="insignia insignia--exito">
-        <ShieldCheck size={14} aria-hidden="true" />
-      </span>
+    <AuthLayout titulo={tituloPanel} bajada={bajadaPanel} insignia={insignia}>
+      <div className="icono-tarjeta">
+        <ShieldCheck size={22} aria-hidden="true" />
+      </div>
       <h2>Verificación en dos pasos</h2>
       <p>Abre tu app autenticadora e ingresa el código de 6 dígitos que aparece para Kairos.</p>
+      {correo && (
+        <span className="chip-correo">
+          <span className="correo">{correo}</span>
+          <button type="button" onClick={cambiarCuenta}>
+            Cambiar
+          </button>
+        </span>
+      )}
       <form onSubmit={handleSubmit}>
-        <label htmlFor="codigo">Código de verificación</label>
-        <input id="codigo" name="codigo" inputMode="numeric" maxLength={6} required />
-        {error && <p role="alert">{error}</p>}
-        <button type="submit" className="boton-con-icono">
+        <CasilleroCodigo
+          key={intento}
+          valor={codigo}
+          onCambio={setCodigo}
+          etiqueta="Código de verificación"
+          idBase="totp"
+          name="codigo"
+          descripcionId={DESCRIPCION_TEMPORIZADOR_ID}
+          invalido={Boolean(error)}
+          deshabilitado={enviando}
+          enfocarAlMontar
+        />
+        <TemporizadorTotp id={DESCRIPCION_TEMPORIZADOR_ID} />
+        {error && (
+          <div className="tarjeta-error" role="alert">
+            <strong>
+              <AlertCircle size={16} aria-hidden="true" />
+              Código incorrecto
+            </strong>
+            <p>{error}</p>
+          </div>
+        )}
+        <button type="submit" className="boton-con-icono" disabled={codigo.length < 6 || enviando}>
           Verificar
           <ArrowRight size={16} aria-hidden="true" />
         </button>
       </form>
+      {/* "Usar un código de respaldo" — pendiente: Supabase MFA no soporta backup codes hoy. */}
       <a href="/" className="boton-con-icono" style={{ fontSize: "0.85rem" }}>
         <ArrowLeft size={14} aria-hidden="true" />
         Volver al inicio de sesión

@@ -484,3 +484,126 @@ button.boton-con-icono {
     max-width: 32rem;
   }
 }
+
+/* ─── §casillero ─── */
+/* Dos resets obligatorios: fieldset trae borde+padding (tokens.css §base) e input trae
+   width:100% (idem) — sin pisarlos las 6 celdas salen deformadas o apiladas. */
+
+.casillero-codigo {
+  border: none;
+  padding: 0;
+  margin: 0 0 0.5rem;
+}
+
+.etiqueta-casillero {
+  padding: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--navy-medio);
+  margin-bottom: 0.5rem;
+}
+
+.casillero-codigo .celdas {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.casillero-codigo input {
+  width: clamp(2.25rem, 12vw, 3.25rem);
+  aspect-ratio: 1;
+  padding: 0;
+  text-align: center;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.casillero-codigo.invalido input {
+  border-color: #b3261e;
+}
+
+.temporizador-totp {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 1rem;
+}
+
+.temporizador-totp .linea {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--navy-medio);
+}
+
+.temporizador-totp .cuenta-regresiva {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--navy);
+}
+
+.barra-progreso {
+  width: 100%;
+  max-width: 12rem;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(0, 43, 91, 0.12);
+  overflow: hidden;
+}
+
+.barra-progreso .relleno {
+  height: 100%;
+  background: var(--teal);
+  transition: width 1s linear;
+}
+
+.temporizador-totp p {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--navy-medio);
+  text-align: center;
+}
+
+.chip-correo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--superficie);
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  margin-bottom: 1rem;
+  font-size: 0.82rem;
+  color: var(--navy-medio);
+  max-width: 100%;
+}
+
+.chip-correo .correo {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.chip-correo button {
+  background: transparent;
+  border: none;
+  color: var(--teal);
+  font-weight: 600;
+  font-size: 0.8rem;
+  padding: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.icono-tarjeta {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 12px;
+  background: var(--teal);
+  color: white;
+  display: grid;
+  place-items: center;
+  margin: 0 auto 1rem;
+}

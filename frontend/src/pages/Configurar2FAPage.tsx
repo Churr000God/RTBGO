@@ -37,7 +37,14 @@ export function Configurar2FAPage() {
   }, []);
 
   if (factorId && listoParaVerificar) {
-    return <VerificarTotpPage factorId={factorId} />;
+    return (
+      <VerificarTotpPage
+        factorId={factorId}
+        tituloPanel="Protege tu cuenta"
+        bajadaPanel="Escanea el código con tu app autenticadora."
+        insignia={INSIGNIA_PASO}
+      />
+    );
   }
 
   if (yaConfigurado) {

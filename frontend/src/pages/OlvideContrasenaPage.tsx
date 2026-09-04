@@ -18,8 +18,8 @@ export function OlvideContrasenaPage() {
 
   return (
     <AuthLayout titulo="Recupera tu acceso" bajada="Te enviamos un enlace a tu correo.">
-      <span className="insignia insignia--exito" style={{ background: "var(--superficie)" }}>
-        <KeyRound size={16} aria-hidden="true" />
+      <span className="icono-tarjeta">
+        <KeyRound size={22} aria-hidden="true" />
       </span>
       <h2>¿Olvidaste tu contraseña?</h2>
       {enviado ? (
