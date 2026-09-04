@@ -13,6 +13,11 @@ export function AltaUsuarioPage() {
   const [estadoPersonas, setEstadoPersonas] = useState<EstadoPersonas>("cargando");
   const [error, setError] = useState<string | null>(null);
   const [enviado, setEnviado] = useState(false);
+  // Deep-link desde "Crear acceso a Kairos" en la ficha de persona (?persona_id=...) — precarga
+  // la selección así no hay que volver a buscar a la misma persona de la que se vino.
+  const [personaId, setPersonaId] = useState(
+    () => new URLSearchParams(window.location.search).get("persona_id") ?? ""
+  );
 
   function cargarPersonas() {
     setEstadoPersonas("cargando");
@@ -102,7 +107,13 @@ export function AltaUsuarioPage() {
                 Datos de acceso
               </legend>
               <label htmlFor="persona_id">Persona</label>
-              <select id="persona_id" name="persona_id" required>
+              <select
+                id="persona_id"
+                name="persona_id"
+                required
+                value={personaId}
+                onChange={(evento) => setPersonaId(evento.target.value)}
+              >
                 <option value="">Selecciona una persona</option>
                 {personas.map((p) => (
                   <option key={p.id} value={p.id}>

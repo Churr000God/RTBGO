@@ -84,4 +84,15 @@ describe("AltaUsuarioPage", () => {
 
     await waitFor(() => expect(screen.getByLabelText(/persona/i)).toBeInTheDocument());
   });
+
+  it("preselecciona la persona cuando llega ?persona_id= en la URL (deep-link desde la ficha)", async () => {
+    window.history.pushState({}, "", "/usuarios/nuevo?persona_id=1");
+    mockApiFetch(new Response(JSON.stringify(PERSONAS)));
+
+    render(<AltaUsuarioPage />);
+
+    await waitFor(() => expect(screen.getByLabelText(/persona/i)).toHaveValue("1"));
+
+    window.history.pushState({}, "", "/");
+  });
 });

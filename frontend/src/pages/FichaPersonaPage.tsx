@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { AlertCircle, Loader2, RefreshCw } from "lucide-react";
+import { AlertCircle, KeyRound, Loader2, RefreshCw } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
@@ -20,6 +20,7 @@ type Persona = {
   estado: string;
   tipo_contrato: string | null;
   documento_ref: string | null;
+  tiene_usuario: boolean;
 };
 
 const ETIQUETA_ESTADO: Record<Estado, string> = {
@@ -151,10 +152,18 @@ export function FichaPersonaPage() {
               </p>
             </div>
           </div>
-          <a href={`/personas/${persona.id}/movimiento`} className="boton-con-icono boton-primario">
-            <RefreshCw size={16} aria-hidden="true" />
-            Nuevo movimiento
-          </a>
+          <div className="botonera">
+            {!persona.tiene_usuario && (
+              <a href={`/usuarios/nuevo?persona_id=${persona.id}`} className="boton-con-icono">
+                <KeyRound size={16} aria-hidden="true" />
+                Crear acceso a Kairos
+              </a>
+            )}
+            <a href={`/personas/${persona.id}/movimiento`} className="boton-con-icono boton-primario">
+              <RefreshCw size={16} aria-hidden="true" />
+              Nuevo movimiento
+            </a>
+          </div>
         </div>
 
         <div className="tarjeta-resumen">

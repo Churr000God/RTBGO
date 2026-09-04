@@ -30,6 +30,7 @@ const PERSONA = {
   estado: "activo",
   tipo_contrato: "indefinido",
   documento_ref: "RTB-2026-001",
+  tiene_usuario: false,
 };
 
 const MOVIMIENTOS = [
@@ -170,6 +171,41 @@ describe("FichaPersonaPage", () => {
     await waitFor(() =>
       expect(screen.getAllByText("Mariana Guadalupe Alcántara Ruvalcaba").length).toBeGreaterThan(0)
     );
+  });
+
+  it("muestra 'Crear acceso a Kairos' cuando la persona no tiene usuario vinculado", async () => {
+    mockApiFetch();
+    renderPagina();
+
+    await waitFor(() =>
+      expect(screen.getAllByText("Mariana Guadalupe Alcántara Ruvalcaba").length).toBeGreaterThan(0)
+    );
+    expect(
+      screen.getByRole("link", { name: /crear acceso a kairos/i })
+    ).toHaveAttribute("href", `/usuarios/nuevo?persona_id=${PERSONA.id}`);
+  });
+
+  it("oculta 'Crear acceso a Kairos' cuando la persona ya tiene usuario vinculado", async () => {
+    vi.mocked(apiFetch).mockImplementation((path: string) => {
+      if (path === "/api/sesion") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ acceso_permitido: true, motivo_bloqueo: null }))
+        );
+      }
+      if (path.endsWith("/movimientos")) {
+        return Promise.resolve(new Response(JSON.stringify(MOVIMIENTOS)));
+      }
+      return Promise.resolve(new Response(JSON.stringify({ ...PERSONA, tiene_usuario: true })));
+    });
+    renderPagina();
+
+    await waitFor(() =>
+      expect(screen.getAllByText("Mariana Guadalupe Alcántara Ruvalcaba").length).toBeGreaterThan(0)
+    );
+    expect(
+      screen.queryByRole("link", { name: /crear acceso a kairos/i })
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /nuevo movimiento/i })).toBeInTheDocument();
   });
 
   it("una persona sin expediente (documento_ref/tipo_contrato null) no rompe, muestra los fallbacks", async () => {
