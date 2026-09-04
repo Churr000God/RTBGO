@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from "react";
-import { AlertCircle, ArrowRight, Eye, EyeOff, Lock, Mail } from "lucide-react";
+import { AlertCircle, ArrowRight, Eye, EyeOff, Info, Lock, Mail } from "lucide-react";
 
 import { supabase } from "../lib/supabaseClient";
 import { AuthLayout } from "../layouts/AuthLayout";
@@ -58,8 +58,12 @@ export function LoginPage() {
 
   return (
     <AuthLayout
-      titulo="El tiempo de tu gente, en orden."
-      bajada="Control de jornada, marcas, banco de horas y gestión de personas en una sola plataforma."
+      titulo={error ? "No pudimos verificar tu acceso." : "El tiempo de tu gente, en orden."}
+      bajada={
+        error
+          ? "Revisa tu correo corporativo y tu contraseña antes de volver a intentarlo. Tras cinco intentos fallidos la cuenta se bloquea de forma temporal por seguridad."
+          : "Control de jornada, marcas, banco de horas y gestión de personas en una sola plataforma."
+      }
     >
       <h2>Iniciar sesión</h2>
       <p>Accede con tu correo corporativo.</p>
@@ -93,14 +97,22 @@ export function LoginPage() {
             required
           />
         </div>
-        <label htmlFor="contrasena">Contraseña</label>
-        <div className="campo-con-icono">
+        <div className="fila-etiqueta">
+          <label htmlFor="contrasena">Contraseña</label>
+          <a href="/olvide-contrasena" className="enlace-etiqueta">
+            ¿Olvidaste tu contraseña?
+          </a>
+        </div>
+        <div className={`campo-con-icono${error ? " invalido" : ""}`}>
           <Lock size={16} className="icono-campo" aria-hidden="true" />
           <input
             id="contrasena"
             name="contrasena"
             type={mostrarContrasena ? "text" : "password"}
+            placeholder="Escribe tu contraseña"
             required
+            aria-invalid={error || undefined}
+            aria-describedby={error ? "hint-contrasena" : undefined}
           />
           <button
             type="button"
@@ -111,9 +123,12 @@ export function LoginPage() {
             {mostrarContrasena ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>
         </div>
-        <a href="/olvide-contrasena" style={{ fontSize: "0.85rem", alignSelf: "flex-end" }}>
-          ¿Olvidaste tu contraseña?
-        </a>
+        {error && (
+          <p className="hint-campo" id="hint-contrasena">
+            <Info size={14} aria-hidden="true" />
+            Distingue mayúsculas y minúsculas.
+          </p>
+        )}
         <button type="submit" className="boton-con-icono" disabled={bloqueado}>
           {error ? "Reintentar acceso" : "Iniciar sesión"}
           <ArrowRight size={16} aria-hidden="true" />

@@ -199,6 +199,37 @@ th {
   display: flex;
 }
 
+.campo-con-icono.invalido input {
+  border-color: #b3261e;
+}
+
+.campo-con-icono.invalido svg.icono-campo {
+  color: #b3261e;
+}
+
+.fila-etiqueta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.fila-etiqueta label {
+  margin-bottom: 0;
+}
+
+.enlace-etiqueta {
+  font-size: 0.85rem;
+}
+
+.hint-campo {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: -0.5rem 0 0;
+  font-size: 0.82rem;
+  color: #b3261e;
+}
+
 .wordmark {
   display: flex;
   align-items: center;
