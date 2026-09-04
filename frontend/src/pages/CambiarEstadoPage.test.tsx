@@ -18,7 +18,17 @@ vi.mock("../lib/supabaseClient", () => ({
 
 describe("CambiarEstadoPage", () => {
   it("exige motivo y envía el movimiento elegido", async () => {
-    vi.mocked(apiFetch).mockResolvedValue(new Response(JSON.stringify({ id: "m1" }), { status: 201 }));
+    // Tres consumidores de apiFetch en esta pantalla: AppShell (GET /api/sesion), la propia
+    // página (GET /api/personas/:id) y el submit (POST /movimientos) — cada uno necesita su
+    // propio Response, no uno compartido (el body sólo se lee una vez).
+    vi.mocked(apiFetch).mockImplementation((path: string) => {
+      if (path === "/api/sesion") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ acceso_permitido: true, motivo_bloqueo: null }))
+        );
+      }
+      return Promise.resolve(new Response(JSON.stringify({ id: "m1" }), { status: 201 }));
+    });
 
     render(
       <MemoryRouter initialEntries={["/personas/1/movimiento"]}>
@@ -28,7 +38,7 @@ describe("CambiarEstadoPage", () => {
       </MemoryRouter>
     );
 
-    await userEvent.click(screen.getByLabelText(/suspensión/i));
+    await userEvent.click(await screen.findByLabelText(/suspensión/i));
     await userEvent.type(screen.getByLabelText(/motivo/i), "Licencia sin goce de sueldo");
     await userEvent.click(screen.getByRole("button", { name: /confirmar/i }));
 

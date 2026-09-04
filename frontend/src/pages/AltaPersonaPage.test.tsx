@@ -6,13 +6,31 @@ import { apiFetch } from "../lib/apiClient";
 import { AltaPersonaPage } from "./AltaPersonaPage";
 
 vi.mock("../lib/apiClient", () => ({ apiFetch: vi.fn() }));
+vi.mock("../lib/supabaseClient", () => ({
+  supabase: {
+    auth: {
+      getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
+      signOut: vi.fn().mockResolvedValue({ error: null }),
+    },
+  },
+}));
 
 describe("AltaPersonaPage", () => {
   it("envía los datos del formulario a POST /api/personas", async () => {
-    vi.mocked(apiFetch).mockResolvedValue(new Response(JSON.stringify({ id: "1" }), { status: 201 }));
+    // AppShell hace su propio GET /api/sesion al montar — mockImplementation por path para
+    // no compartir un único Response entre los dos consumidores (el body sólo se puede leer
+    // una vez).
+    vi.mocked(apiFetch).mockImplementation((path: string) => {
+      if (path === "/api/sesion") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ acceso_permitido: true, motivo_bloqueo: null }))
+        );
+      }
+      return Promise.resolve(new Response(JSON.stringify({ id: "1" }), { status: 201 }));
+    });
 
     render(<AltaPersonaPage />);
-    await userEvent.type(screen.getByLabelText(/primer nombre/i), "Mariana");
+    await userEvent.type(await screen.findByLabelText(/primer nombre/i), "Mariana");
     await userEvent.type(screen.getByLabelText(/apellido paterno/i), "Alcántara");
     await userEvent.type(screen.getByLabelText(/curp/i), "AARM910427MDFLVR03");
     await userEvent.type(screen.getByLabelText(/rfc/i), "AARM910427H8A");
@@ -28,7 +46,8 @@ describe("AltaPersonaPage", () => {
         expect.objectContaining({ method: "POST" })
       )
     );
-    const cuerpo = JSON.parse(vi.mocked(apiFetch).mock.calls[0][1]!.body as string);
+    const llamadaPost = vi.mocked(apiFetch).mock.calls.find(([path]) => path === "/api/personas")!;
+    const cuerpo = JSON.parse(llamadaPost[1]!.body as string);
     expect(cuerpo.curp).toBe("AARM910427MDFLVR03");
   });
 });

@@ -6,6 +6,14 @@ import { apiFetch } from "../lib/apiClient";
 import { DirectorioPersonasPage } from "./DirectorioPersonasPage";
 
 vi.mock("../lib/apiClient", () => ({ apiFetch: vi.fn() }));
+vi.mock("../lib/supabaseClient", () => ({
+  supabase: {
+    auth: {
+      getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
+      signOut: vi.fn().mockResolvedValue({ error: null }),
+    },
+  },
+}));
 
 const PERSONAS = [
   {
@@ -34,22 +42,38 @@ const PERSONAS = [
   },
 ];
 
+// AppShell hace su propio GET /api/sesion al montar — cada consumidor necesita su propio
+// Response (el body sólo se puede leer una vez), y una respuesta sin acceso_permitido:true
+// dispararía el guard de sesión y redirigiría, rompiendo el resto del test.
+function mockApiFetch(respuestaPersonas: Response) {
+  vi.mocked(apiFetch).mockImplementation((path: string) => {
+    if (path === "/api/sesion") {
+      return Promise.resolve(
+        new Response(JSON.stringify({ acceso_permitido: true, motivo_bloqueo: null }))
+      );
+    }
+    return Promise.resolve(respuestaPersonas);
+  });
+}
+
 describe("DirectorioPersonasPage", () => {
   beforeEach(() => {
     vi.mocked(apiFetch).mockReset();
   });
 
-  it("lista las personas devueltas por el backend, sin una segunda petición", async () => {
-    vi.mocked(apiFetch).mockResolvedValue(new Response(JSON.stringify(PERSONAS)));
+  it("lista las personas devueltas por el backend, sin una segunda petición de la página", async () => {
+    mockApiFetch(new Response(JSON.stringify(PERSONAS)));
 
     render(<DirectorioPersonasPage />);
 
     await waitFor(() => expect(screen.getByText(/mariana alcántara/i)).toBeInTheDocument());
-    expect(apiFetch).toHaveBeenCalledTimes(1);
+    // 2 llamadas totales: el guard de AppShell (/api/sesion) + la propia página
+    // (/api/personas) — D5 sigue cumplido: la página no hace una segunda petición propia.
+    expect(apiFetch).toHaveBeenCalledTimes(2);
   });
 
   it("tolera personas sin fecha_ingreso/fecha_baja (undefined)", async () => {
-    vi.mocked(apiFetch).mockResolvedValue(
+    mockApiFetch(
       new Response(
         JSON.stringify([{ id: "1", primer_nombre: "Mariana", apellido_paterno: "Alcántara", estado: "activo" }])
       )
@@ -61,7 +85,7 @@ describe("DirectorioPersonasPage", () => {
   });
 
   it("calcula las métricas correctas (total, activos, suspensión, bajas del mes)", async () => {
-    vi.mocked(apiFetch).mockResolvedValue(new Response(JSON.stringify(PERSONAS)));
+    mockApiFetch(new Response(JSON.stringify(PERSONAS)));
 
     render(<DirectorioPersonasPage />);
 
@@ -73,7 +97,7 @@ describe("DirectorioPersonasPage", () => {
   });
 
   it("filtra por texto de búsqueda (nombre)", async () => {
-    vi.mocked(apiFetch).mockResolvedValue(new Response(JSON.stringify(PERSONAS)));
+    mockApiFetch(new Response(JSON.stringify(PERSONAS)));
 
     render(<DirectorioPersonasPage />);
     await waitFor(() => expect(screen.getByText(/mariana alcántara/i)).toBeInTheDocument());
@@ -85,7 +109,7 @@ describe("DirectorioPersonasPage", () => {
   });
 
   it("filtra por estado", async () => {
-    vi.mocked(apiFetch).mockResolvedValue(new Response(JSON.stringify(PERSONAS)));
+    mockApiFetch(new Response(JSON.stringify(PERSONAS)));
 
     render(<DirectorioPersonasPage />);
     await waitFor(() => expect(screen.getByText(/mariana alcántara/i)).toBeInTheDocument());
@@ -97,7 +121,7 @@ describe("DirectorioPersonasPage", () => {
   });
 
   it("muestra el estado vacío con copy propio cuando no hay personas", async () => {
-    vi.mocked(apiFetch).mockResolvedValue(new Response(JSON.stringify([])));
+    mockApiFetch(new Response(JSON.stringify([])));
 
     render(<DirectorioPersonasPage />);
 
@@ -109,7 +133,7 @@ describe("DirectorioPersonasPage", () => {
   });
 
   it("muestra el estado de error con opción de reintentar", async () => {
-    vi.mocked(apiFetch).mockResolvedValue(new Response(null, { status: 500 }));
+    mockApiFetch(new Response(null, { status: 500 }));
 
     render(<DirectorioPersonasPage />);
 

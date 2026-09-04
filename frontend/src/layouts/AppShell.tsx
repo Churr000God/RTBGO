@@ -1,6 +1,10 @@
 import { useEffect, useState, type ReactNode } from "react";
 
+import { apiFetch } from "../lib/apiClient";
 import { supabase } from "../lib/supabaseClient";
+import { registrarErrorAuth } from "../lib/erroresAuth";
+
+type EstadoAcceso = "verificando" | "permitido";
 
 const NAV_ITEMS = [
   { label: "Panel", href: "/", disponible: false },
@@ -17,6 +21,7 @@ type Props = { children: ReactNode };
 export function AppShell({ children }: Props) {
   const rutaActual = typeof window !== "undefined" ? window.location.pathname : "";
   const [correoUsuario, setCorreoUsuario] = useState<string | null>(null);
+  const [estadoAcceso, setEstadoAcceso] = useState<EstadoAcceso>("verificando");
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -24,9 +29,49 @@ export function AppShell({ children }: Props) {
     });
   }, []);
 
+  useEffect(() => {
+    // Guard de sesión: LoginPage ya chequea /api/sesion al loguearse, pero eso no cubre a
+    // alguien que ya tenía una sesión bloqueada y navega/recarga directo a una ruta interna
+    // (AppShell envuelve todas). Fail-open (mismo criterio que LoginPage, D8 del plan): si
+    // /api/sesion falla, no se bloquea — la RLS de Postgres sigue siendo el control real.
+    let vivo = true;
+
+    apiFetch("/api/sesion")
+      .then(async (respuesta) => {
+        if (!respuesta.ok) {
+          if (vivo) setEstadoAcceso("permitido");
+          return;
+        }
+        const sesion = await respuesta.json();
+        if (!vivo) return;
+        if (!sesion.acceso_permitido) {
+          await supabase.auth.signOut();
+          window.location.href = `/cuenta-suspendida?motivo=${sesion.motivo_bloqueo ?? "suspension"}`;
+          return;
+        }
+        setEstadoAcceso("permitido");
+      })
+      .catch((error) => {
+        registrarErrorAuth("AppShell.sesion", error);
+        if (vivo) setEstadoAcceso("permitido");
+      });
+
+    return () => {
+      vivo = false;
+    };
+  }, []);
+
   async function cerrarSesion() {
     await supabase.auth.signOut();
     window.location.href = "/";
+  }
+
+  if (estadoAcceso === "verificando") {
+    return (
+      <div style={{ display: "grid", placeItems: "center", minHeight: "100vh" }}>
+        <p style={{ color: "var(--navy-medio)" }}>Verificando acceso…</p>
+      </div>
+    );
   }
 
   return (

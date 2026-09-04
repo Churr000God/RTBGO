@@ -58,6 +58,11 @@ const MOVIMIENTOS = [
 
 function mockApiFetch(movimientos: typeof MOVIMIENTOS) {
   vi.mocked(apiFetch).mockImplementation((path: string) => {
+    if (path === "/api/sesion") {
+      return Promise.resolve(
+        new Response(JSON.stringify({ acceso_permitido: true, motivo_bloqueo: null }))
+      );
+    }
     if (path.endsWith("/movimientos")) {
       return Promise.resolve(new Response(JSON.stringify(movimientos)));
     }
