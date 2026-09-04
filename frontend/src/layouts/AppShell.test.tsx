@@ -186,9 +186,14 @@ describe("AppShell", () => {
     );
 
     await waitFor(() => expect(screen.getByText("Contenido protegido")).toBeInTheDocument());
-    const departamentos = screen.getByText("Departamentos").closest("[aria-disabled]");
-    expect(departamentos).toHaveAttribute("aria-disabled", "true");
-    expect(screen.queryByRole("link", { name: "Departamentos" })).not.toBeInTheDocument();
+    const puestos = screen.getByText("Puestos").closest("[aria-disabled]");
+    expect(puestos).toHaveAttribute("aria-disabled", "true");
+    expect(screen.queryByRole("link", { name: "Puestos" })).not.toBeInTheDocument();
+    // Departamentos ya es navegable (segundo corte de Estructura organizacional).
+    expect(screen.getByRole("link", { name: "Departamentos" })).toHaveAttribute(
+      "href",
+      "/estructura/departamentos"
+    );
 
     window.history.pushState({}, "", "/");
   });

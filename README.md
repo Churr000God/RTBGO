@@ -126,10 +126,12 @@ psql "$DATABASE_URL" -f db/ddl/08_personas_permisos.sql
 psql "$DATABASE_URL" -f db/ddl/09_personas_bitacora_inmutable.sql
 psql "$DATABASE_URL" -f db/ddl/10_personas_area.sql
 psql "$DATABASE_URL" -f db/ddl/11_area_migracion_inicial.sql
+psql "$DATABASE_URL" -f db/ddl/12_personas_departamento.sql
+psql "$DATABASE_URL" -f db/ddl/13_departamento_migracion_inicial.sql
 ```
 
-`10`/`11` son el primer corte del módulo Estructura Organizacional (`area`, ver `CLAUDE.md`) —
-sólo la tabla raíz, sin `departamento`/`puesto`/`permiso`/`asignacion`, todavía sin construir.
+`10`–`13` son el módulo Estructura Organizacional en construcción (`area`, `departamento`, ver
+`CLAUDE.md`) — todavía sin `puesto`/`permiso`/`asignacion`.
 
 ### 4. Generar datos sintéticos
 

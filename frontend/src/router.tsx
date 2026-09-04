@@ -1,6 +1,7 @@
 import { createBrowserRouter } from "react-router-dom";
 
 import { AltaAreaPage } from "./pages/AltaAreaPage";
+import { AltaDepartamentoPage } from "./pages/AltaDepartamentoPage";
 import { AltaPersonaPage } from "./pages/AltaPersonaPage";
 import { AltaUsuarioPage } from "./pages/AltaUsuarioPage";
 import { BitacoraMovimientosPage } from "./pages/BitacoraMovimientosPage";
@@ -9,8 +10,10 @@ import { CompletarInvitacionPage } from "./pages/CompletarInvitacionPage";
 import { Configurar2FAPage } from "./pages/Configurar2FAPage";
 import { CuentaSuspendidaPage } from "./pages/CuentaSuspendidaPage";
 import { DirectorioAreasPage } from "./pages/DirectorioAreasPage";
+import { DirectorioDepartamentosPage } from "./pages/DirectorioDepartamentosPage";
 import { DirectorioPersonasPage } from "./pages/DirectorioPersonasPage";
 import { FichaAreaPage } from "./pages/FichaAreaPage";
+import { FichaDepartamentoPage } from "./pages/FichaDepartamentoPage";
 import { FichaPersonaPage } from "./pages/FichaPersonaPage";
 import { LoginPage } from "./pages/LoginPage";
 import { OlvideContrasenaPage } from "./pages/OlvideContrasenaPage";
@@ -34,4 +37,7 @@ export const router = createBrowserRouter([
   { path: "/estructura/areas", element: <DirectorioAreasPage /> },
   { path: "/estructura/areas/nueva", element: <AltaAreaPage /> },
   { path: "/estructura/areas/:id", element: <FichaAreaPage /> },
+  { path: "/estructura/departamentos", element: <DirectorioDepartamentosPage /> },
+  { path: "/estructura/departamentos/nueva", element: <AltaDepartamentoPage /> },
+  { path: "/estructura/departamentos/:id", element: <FichaDepartamentoPage /> },
 ]);
