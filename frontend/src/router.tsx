@@ -3,6 +3,7 @@ import { createBrowserRouter } from "react-router-dom";
 import { AltaAreaPage } from "./pages/AltaAreaPage";
 import { AltaDepartamentoPage } from "./pages/AltaDepartamentoPage";
 import { AltaPersonaPage } from "./pages/AltaPersonaPage";
+import { AltaPuestoPage } from "./pages/AltaPuestoPage";
 import { AltaUsuarioPage } from "./pages/AltaUsuarioPage";
 import { BitacoraMovimientosPage } from "./pages/BitacoraMovimientosPage";
 import { CambiarEstadoPage } from "./pages/CambiarEstadoPage";
@@ -12,9 +13,11 @@ import { CuentaSuspendidaPage } from "./pages/CuentaSuspendidaPage";
 import { DirectorioAreasPage } from "./pages/DirectorioAreasPage";
 import { DirectorioDepartamentosPage } from "./pages/DirectorioDepartamentosPage";
 import { DirectorioPersonasPage } from "./pages/DirectorioPersonasPage";
+import { DirectorioPuestosPage } from "./pages/DirectorioPuestosPage";
 import { FichaAreaPage } from "./pages/FichaAreaPage";
 import { FichaDepartamentoPage } from "./pages/FichaDepartamentoPage";
 import { FichaPersonaPage } from "./pages/FichaPersonaPage";
+import { FichaPuestoPage } from "./pages/FichaPuestoPage";
 import { LoginPage } from "./pages/LoginPage";
 import { OlvideContrasenaPage } from "./pages/OlvideContrasenaPage";
 import { RestablecerContrasenaPage } from "./pages/RestablecerContrasenaPage";
@@ -40,4 +43,7 @@ export const router = createBrowserRouter([
   { path: "/estructura/departamentos", element: <DirectorioDepartamentosPage /> },
   { path: "/estructura/departamentos/nueva", element: <AltaDepartamentoPage /> },
   { path: "/estructura/departamentos/:id", element: <FichaDepartamentoPage /> },
+  { path: "/estructura/puestos", element: <DirectorioPuestosPage /> },
+  { path: "/estructura/puestos/nueva", element: <AltaPuestoPage /> },
+  { path: "/estructura/puestos/:id", element: <FichaPuestoPage /> },
 ]);

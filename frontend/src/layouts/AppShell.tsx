@@ -47,7 +47,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Áreas", href: "/estructura/areas", disponible: true },
       { label: "Departamentos", href: "/estructura/departamentos", disponible: true },
-      { label: "Puestos", href: "/estructura/puestos", disponible: false },
+      { label: "Puestos", href: "/estructura/puestos", disponible: true },
       { label: "Permisos", href: "/estructura/permisos", disponible: false },
     ],
   },

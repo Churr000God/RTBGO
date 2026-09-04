@@ -128,10 +128,16 @@ psql "$DATABASE_URL" -f db/ddl/10_personas_area.sql
 psql "$DATABASE_URL" -f db/ddl/11_area_migracion_inicial.sql
 psql "$DATABASE_URL" -f db/ddl/12_personas_departamento.sql
 psql "$DATABASE_URL" -f db/ddl/13_departamento_migracion_inicial.sql
+psql "$DATABASE_URL" -f db/ddl/14_personas_puesto.sql
+psql "$DATABASE_URL" -f db/ddl/15_estructura_placeholders_direccion.sql
+psql "$DATABASE_URL" -f db/ddl/16_puesto_migracion_inicial.sql
 ```
 
-`10`–`13` son el módulo Estructura Organizacional en construcción (`area`, `departamento`, ver
-`CLAUDE.md`) — todavía sin `puesto`/`permiso`/`asignacion`.
+`10`–`16` son el módulo Estructura Organizacional en construcción (`area`, `departamento`,
+`puesto`, ver `CLAUDE.md`) — todavía sin `permiso`/`asignacion`. `15` agrega una 6ª área
+("Dirección General") y 6 departamentos placeholder que no son estructura real del organigrama —
+sólo existen para que los puestos de dirección tengan dónde colgar (`departamento_id` es
+`NOT NULL`); ver el comentario de cabecera del archivo.
 
 ### 4. Generar datos sintéticos
 
