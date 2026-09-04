@@ -45,8 +45,8 @@ backend y un frontend que lo exponen. Ver `README.md` y `docs/00-contexto/SCJ-CT
   `--no-dev` (sin pytest) y el frontend prod es nginx sirviendo el bundle (sin npm/node); el script
   corta con un mensaje explícito en vez de fallar con un error de `docker exec`. Las pruebas
   siempre corren con `dev pruebas`.
-- **Tests:** backend `uv run pytest` (19 casos), frontend `npm test` (91 casos). Ambos corren igual
-  dentro de los contenedores (`./scripts/desplegar.sh <entorno> pruebas`).
+- **Tests:** backend `uv run pytest` (101 casos), frontend `npm test` (191 casos). Ambos corren
+  igual dentro de los contenedores (`./scripts/desplegar.sh <entorno> pruebas`).
 - **Módulo Personas y Usuarios (`SCJ-PRO-01`/`SCJ-PRO-02`):** entregado el 3 de septiembre de 2026,
   de punta a punta (backend + frontend + DDL de `personas`). Puesto/área/departamento/permiso/
   asignación quedaron **fuera de alcance a propósito** — no asumir tablas ni endpoints de eso.
@@ -61,6 +61,21 @@ backend y un frontend que lo exponen. Ver `README.md` y `docs/00-contexto/SCJ-CT
   09-14 y fix del bug real de "Alta de usuario" inalcanzable (ahora hay botón "Crear acceso a
   Kairos" en la ficha, condicionado al campo `tiene_usuario` de `GET /api/personas/{id}`). Ver
   `bitacora/2026-09-04_qa_personas_fixes.md`.
+- **Módulo Estructura Organizacional (`SCJ-PRO-03/04/05`):** entregado el 4 de septiembre de 2026,
+  de punta a punta, en 5 cortes delegados al equipo (`area` → `departamento` → `puesto` →
+  `asignacion` → `puesto_permiso`, commits `847fa96`/`628587f`/`2e14b46`/`3de346f`/`d3997cb`).
+  Catálogo de 16 permisos (`personas.permiso`, única tabla del proyecto con `codigo varchar` como
+  `PRIMARY KEY`), otorgar/revocar con validación real de auto-otorgamiento y herencia jerárquica,
+  y un mecanismo de "usuario base de bootstrap" en `./scripts/desplegar.sh` (crea un usuario con
+  todos los permisos al desplegar desde cero, credenciales por prompt interactivo, nunca en
+  `.env` — ver memoria de proyecto `usuario-base-bootstrap`). **El gate de permisos real NO está
+  conectado todavía** — los 5 routers (`areas`, `departamentos`, `puestos`, `asignaciones`,
+  `permisos`) siguen gateados sólo por "usuario autenticado y activo"; conectarlo de verdad
+  (incluida la relación entre `ver_modulo_1`/`ver_modulo_2` y el sidebar) es un corte aparte, no
+  asumir que ya está hecho. Primer `CREATE OR REPLACE FUNCTION` y primer RPC del proyecto
+  (`fn_asignacion_cambiar_puesto`) aparecieron en el corte de `asignacion`. Ver
+  `bitacora/2026-09-04_modulo_{area,departamento,puesto,asignacion,puesto_permiso}.md` para el
+  detalle de cada corte.
 
 ## Arquitectura y módulos
 
@@ -105,6 +120,15 @@ Cada una vive en su propio documento de decisión — no se duplican aquí, sól
   `http://localhost:5173` fijo a mano — esa configuración no vive en este repositorio. Al pasar a
   producción (`docker compose … prod`, frontend en `:8080`) hay que actualizarla ahí también, o
   los links de invitación/recuperación de contraseña no aterrizan en la app.
+- El DDL corre hasta `db/ddl/28_*.sql` (módulo Estructura Organizacional completo). `personas.permiso`
+  es la única tabla del proyecto con clave natural (`codigo varchar PRIMARY KEY`) en vez de `uuid`
+  — decisión deliberada, fiel a la redacción literal de `SCJ-PRO-05`, no un descuido a corregir.
+- `ALTER DEFAULT PRIVILEGES` de `08_personas_permisos.sql` le da `GRANT ALL` a cualquier tabla nueva
+  creada por el mismo rol — eso incluye `UPDATE`/`DELETE`, que un `GRANT` explícito más chico
+  (`SELECT, INSERT`) **no revoca** (`GRANT` es aditivo). Toda tabla de bitácora nueva que deba ser
+  inmutable necesita su propio `REVOKE UPDATE, DELETE` explícito desde el arranque, no asumir que
+  "nunca se concedieron" sólo porque el `GRANT` del archivo no los menciona (hallazgo real de
+  seguridad en el corte de `puesto_permiso`, corregido en `28_*.sql`).
 
 ## Historial de decisiones
 
