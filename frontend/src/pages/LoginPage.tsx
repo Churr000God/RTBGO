@@ -5,6 +5,7 @@ import { supabase } from "../lib/supabaseClient";
 import { AuthLayout } from "../layouts/AuthLayout";
 import { registrarErrorAuth } from "../lib/erroresAuth";
 import { apiFetch } from "../lib/apiClient";
+import { CONTACTOS } from "../lib/contactos";
 
 const INTENTOS_INICIALES = 5;
 const BLOQUEO_MS = 15 * 60 * 1000;
@@ -153,7 +154,10 @@ export function LoginPage() {
           <ArrowRight size={16} aria-hidden="true" />
         </button>
       </form>
-      <p className="texto-ayuda">¿Problemas para entrar? Escribe a Recursos Humanos.</p>
+      <p className="texto-ayuda">
+        ¿Problemas para entrar? Escribe a{" "}
+        <a href={`mailto:${CONTACTOS.rh.correo}`}>Recursos Humanos</a>.
+      </p>
     </AuthLayout>
   );
 }

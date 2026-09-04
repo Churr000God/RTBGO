@@ -125,4 +125,13 @@ describe("LoginPage", () => {
     );
     expect(supabase.auth.signOut).not.toHaveBeenCalled();
   });
+
+  it("el enlace a Recursos Humanos es un mailto: real", () => {
+    render(<LoginPage />);
+
+    expect(screen.getByRole("link", { name: /recursos humanos/i })).toHaveAttribute(
+      "href",
+      expect.stringMatching(/^mailto:.+@/)
+    );
+  });
 });

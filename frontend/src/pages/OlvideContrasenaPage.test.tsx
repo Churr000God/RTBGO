@@ -46,4 +46,13 @@ describe("OlvideContrasenaPage", () => {
     );
     expect(screen.queryByText(/revisa tu correo/i)).not.toBeInTheDocument();
   });
+
+  it("el enlace a Recursos Humanos es un mailto: real", () => {
+    render(<OlvideContrasenaPage />);
+
+    expect(screen.getByRole("link", { name: /recursos humanos/i })).toHaveAttribute(
+      "href",
+      expect.stringMatching(/^mailto:.+@/)
+    );
+  });
 });

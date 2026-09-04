@@ -1,6 +1,7 @@
 import { Clock, Info, Lock, Mail, Phone } from "lucide-react";
 
 import { AuthLayout } from "../layouts/AuthLayout";
+import { CONTACTOS } from "../lib/contactos";
 
 type Motivo = "suspension" | "baja_definitiva" | "sin_persona" | "sin_usuario";
 
@@ -10,6 +11,7 @@ type Copy = {
   tituloTarjeta: string;
   bajadaTarjeta: string;
   siguientePaso: string;
+  contacto: "rh" | "sistemas";
 };
 
 const COPY: Record<Motivo, Copy> = {
@@ -21,6 +23,7 @@ const COPY: Record<Motivo, Copy> = {
     bajadaTarjeta:
       "El acceso a Kairos fue suspendido para este usuario. Mientras la cuenta permanezca en ese estado no es posible iniciar sesión ni registrar marcas de jornada.",
     siguientePaso: "La reactivación sólo la puede realizar Recursos Humanos.",
+    contacto: "rh",
   },
   baja_definitiva: {
     tituloPanel: "Este acceso ya no está disponible",
@@ -30,6 +33,7 @@ const COPY: Record<Motivo, Copy> = {
     bajadaTarjeta:
       "El acceso a Kairos fue cerrado de forma definitiva para este usuario. No es posible iniciar sesión ni registrar marcas de jornada.",
     siguientePaso: "Si consideras que esto es un error, comunícate con Recursos Humanos.",
+    contacto: "rh",
   },
   sin_persona: {
     tituloPanel: "No encontramos tu perfil",
@@ -38,7 +42,8 @@ const COPY: Record<Motivo, Copy> = {
     tituloTarjeta: "No pudimos verificar tu perfil",
     bajadaTarjeta:
       "Tu cuenta existe, pero no encontramos un registro de persona asociado. Esto puede deberse a un alta incompleta.",
-    siguientePaso: "Contacta a Recursos Humanos para completar tu registro.",
+    siguientePaso: "Contacta a Sistemas para completar la vinculación de tu cuenta.",
+    contacto: "sistemas",
   },
   sin_usuario: {
     tituloPanel: "No encontramos tu perfil",
@@ -47,7 +52,8 @@ const COPY: Record<Motivo, Copy> = {
     tituloTarjeta: "No pudimos verificar tu perfil",
     bajadaTarjeta:
       "Tu cuenta existe, pero no encontramos un registro de persona asociado. Esto puede deberse a un alta incompleta.",
-    siguientePaso: "Contacta a Recursos Humanos para completar tu registro.",
+    siguientePaso: "Contacta a Sistemas para completar la vinculación de tu cuenta.",
+    contacto: "sistemas",
   },
 };
 
@@ -62,6 +68,7 @@ function leerMotivo(): Motivo {
 
 export function CuentaSuspendidaPage() {
   const copy = COPY[leerMotivo()];
+  const contacto = CONTACTOS[copy.contacto];
 
   return (
     <AuthLayout titulo={copy.tituloPanel} bajada={copy.bajadaPanel}>
@@ -75,17 +82,18 @@ export function CuentaSuspendidaPage() {
         <p className="eyebrow-seccion">Siguiente paso</p>
         <p className="texto-siguiente-paso">{copy.siguientePaso}</p>
 
-        {/* Datos de contacto de RH hardcodeados a propósito: Distribuidora Central es la
-            empresa ficticia del caso de estudio (docs/00-contexto/SCJ-ANO-01_*.md) — no hay
-            (ni debe inventarse) un endpoint de configuración real para esto. */}
+        {/* El correo sale de lib/contactos.ts (configurable por VITE_CONTACTO_*_CORREO).
+            Extensión/horario siguen hardcodeados a propósito: Distribuidora Central es la
+            empresa ficticia del caso de estudio (docs/00-contexto/SCJ-ANO-01_*.md) y sólo los
+            correos se pidieron configurables. */}
         <div className="tarjeta-contacto">
-          <h3>Contacta a Recursos Humanos</h3>
+          <h3>Contacta a {contacto.nombre}</h3>
           <div className="fila">
             <span className="etiqueta">
               <Mail size={14} aria-hidden="true" />
               Correo
             </span>
-            <span className="valor">rh@distribuidoracentral.mx</span>
+            <span className="valor">{contacto.correo}</span>
           </div>
           <div className="fila">
             <span className="etiqueta">

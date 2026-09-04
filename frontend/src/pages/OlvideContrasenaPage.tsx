@@ -4,6 +4,7 @@ import { AlertCircle, Clock, KeyRound, Mail, Send } from "lucide-react";
 import { AuthLayout } from "../layouts/AuthLayout";
 import { supabase } from "../lib/supabaseClient";
 import { mensajeDeErrorAuth, registrarErrorAuth } from "../lib/erroresAuth";
+import { CONTACTOS } from "../lib/contactos";
 
 export function OlvideContrasenaPage() {
   const [enviado, setEnviado] = useState(false);
@@ -66,7 +67,8 @@ export function OlvideContrasenaPage() {
             </p>
           </form>
           <p className="texto-ayuda">
-            ¿No recibes el correo? Revisa tu bandeja de no deseados o escribe a Recursos Humanos.
+            ¿No recibes el correo? Revisa tu bandeja de no deseados o escribe a{" "}
+            <a href={`mailto:${CONTACTOS.rh.correo}`}>Recursos Humanos</a>.
           </p>
         </>
       )}
