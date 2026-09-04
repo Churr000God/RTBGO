@@ -23,26 +23,28 @@ export function DirectorioPersonasPage() {
     <AppShell>
       <div className="contenedor-pagina">
         <h1>Personas</h1>
-        <table>
-          <thead>
-            <tr>
-              <th>Nombre</th>
-              <th>Estado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {personas.map((persona) => (
-              <tr key={persona.id}>
-                <td>
-                  <a href={`/personas/${persona.id}`}>
-                    {persona.primer_nombre} {persona.apellido_paterno}
-                  </a>
-                </td>
-                <td>{persona.estado}</td>
+        <div className="tabla-desplazable">
+          <table>
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Estado</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {personas.map((persona) => (
+                <tr key={persona.id}>
+                  <td>
+                    <a href={`/personas/${persona.id}`}>
+                      {persona.primer_nombre} {persona.apellido_paterno}
+                    </a>
+                  </td>
+                  <td>{persona.estado}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         <a href="/personas/nueva">Agregar persona</a>
       </div>
     </AppShell>

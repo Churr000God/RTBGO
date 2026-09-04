@@ -10,6 +10,8 @@
   --font-cuerpo: "Inter", system-ui, sans-serif;
   --radio-tarjeta: 14px;
   --sombra-tarjeta: 0 2px 10px rgba(0, 43, 91, 0.05);
+  --ancho-tarjeta-auth: 26.25rem;
+  --ancho-panel-auth: 42%;
 }
 
 body {
@@ -145,11 +147,23 @@ th {
 }
 
 /* Contenedor para las páginas internas (directorio, fichas, formularios de alta) — las
-   pantallas de autenticación no lo usan, tienen su propio layout de pantalla completa. */
+   pantallas de autenticación no lo usan, tienen su propio layout de pantalla completa.
+   Padding reducido en móvil: stopgap del meta viewport (§layout auth) — el responsive
+   completo de AppShell y las tablas queda fuera de esta tanda. */
 .contenedor-pagina {
   max-width: 720px;
   margin: 2.5rem auto;
-  padding: 0 1.5rem;
+  padding: 0 1rem;
+}
+
+@media (min-width: 48rem) {
+  .contenedor-pagina {
+    padding: 0 1.5rem;
+  }
+}
+
+.tabla-desplazable {
+  overflow-x: auto;
 }
 
 /* Capa decorativa de las pantallas de autenticación — iconos en campos, badges,
@@ -360,4 +374,113 @@ button.boton-con-icono {
 
 .icono-girando {
   animation: girar 1s linear infinite;
+}
+
+/* ─── §layout auth ─── */
+/* Breakpoints: 48rem (768px, tablet) · 64rem (1024px, entra el split de dos columnas) ·
+   80rem (1280px, amplio). El split entra recién en 64rem por aritmética: a 768px el aside
+   al 42% deja 226px útiles tras su padding de 3rem, mientras la tarjeta necesita 500px en
+   los 446px restantes del panel — desborda. A 1024px entra con aire de sobra. */
+
+.pantalla-auth {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.panel-decorativo {
+  background: linear-gradient(160deg, var(--navy) 0%, var(--teal) 60%, var(--teal-claro) 100%);
+  color: white;
+  padding: 2rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+
+.wordmark strong {
+  font-family: var(--font-titulo);
+  font-size: 1.25rem;
+}
+
+.titulo-panel {
+  font-size: clamp(1.35rem, 5vw, 2.5rem);
+  line-height: 1.15;
+  text-wrap: balance;
+  margin: 0 0 0.75rem;
+}
+
+.regla-dorada {
+  display: block;
+  width: 3rem;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--oro);
+  margin-bottom: 1rem;
+}
+
+.bajada-panel,
+.pie-panel {
+  display: none; /* copy de marketing: se recupera desde 48rem/64rem, no cabe en móvil */
+}
+
+.zona-formulario {
+  display: grid;
+  place-items: start center;
+  background: var(--blanco);
+  min-width: 0; /* el arreglo real: sin esto el ítem de grid no se encoge bajo su min-content */
+  padding: 2rem 1rem 3rem;
+}
+
+.tarjeta-auth {
+  background: var(--superficie);
+  border-radius: var(--radio-tarjeta);
+  box-shadow: var(--sombra-tarjeta);
+  padding: 1.75rem;
+  width: 100%;
+  max-width: var(--ancho-tarjeta-auth);
+  box-sizing: border-box;
+}
+
+.tarjeta-auth img {
+  max-width: 100%;
+  height: auto; /* el QR de Configurar2FA desbordaba sin este freno */
+}
+
+@media (min-width: 48rem) {
+  .bajada-panel {
+    display: block;
+  }
+  .panel-decorativo {
+    padding: 2.5rem 2rem;
+  }
+  .zona-formulario {
+    padding: 2.5rem 1.5rem 3rem;
+  }
+  .tarjeta-auth {
+    padding: 2.5rem;
+  }
+}
+
+@media (min-width: 64rem) {
+  .pantalla-auth {
+    grid-template-rows: none;
+    grid-template-columns: minmax(20rem, var(--ancho-panel-auth)) 1fr;
+  }
+  .panel-decorativo {
+    padding: 3rem;
+  }
+  .pie-panel {
+    display: block;
+  }
+}
+
+@media (min-width: 80rem) {
+  .panel-decorativo {
+    padding: 4rem;
+  }
+  .bajada-panel {
+    max-width: 32rem;
+  }
 }

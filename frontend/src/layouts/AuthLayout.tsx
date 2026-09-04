@@ -17,49 +17,29 @@ export function AuthLayout({ titulo, bajada, insignia, children }: Props) {
   const IconoInsignia = insignia?.icono;
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh" }}>
-      <aside
-        style={{
-          flex: "0 0 42%",
-          background:
-            "linear-gradient(160deg, var(--navy) 0%, var(--teal) 60%, var(--teal-claro) 100%)",
-          color: "white",
-          padding: "3rem",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "space-between",
-        }}
-      >
+    <div className="pantalla-auth">
+      <aside className="panel-decorativo">
         <span className="wordmark">
           <span className="icono-reloj">
             <Clock size={18} color="white" aria-hidden="true" />
           </span>
-          <strong style={{ fontFamily: "var(--font-titulo)", fontSize: "1.5rem" }}>Kairos</strong>
+          <strong>Kairos</strong>
         </span>
-        <div>
+        <div className="bloque-mensaje">
           {insignia && IconoInsignia && (
             <span className="insignia insignia--clara">
               <IconoInsignia size={14} aria-hidden="true" />
               {insignia.texto}
             </span>
           )}
-          <h1 style={{ fontFamily: "var(--font-titulo)", fontSize: "2.5rem" }}>{titulo}</h1>
-          <p>{bajada}</p>
+          <h1 className="titulo-panel">{titulo}</h1>
+          <span className="regla-dorada" aria-hidden="true" />
+          {bajada && <p className="bajada-panel">{bajada}</p>}
         </div>
-        <small>Distribuidora Central, S.A. de C.V. · v1.0</small>
+        <small className="pie-panel">Distribuidora Central, S.A. de C.V. · v1.0</small>
       </aside>
-      <main style={{ flex: 1, display: "grid", placeItems: "center", background: "white" }}>
-        <div
-          style={{
-            background: "var(--superficie)",
-            borderRadius: "var(--radio-tarjeta)",
-            boxShadow: "var(--sombra-tarjeta)",
-            padding: "2.5rem",
-            width: "min(420px, 90%)",
-          }}
-        >
-          {children}
-        </div>
+      <main className="zona-formulario">
+        <div className="tarjeta-auth">{children}</div>
       </main>
     </div>
   );
