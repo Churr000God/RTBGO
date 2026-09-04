@@ -45,7 +45,7 @@ backend y un frontend que lo exponen. Ver `README.md` y `docs/00-contexto/SCJ-CT
   `--no-dev` (sin pytest) y el frontend prod es nginx sirviendo el bundle (sin npm/node); el script
   corta con un mensaje explícito en vez de fallar con un error de `docker exec`. Las pruebas
   siempre corren con `dev pruebas`.
-- **Tests:** backend `uv run pytest` (16 casos), frontend `npm test` (87 casos). Ambos corren igual
+- **Tests:** backend `uv run pytest` (19 casos), frontend `npm test` (91 casos). Ambos corren igual
   dentro de los contenedores (`./scripts/desplegar.sh <entorno> pruebas`).
 - **Módulo Personas y Usuarios (`SCJ-PRO-01`/`SCJ-PRO-02`):** entregado el 3 de septiembre de 2026,
   de punta a punta (backend + frontend + DDL de `personas`). Puesto/área/departamento/permiso/
@@ -54,6 +54,13 @@ backend y un frontend que lo exponen. Ver `README.md` y `docs/00-contexto/SCJ-CT
   `diseno_paginas/personas/` (incluida la bitácora de movimientos, pantalla nueva); sumó el
   endpoint `GET /api/sesion` para el enforcement real de cuenta suspendida (antes sólo existía
   el bloqueo de RLS, sin feedback en la UI). Ver `bitacora/2026-09-04_qa_personas_mockups.md`.
+  **Segundo bloque de fixes, mismo día**: login centrado en pantallas grandes, CURP/RFC
+  normalizados a mayúsculas (frontend y backend), fix de usuario huérfano en Supabase Auth si
+  fallaba el insert tras la invitación, auditoría de inyección SQL sin hallazgos (el diseño ya la
+  cubre por construcción: `supabase-py` parametrizado + Pydantic), pasada de calidad visual en
+  09-14 y fix del bug real de "Alta de usuario" inalcanzable (ahora hay botón "Crear acceso a
+  Kairos" en la ficha, condicionado al campo `tiene_usuario` de `GET /api/personas/{id}`). Ver
+  `bitacora/2026-09-04_qa_personas_fixes.md`.
 
 ## Arquitectura y módulos
 
