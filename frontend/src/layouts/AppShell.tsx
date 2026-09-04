@@ -45,7 +45,17 @@ export function AppShell({ children }: Props) {
         const sesion = await respuesta.json();
         if (!vivo) return;
         if (!sesion.acceso_permitido) {
-          await supabase.auth.signOut();
+          // Una vez confirmado que NO hay acceso, el redirect tiene que pasar sí o sí — que
+          // signOut() falle (p. ej. un hiccup de red al llamar a GoTrue, después de que ya
+          // limpió la sesión local) no puede tirarnos al .catch() de más abajo y hacer
+          // fail-open: eso dejaría a la persona deslogueada en silencio y sin redirigir,
+          // viendo la ruta interna rota. El signOut ya limpia localStorage aunque la llamada
+          // de red falle, así que igual conviene mandarla a la pantalla de bloqueo.
+          try {
+            await supabase.auth.signOut();
+          } catch (errorSignOut) {
+            registrarErrorAuth("AppShell.signOut", errorSignOut);
+          }
           window.location.href = `/cuenta-suspendida?motivo=${sesion.motivo_bloqueo ?? "suspension"}`;
           return;
         }

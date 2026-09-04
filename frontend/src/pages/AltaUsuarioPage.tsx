@@ -1,20 +1,35 @@
 import { type FormEvent, useEffect, useState } from "react";
-import { Mail, Send, User } from "lucide-react";
+import { AlertCircle, Mail, Send, User } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
 
 type PersonaOpcion = { id: string; primer_nombre: string; apellido_paterno: string };
 
+type EstadoPersonas = "cargando" | "listo" | "error";
+
 export function AltaUsuarioPage() {
   const [personas, setPersonas] = useState<PersonaOpcion[]>([]);
+  const [estadoPersonas, setEstadoPersonas] = useState<EstadoPersonas>("cargando");
   const [error, setError] = useState<string | null>(null);
   const [enviado, setEnviado] = useState(false);
 
-  useEffect(() => {
+  function cargarPersonas() {
+    setEstadoPersonas("cargando");
     apiFetch("/api/personas")
-      .then((r) => r.json())
-      .then(setPersonas);
+      .then((r) => {
+        if (!r.ok) throw new Error(`status ${r.status}`);
+        return r.json();
+      })
+      .then((datos: PersonaOpcion[]) => {
+        setPersonas(datos);
+        setEstadoPersonas("listo");
+      })
+      .catch(() => setEstadoPersonas("error"));
+  }
+
+  useEffect(() => {
+    cargarPersonas();
   }, []);
 
   async function handleSubmit(evento: FormEvent<HTMLFormElement>) {
@@ -48,7 +63,7 @@ export function AltaUsuarioPage() {
 
   return (
     <AppShell>
-      <form onSubmit={handleSubmit} className="contenedor-pagina">
+      <div className="contenedor-pagina">
         <nav className="migas">
           <a href="/personas">Personas</a> / <strong>Alta de usuario</strong>
         </nav>
@@ -56,42 +71,62 @@ export function AltaUsuarioPage() {
         <p className="subtitulo-pagina">
           Selecciona a una persona ya registrada y envíale una invitación de acceso.
         </p>
-        <fieldset className="fieldset-formulario">
-          <legend className="encabezado-fieldset">
-            <span className="icono-seccion">
-              <User size={16} aria-hidden="true" />
-            </span>
-            Datos de acceso
-          </legend>
-          <label htmlFor="persona_id">Persona</label>
-          <select id="persona_id" name="persona_id" required>
-            <option value="">Selecciona una persona</option>
-            {personas.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.primer_nombre} {p.apellido_paterno}
-              </option>
-            ))}
-          </select>
-          <label htmlFor="correo">Correo</label>
-          <div className="campo-con-icono">
-            <Mail size={16} className="icono-campo" aria-hidden="true" />
-            <input id="correo" name="correo" type="email" required />
+
+        {estadoPersonas === "cargando" && <p>Cargando personas…</p>}
+
+        {estadoPersonas === "error" && (
+          <div className="tarjeta-error" role="alert">
+            <strong>
+              <AlertCircle size={16} aria-hidden="true" />
+              No se pudo cargar el listado de personas
+            </strong>
+            <p>Ocurrió un problema al consultar el padrón.</p>
+            <button type="button" onClick={cargarPersonas}>
+              Reintentar
+            </button>
           </div>
-          <small className="ayuda-campo">
-            A esta dirección llega el enlace de activación. Vigencia de 72 horas.
-          </small>
-          <label htmlFor="nombre_usuario">Nombre de usuario</label>
-          <input id="nombre_usuario" name="nombre_usuario" required />
-        </fieldset>
-        {error && <p role="alert">{error}</p>}
-        <div className="botonera">
-          <a href="/personas">Cancelar</a>
-          <button type="submit" className="boton-con-icono">
-            Enviar invitación
-            <Send size={16} aria-hidden="true" />
-          </button>
-        </div>
-      </form>
+        )}
+
+        {estadoPersonas === "listo" && (
+          <form onSubmit={handleSubmit}>
+            <fieldset className="fieldset-formulario">
+              <legend className="encabezado-fieldset">
+                <span className="icono-seccion">
+                  <User size={16} aria-hidden="true" />
+                </span>
+                Datos de acceso
+              </legend>
+              <label htmlFor="persona_id">Persona</label>
+              <select id="persona_id" name="persona_id" required>
+                <option value="">Selecciona una persona</option>
+                {personas.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.primer_nombre} {p.apellido_paterno}
+                  </option>
+                ))}
+              </select>
+              <label htmlFor="correo">Correo</label>
+              <div className="campo-con-icono">
+                <Mail size={16} className="icono-campo" aria-hidden="true" />
+                <input id="correo" name="correo" type="email" required />
+              </div>
+              <small className="ayuda-campo">
+                A esta dirección llega el enlace de activación. Vigencia de 72 horas.
+              </small>
+              <label htmlFor="nombre_usuario">Nombre de usuario</label>
+              <input id="nombre_usuario" name="nombre_usuario" required />
+            </fieldset>
+            {error && <p role="alert">{error}</p>}
+            <div className="botonera">
+              <a href="/personas">Cancelar</a>
+              <button type="submit" className="boton-con-icono">
+                Enviar invitación
+                <Send size={16} aria-hidden="true" />
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
     </AppShell>
   );
 }

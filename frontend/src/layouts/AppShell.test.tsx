@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import { StrictMode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { apiFetch } from "../lib/apiClient";
@@ -78,5 +79,58 @@ describe("AppShell", () => {
 
     await waitFor(() => expect(screen.getByText("Contenido protegido")).toBeInTheDocument());
     expect(supabase.auth.signOut).not.toHaveBeenCalled();
+  });
+
+  it("si signOut() falla tras detectar acceso no permitido, igual redirige (no cae a fail-open)", async () => {
+    // Bug real reportado por testing: signOut() puede limpiar localStorage y AUN ASÍ
+    // rechazar (hiccup de red hacia GoTrue). Antes, eso caía al .catch() externo y hacía
+    // fail-open — la persona quedaba deslogueada en silencio, sin redirigir, viendo la ruta
+    // interna rota (422 en las llamadas siguientes, sin token).
+    vi.mocked(apiFetch).mockResolvedValue(
+      new Response(JSON.stringify({ acceso_permitido: false, motivo_bloqueo: "sin_usuario" }), {
+        status: 200,
+      })
+    );
+    vi.mocked(supabase.auth.signOut).mockRejectedValue(new Error("network hiccup hacia GoTrue"));
+
+    render(
+      <AppShell>
+        <p>Contenido protegido</p>
+      </AppShell>
+    );
+
+    await waitFor(() => expect(supabase.auth.signOut).toHaveBeenCalled());
+    // Nunca debe "recuperarse" mostrando el contenido protegido — el fail-open sólo aplica
+    // cuando no sabemos el estado de la cuenta, no cuando ya confirmamos que está bloqueada.
+    expect(screen.queryByText("Contenido protegido")).not.toBeInTheDocument();
+    expect(screen.queryByText("Verificando acceso…")).toBeInTheDocument();
+  });
+
+  it("con doble-mount de StrictMode (dev), la corrida descartada no dispara signOut ni pisa el redirect", async () => {
+    let llamadas = 0;
+    vi.mocked(apiFetch).mockImplementation(() => {
+      llamadas += 1;
+      return Promise.resolve(
+        new Response(JSON.stringify({ acceso_permitido: false, motivo_bloqueo: "sin_usuario" }), {
+          status: 200,
+        })
+      );
+    });
+
+    render(
+      <StrictMode>
+        <AppShell>
+          <p>Contenido protegido</p>
+        </AppShell>
+      </StrictMode>
+    );
+
+    await waitFor(() => expect(supabase.auth.signOut).toHaveBeenCalled());
+    // dar tiempo a que la corrida "descartada" (si StrictMode disparó una) también resuelva
+    await new Promise((resolver) => setTimeout(resolver, 20));
+
+    expect(supabase.auth.signOut).toHaveBeenCalledTimes(1);
+    expect(llamadas).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText("Contenido protegido")).not.toBeInTheDocument();
   });
 });
