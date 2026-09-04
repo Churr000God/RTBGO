@@ -40,18 +40,21 @@ sangre, domicilio, parentesco).
 **Expediente** — mismo caso que en `11`: el checklist de documentos con fechas y estatus
 individuales no tiene respaldo real, solo existe `documento_ref`.
 
-**Puesto y área actuales** — de más: `jefe inmediato`. El resto (puesto, área, vigente desde) sí
-tiene respaldo real en `asignacion`/`puesto`/`departamento`.
+**Puesto y área actuales** — de más **por completo**, incluido `jefe inmediato`: puesto, área,
+departamento y asignación quedaron **fuera de alcance del proyecto a propósito** (ver `CLAUDE.md`),
+no es un módulo "pendiente de diseñar". Las tablas `asignacion`/`puesto`/`departamento` **no
+existen** en `db/ddl/` — una versión anterior de esta nota decía lo contrario, era un error.
 
-**Histórico de movimientos** — corregido para respetar `SCJ-PRO-02` ya cerrado: mezclaba cambios de
-puesto/área con cambios de `estado` en una sola tabla. `bitacora_movimiento_persona` **solo**
-registra los 3 valores de `estado` (alta/suspensión/reactivación/baja) — los cambios de puesto/área
-viven en `asignacion`, tabla y concepto distintos. El mockup se separó en dos bloques para no
-implicar que es un solo historial.
+**Histórico de movimientos** — mismo caso por consistencia: el bloque separado "Historial de puesto
+y área" del mockup tampoco se implementa, misma razón (puesto/área fuera de alcance a propósito).
+`bitacora_movimiento_persona` **solo** registra los 3 valores de `estado`
+(alta/suspensión/reactivación/baja) — no hay ninguna tabla `asignacion` con la que "mezclar".
 
-**Estado actual / Asistencia** (banco de horas, puntualidad, incidencias) — estos SÍ tienen
-respaldo real en el subsistema Tiempo ya cerrado (`saldo`, `ausencia`, `excepcion`, `marca`), no son
-extras.
+**Estado actual / Asistencia** (banco de horas, puntualidad, incidencias) — matiz: el subsistema
+Tiempo (`saldo`, `ausencia`, `excepcion`, `marca`) sí tiene **respaldo de datos** real en el DDL, ya
+cerrado — pero **cero superficie de API**: `backend/app/main.py` sólo registra los routers de
+personas/usuarios/movimientos. No es un campo inexistente en el modelo, es un módulo entero sin
+endpoints todavía — por eso queda fuera de esta tanda de frontend, no por falta de diseño de datos.
 
 ## `12-alta-usuario` (alta de usuario)
 
@@ -88,3 +91,63 @@ sí devuelve el backend (`B3` de `SCJ-PRO-02`) es `registrado_por_nombre` = `nom
 nuevo completo, no es un ajuste cosmético de la pantalla existente. El "Historial de estados"
 además depende de la pantalla de bitácora (`14-bitacora-movimientos`, todavía no implementada).
 Layout de navegación superior — mismo caso que `12`, descartado.
+
+## `14-bitacora-movimientos` (bitácora de movimientos)
+
+**Folio** (`MOV-0007` en el mockup) — de más: `bitacora_movimiento_persona` no tiene columna
+secuencial/de negocio, sólo `id uuid`. No hay folio legible para mostrar.
+
+**Origen** (`Panel de personas` / `Importación`) — de más: esa columna no existe en
+`bitacora_movimiento_persona`. Sí existe un concepto de origen en `tiempo.marca` (terminal/app),
+pero es de un esquema distinto y no aplica acá.
+
+**Estado `Prealta` y pseudo-estado "Sin registro"** — de más: el `CHECK` real de
+`personas.persona.estado` sólo admite `activo` / `baja_definitiva` / `suspension`. No existe
+"prealta" como estado, y "Sin registro" no es un estado sino la ausencia de movimiento previo — se
+representa sin flecha en el primer registro (`alta`), no como un pseudo-valor.
+
+**Columnas `estado_anterior`/`estado_nuevo`** — de más como *columnas*: no existen en la tabla, se
+derivan en el cliente (`frontend/src/lib/movimientos.ts`) recorriendo los movimientos en orden
+ascendente. El mapeo espeja exactamente `personas.fn_bitacora_sincroniza_persona`
+(`db/ddl/05_personas_estructura.sql`): `alta`→`activo`, `suspension`→`suspension`,
+`reactivacion`→`activo`, `baja_definitiva`→`baja_definitiva`.
+
+**"Exportar bitácora"** — de más: no hay endpoint ni mecanismo de exportación (CSV/PDF) en ningún
+punto del backend.
+
+**Rol del autor** (`· Recursos Humanos` junto al nombre) — de más: no existe tabla de rol/puesto.
+Lo que sí devuelve el backend (`B3`) es `registrado_por_nombre` = `nombre_usuario`
+(ej. `mariana.alcantara`), sin rol — mismo caso ya documentado para `13-cambio-estado`.
+
+**"Registro inmutable"** — **esta sí es cierta**, a partir de `db/ddl/09_personas_bitacora_inmutable.sql`
+(aplicado 2026-09-04): revoca `UPDATE`/`DELETE` a `anon`/`authenticated`, reemplaza la policy `FOR
+ALL` por `SELECT`+`INSERT` explícitas, y agrega un trigger `BEFORE UPDATE OR DELETE` que aborta
+incluso para `service_role`. Antes de este DDL la tarjeta mentía (la policy `FOR ALL` de
+`06_personas_rls.sql` y el `GRANT ALL` de `08_personas_permisos.sql` no bloqueaban nada).
+
+## `09-directorio-personas` (directorio)
+
+**Correo** y **número de empleado** — de más: no existen en `personas.persona`. El correo vive en
+`auth.users`/`personas.usuario`, no en la persona.
+
+**Filtros de Área/Puesto** — de más: puesto/área fuera de alcance a propósito (mismo caso que en
+`10`/`11`/`12`/`13`).
+
+**Paginación de servidor** (`"Mostrando 8 de 248"`) — de más: el filtrado/búsqueda/métricas de esta
+tanda es 100% client-side (volumen de proyecto académico); no hay paginación real de servidor.
+
+**"Exportar"** — de más, mismo caso que en `14`: no hay endpoint de exportación.
+
+**Menú `⋮`** (acciones masivas por fila) — de más: no hay acciones de ese tipo implementadas ni
+endpoints que las respalden.
+
+## `08-error-cuenta-suspendida` (cuenta suspendida)
+
+**Datos de contacto de RH/Sistemas/Administración/Dirección** — no son datos "de más" del mockup
+(la empresa ficticia sí los necesita mostrar), pero **no vienen de una tabla ni de un endpoint de
+configuración**: son variables de entorno de build del frontend (`VITE_CONTACTO_RH_CORREO`,
+`VITE_CONTACTO_SISTEMAS_CORREO`, `VITE_CONTACTO_ADMINISTRACION_CORREO`,
+`VITE_CONTACTO_DIRECCION_CORREO`, ver `frontend/.env.example` y `CLAUDE.md`) — no hardcodeadas en
+el código de la página como se planteó originalmente, pero tampoco dinámicas: cambiar un correo en
+producción exige rebuild del frontend (`--build`, no basta reiniciar el contenedor), mismo gotcha
+que el resto de las `VITE_*` del proyecto.
