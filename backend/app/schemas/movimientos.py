@@ -14,4 +14,6 @@ class MovimientoOut(BaseModel):
     tipo_movimiento: str
     fecha_efectiva: datetime
     motivo: str | None
+    documento_ref: str | None = None
     registrado_por: str | None
+    registrado_por_nombre: str | None = None  # sólo se resuelve en el GET
