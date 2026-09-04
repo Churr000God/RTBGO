@@ -844,3 +844,95 @@ button.boton-con-icono {
   background: rgba(179, 38, 30, 0.1);
   color: #b3261e;
 }
+
+/* ─── §cuenta suspendida (mockup 08) ─── */
+
+.contenido-centrado {
+  text-align: center;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.85rem;
+  border: 1px solid rgba(173, 149, 81, 0.4);
+  border-radius: 999px;
+  color: var(--oro);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 1rem;
+}
+
+.eyebrow::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--oro);
+}
+
+.eyebrow-seccion {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--teal);
+  margin: 1.5rem 0 0.4rem;
+}
+
+.texto-siguiente-paso {
+  font-family: var(--font-titulo);
+  font-size: 1.15rem;
+  color: var(--navy);
+  margin: 0;
+}
+
+.tarjeta-contacto {
+  background: var(--superficie);
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  margin: 1.5rem 0 1rem;
+  text-align: left;
+}
+
+.tarjeta-contacto h3 {
+  font-family: var(--font-cuerpo);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--navy-medio);
+  margin: 0 0 0.5rem;
+}
+
+.tarjeta-contacto .fila {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.55rem 0;
+  border-top: 1px solid rgba(0, 43, 91, 0.08);
+}
+
+.tarjeta-contacto .fila:first-of-type {
+  border-top: none;
+}
+
+.tarjeta-contacto .etiqueta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--navy-medio);
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.tarjeta-contacto .valor {
+  font-weight: 600;
+  color: var(--navy);
+  font-size: 0.85rem;
+  text-align: right;
+}

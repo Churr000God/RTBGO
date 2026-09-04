@@ -4,6 +4,7 @@ import { AlertCircle, ArrowRight, Eye, EyeOff, Info, Lock, Mail } from "lucide-r
 import { supabase } from "../lib/supabaseClient";
 import { AuthLayout } from "../layouts/AuthLayout";
 import { registrarErrorAuth } from "../lib/erroresAuth";
+import { apiFetch } from "../lib/apiClient";
 
 const INTENTOS_INICIALES = 5;
 const BLOQUEO_MS = 15 * 60 * 1000;
@@ -41,6 +42,24 @@ export function LoginPage() {
     }
 
     setError(false);
+
+    // Chequeo de sesión antes de la bifurcación MFA (D9 del plan): no tiene sentido pedir
+    // TOTP a alguien que va a terminar bloqueado. Fail-open (D8): si /api/sesion no responde,
+    // se loguea y el login sigue normal — es UX, el control de seguridad real es la RLS.
+    try {
+      const respuestaSesion = await apiFetch("/api/sesion");
+      if (respuestaSesion.ok) {
+        const sesion = await respuestaSesion.json();
+        if (!sesion.acceso_permitido) {
+          await supabase.auth.signOut();
+          window.location.href = `/cuenta-suspendida?motivo=${sesion.motivo_bloqueo ?? "suspension"}`;
+          return;
+        }
+      }
+    } catch (errorSesion) {
+      registrarErrorAuth("LoginPage.sesion", errorSesion);
+    }
+
     const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
     if (aal?.nextLevel === "aal2" && aal.currentLevel !== aal.nextLevel) {
       window.location.href = "/verificar-totp";
