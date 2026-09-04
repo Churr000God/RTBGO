@@ -132,4 +132,16 @@ describe("BitacoraMovimientosPage", () => {
     expect(screen.getByText("2026")).toBeInTheDocument();
     expect(screen.getByText("2024")).toBeInTheDocument();
   });
+
+  it("muestra la tarjeta de registro inmutable (DB1 ya aplicado)", async () => {
+    mockApiFetch(MOVIMIENTOS);
+    renderPagina();
+
+    await waitFor(() => expect(screen.getByText("Ana Miranda", { selector: "strong" })).toBeInTheDocument());
+
+    expect(screen.getByText("Registro inmutable")).toBeInTheDocument();
+    expect(
+      screen.getByText(/no se editan ni se borran/i)
+    ).toBeInTheDocument();
+  });
 });

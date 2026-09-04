@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import { ArrowRight, Search } from "lucide-react";
+import { ArrowRight, Lock, Search } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
@@ -287,6 +287,17 @@ export function BitacoraMovimientosPage() {
                         </span>
                       </li>
                     </ul>
+                  </div>
+
+                  <div className="tarjeta-resumen tarjeta-inmutable">
+                    <h3>
+                      <Lock size={16} aria-hidden="true" />
+                      Registro inmutable
+                    </h3>
+                    <p>
+                      Los movimientos no se editan ni se borran. Una corrección se registra como
+                      un movimiento nuevo que referencia al anterior.
+                    </p>
                   </div>
                 </aside>
               </div>

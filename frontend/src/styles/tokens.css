@@ -1334,3 +1334,20 @@ a.boton-con-icono {
   color: var(--navy-medio);
   margin-left: auto;
 }
+
+.tarjeta-inmutable {
+  border: 1px solid rgba(21, 152, 149, 0.3);
+}
+
+.tarjeta-inmutable h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--teal);
+}
+
+.tarjeta-inmutable p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--navy-medio);
+}
