@@ -120,6 +120,18 @@ flowchart TD
 Nada de este proceso está construido. `puesto_permiso` y `bitacora_movimiento_puesto_permiso`
 existen sólo en el diagrama Lucid V2 (`9015128f-275f-4c42-bf86-85eb41a329f6`).
 
+**Arranque del sistema — quién otorga el primer `puesto_permiso_edicion`.** La precondición §II.1
+exige que quien otorga ya tenga el permiso; al nacer el sistema nadie lo tiene todavía — mismo
+problema de origen que `SCJ-PRO-01` (el primer RH tampoco puede darse de alta a sí mismo). Se
+resuelve igual: **el puesto Sistemas (TI) nace sembrado por migración** con
+`puesto_permiso_edicion` ya activo, sin pasar por este proceso.
+
+Sistemas reporta directo a Dirección — Dirección **no** está en el subárbol hacia abajo de
+Sistemas (está arriba, por `reporta_a_id`), así que Sistemas otorgándoselo a Dirección **no** viola
+el bloqueo de auto-otorgamiento por herencia (§III, `G3-G4`): ese bloqueo es sobre el subárbol
+propio hacia abajo, no hacia arriba. Dirección no necesita sembrarse con el permiso — lo recibe de
+Sistemas por el proceso normal, una vez sembrado Sistemas.
+
 ---
 
 ## VIII. Siguiente paso
