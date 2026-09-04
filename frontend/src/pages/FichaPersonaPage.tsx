@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { RefreshCw } from "lucide-react";
+import { AlertCircle, RefreshCw } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
@@ -18,8 +18,8 @@ type Persona = {
   fecha_nacimiento: string;
   fecha_ingreso: string;
   estado: string;
-  tipo_contrato: string;
-  documento_ref: string;
+  tipo_contrato: string | null;
+  documento_ref: string | null;
 };
 
 const ETIQUETA_ESTADO: Record<Estado, string> = {
@@ -50,26 +50,64 @@ function formatearFecha(fecha?: string | null): string {
   return valor.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+type EstadoCarga = "cargando" | "listo" | "error";
+
 export function FichaPersonaPage() {
   const { id } = useParams<{ id: string }>();
   const [persona, setPersona] = useState<Persona | null>(null);
   const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
+  const [estadoCarga, setEstadoCarga] = useState<EstadoCarga>("cargando");
+
+  function cargar() {
+    setEstadoCarga("cargando");
+    Promise.all([
+      apiFetch(`/api/personas/${id}`).then((r) => {
+        if (!r.ok) throw new Error(`status ${r.status}`);
+        return r.json();
+      }),
+      apiFetch(`/api/personas/${id}/movimientos`).then((r) => {
+        if (!r.ok) throw new Error(`status ${r.status}`);
+        return r.json();
+      }),
+    ])
+      .then(([datosPersona, datosMovimientos]: [Persona, Movimiento[]]) => {
+        setPersona(datosPersona);
+        setMovimientos(datosMovimientos);
+        setEstadoCarga("listo");
+      })
+      .catch(() => setEstadoCarga("error"));
+  }
 
   useEffect(() => {
-    apiFetch(`/api/personas/${id}`)
-      .then((r) => r.json())
-      .then(setPersona);
-    apiFetch(`/api/personas/${id}/movimientos`)
-      .then((r) => r.json())
-      .then(setMovimientos);
+    cargar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  if (!persona) {
+  if (estadoCarga === "cargando") {
     return (
       <AppShell>
         <p className="contenedor-pagina" style={{ marginTop: "2.5rem" }}>
           Cargando…
         </p>
+      </AppShell>
+    );
+  }
+
+  if (estadoCarga === "error" || !persona) {
+    return (
+      <AppShell>
+        <div className="contenedor-pagina" style={{ marginTop: "2.5rem" }}>
+          <div className="tarjeta-error" role="alert">
+            <strong>
+              <AlertCircle size={16} aria-hidden="true" />
+              No se pudo cargar la ficha de esta persona
+            </strong>
+            <p>Ocurrió un problema al consultar el padrón.</p>
+            <button type="button" onClick={cargar}>
+              Reintentar
+            </button>
+          </div>
+        </div>
       </AppShell>
     );
   }
@@ -146,9 +184,13 @@ export function FichaPersonaPage() {
           <h3>Expediente</h3>
           <div className="dato">
             <span>Referencia de documento (documento_ref)</span>
-            <p>
-              <span className="pildora-monoespaciada">{persona.documento_ref}</span>
-            </p>
+            {persona.documento_ref ? (
+              <p>
+                <span className="pildora-monoespaciada">{persona.documento_ref}</span>
+              </p>
+            ) : (
+              <p>Sin expediente asignado.</p>
+            )}
             <small className="ayuda-campo">
               Formato RTB-__-__ · referencia única del expediente físico. Sólo se almacena esta
               referencia — no existe catálogo de documentos individuales por persona.
@@ -157,7 +199,9 @@ export function FichaPersonaPage() {
           <div className="rejilla-datos" style={{ marginTop: "1rem" }}>
             <div className="dato">
               <span>Tipo de contrato</span>
-              <strong>{ETIQUETA_TIPO_CONTRATO[persona.tipo_contrato] ?? persona.tipo_contrato}</strong>
+              <strong>
+                {persona.tipo_contrato ? ETIQUETA_TIPO_CONTRATO[persona.tipo_contrato] ?? persona.tipo_contrato : "—"}
+              </strong>
             </div>
           </div>
         </div>

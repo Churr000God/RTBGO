@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 
@@ -114,5 +115,85 @@ describe("FichaPersonaPage", () => {
     expect(
       screen.getByRole("link", { name: /ver bitácora completa/i })
     ).toHaveAttribute("href", `/personas/${PERSONA.id}/bitacora`);
+  });
+
+  it("si GET /api/personas/:id falla, muestra un error con reintentar en vez de quedarse en Cargando…", async () => {
+    vi.mocked(apiFetch).mockImplementation((path: string) => {
+      if (path === "/api/sesion") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ acceso_permitido: true, motivo_bloqueo: null }))
+        );
+      }
+      if (path.endsWith("/movimientos")) {
+        return Promise.resolve(new Response(JSON.stringify(MOVIMIENTOS)));
+      }
+      // GET /api/personas/:id — el que backend confirmó que a veces devuelve 500
+      return Promise.resolve(new Response(null, { status: 500 }));
+    });
+
+    renderPagina();
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/no se pudo cargar la ficha de esta persona/i)
+      ).toBeInTheDocument()
+    );
+    expect(screen.getByRole("button", { name: /reintentar/i })).toBeInTheDocument();
+    expect(screen.queryByText(/cargando/i)).not.toBeInTheDocument();
+  });
+
+  it("reintentar vuelve a pedir los datos y, si funciona, muestra la ficha", async () => {
+    let intento = 0;
+    vi.mocked(apiFetch).mockImplementation((path: string) => {
+      if (path === "/api/sesion") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ acceso_permitido: true, motivo_bloqueo: null }))
+        );
+      }
+      if (path.endsWith("/movimientos")) {
+        return Promise.resolve(new Response(JSON.stringify(MOVIMIENTOS)));
+      }
+      intento += 1;
+      if (intento === 1) return Promise.resolve(new Response(null, { status: 500 }));
+      return Promise.resolve(new Response(JSON.stringify(PERSONA)));
+    });
+
+    renderPagina();
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/no se pudo cargar la ficha de esta persona/i)
+      ).toBeInTheDocument()
+    );
+    await userEvent.click(screen.getByRole("button", { name: /reintentar/i }));
+
+    await waitFor(() =>
+      expect(screen.getAllByText("Mariana Guadalupe Alcántara Ruvalcaba").length).toBeGreaterThan(0)
+    );
+  });
+
+  it("una persona sin expediente (documento_ref/tipo_contrato null) no rompe, muestra los fallbacks", async () => {
+    vi.mocked(apiFetch).mockImplementation((path: string) => {
+      if (path === "/api/sesion") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ acceso_permitido: true, motivo_bloqueo: null }))
+        );
+      }
+      if (path.endsWith("/movimientos")) {
+        return Promise.resolve(new Response(JSON.stringify([])));
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify({ ...PERSONA, tipo_contrato: null, documento_ref: null }))
+      );
+    });
+
+    renderPagina();
+
+    await waitFor(() =>
+      expect(
+        screen.getAllByText("Mariana Guadalupe Alcántara Ruvalcaba").length
+      ).toBeGreaterThan(0)
+    );
+    expect(screen.getByText(/sin expediente asignado/i)).toBeInTheDocument();
   });
 });
