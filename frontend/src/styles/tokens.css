@@ -528,6 +528,13 @@ a.boton-con-icono {
   .pie-panel {
     display: block;
   }
+  .zona-formulario {
+    /* Desde acá .zona-formulario ocupa toda la altura del viewport (columna del split) — con
+       "start" la tarjeta quedaba pegada arriba y dejaba un vacío grande abajo en pantallas
+       altas. En mobile/tablet "start" tenía sentido (la columna crece con el contenido, no con
+       el viewport), pero en el split de dos columnas conviene centrar en ambos ejes. */
+    place-items: center;
+  }
 }
 
 @media (min-width: 80rem) {
