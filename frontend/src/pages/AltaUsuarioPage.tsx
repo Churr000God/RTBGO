@@ -1,4 +1,5 @@
 import { type FormEvent, useEffect, useState } from "react";
+import { Mail, Send, User } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
@@ -48,22 +49,48 @@ export function AltaUsuarioPage() {
   return (
     <AppShell>
       <form onSubmit={handleSubmit} className="contenedor-pagina">
+        <nav className="migas">
+          <a href="/personas">Personas</a> / <strong>Alta de usuario</strong>
+        </nav>
         <h1>Alta de usuario</h1>
-        <label htmlFor="persona_id">Persona</label>
-        <select id="persona_id" name="persona_id" required>
-          <option value="">Selecciona una persona</option>
-          {personas.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.primer_nombre} {p.apellido_paterno}
-            </option>
-          ))}
-        </select>
-        <label htmlFor="correo">Correo</label>
-        <input id="correo" name="correo" type="email" required />
-        <label htmlFor="nombre_usuario">Nombre de usuario</label>
-        <input id="nombre_usuario" name="nombre_usuario" required />
+        <p className="subtitulo-pagina">
+          Selecciona a una persona ya registrada y envíale una invitación de acceso.
+        </p>
+        <fieldset className="fieldset-formulario">
+          <legend className="encabezado-fieldset">
+            <span className="icono-seccion">
+              <User size={16} aria-hidden="true" />
+            </span>
+            Datos de acceso
+          </legend>
+          <label htmlFor="persona_id">Persona</label>
+          <select id="persona_id" name="persona_id" required>
+            <option value="">Selecciona una persona</option>
+            {personas.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.primer_nombre} {p.apellido_paterno}
+              </option>
+            ))}
+          </select>
+          <label htmlFor="correo">Correo</label>
+          <div className="campo-con-icono">
+            <Mail size={16} className="icono-campo" aria-hidden="true" />
+            <input id="correo" name="correo" type="email" required />
+          </div>
+          <small className="ayuda-campo">
+            A esta dirección llega el enlace de activación. Vigencia de 72 horas.
+          </small>
+          <label htmlFor="nombre_usuario">Nombre de usuario</label>
+          <input id="nombre_usuario" name="nombre_usuario" required />
+        </fieldset>
         {error && <p role="alert">{error}</p>}
-        <button type="submit">Enviar invitación</button>
+        <div className="botonera">
+          <a href="/personas">Cancelar</a>
+          <button type="submit" className="boton-con-icono">
+            Enviar invitación
+            <Send size={16} aria-hidden="true" />
+          </button>
+        </div>
       </form>
     </AppShell>
   );

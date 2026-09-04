@@ -80,23 +80,6 @@ fieldset {
   padding: 0.75rem 1rem;
 }
 
-fieldset label {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-weight: 400;
-  color: var(--navy);
-  margin-bottom: 0.5rem;
-}
-
-fieldset label:last-child {
-  margin-bottom: 0;
-}
-
-fieldset input[type="radio"] {
-  width: auto;
-}
-
 button {
   font-family: var(--font-cuerpo);
   font-weight: 600;
@@ -182,7 +165,8 @@ th {
   pointer-events: none;
 }
 
-.campo-con-icono input {
+.campo-con-icono input,
+.campo-con-icono select {
   padding-left: 2.6rem;
 }
 
@@ -651,4 +635,212 @@ button.boton-con-icono {
   display: grid;
   place-items: center;
   margin: 0 auto 1rem;
+}
+
+/* ─── §formularios internos ─── */
+/* Fidelidad visual de los formularios de personas/usuarios (Tarea F, QA de mockups 11-13):
+   migas, agrupación en fieldset con ícono, rejilla de campos, opciones seleccionables (antes
+   radios sueltos) y la cabecera de persona de CambiarEstadoPage. */
+
+.migas {
+  font-size: 0.82rem;
+  color: var(--navy-medio);
+  margin-bottom: 0.5rem;
+}
+
+.migas a {
+  color: var(--navy-medio);
+  text-decoration: none;
+}
+
+.migas a:hover {
+  color: var(--teal);
+}
+
+.migas strong {
+  color: var(--navy);
+  font-weight: 600;
+}
+
+.subtitulo-pagina {
+  color: var(--navy-medio);
+  margin-top: -0.5rem;
+}
+
+.icono-seccion {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 8px;
+  background: var(--superficie);
+  color: var(--teal);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.encabezado-fieldset {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0;
+  font-family: var(--font-titulo);
+  font-size: 1.05rem;
+  color: var(--navy);
+  margin-bottom: 0.85rem;
+}
+
+.rejilla-campos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.85rem;
+}
+
+/* fieldset base (§base) no es flex — sin esta clase los campos agrupados pierden el
+   gap:1rem que normalmente heredan de form y quedan apretados entre sí. Clase aparte
+   (no el selector fieldset a secas) para no afectar a .casillero-codigo. */
+.fieldset-formulario {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.ayuda-campo {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.78rem;
+  color: var(--navy-medio);
+}
+
+.botonera {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.botonera a {
+  font-size: 0.9rem;
+}
+
+.opciones-seleccionables {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.opciones-seleccionables--compacta {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.opciones-seleccionables--compacta .opcion-seleccionable {
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.opcion-seleccionable {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  border: 1px solid rgba(0, 43, 91, 0.15);
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  cursor: pointer;
+}
+
+.opcion-seleccionable input[type="radio"] {
+  width: auto;
+  margin-top: 0.2rem;
+}
+
+.opcion-seleccionable:has(input:checked) {
+  border-color: var(--teal);
+  background: rgba(21, 152, 149, 0.06);
+}
+
+.opcion-seleccionable .icono-opcion {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 8px;
+  background: var(--superficie);
+  color: var(--teal);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.opcion-seleccionable:has(input:checked) .icono-opcion {
+  background: var(--teal);
+  color: var(--blanco);
+}
+
+.opcion-seleccionable .texto-opcion strong {
+  display: block;
+  color: var(--navy);
+  font-size: 0.92rem;
+}
+
+.opcion-seleccionable .texto-opcion small {
+  display: block;
+  color: var(--navy-medio);
+  font-size: 0.8rem;
+  margin-top: 0.15rem;
+}
+
+.avatar-iniciales {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 999px;
+  background: linear-gradient(160deg, var(--teal) 0%, var(--teal-claro) 100%);
+  color: white;
+  display: grid;
+  place-items: center;
+  font-weight: 600;
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+
+.cabecera-persona {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.85rem;
+  background: var(--blanco);
+  border-radius: var(--radio-tarjeta);
+  box-shadow: var(--sombra-tarjeta);
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.cabecera-persona .identidad {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.insignia-estado {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.insignia-estado.activo {
+  background: rgba(21, 152, 149, 0.12);
+  color: var(--teal);
+}
+
+.insignia-estado.suspension {
+  background: rgba(173, 149, 81, 0.15);
+  color: var(--oro);
+}
+
+.insignia-estado.baja_definitiva {
+  background: rgba(179, 38, 30, 0.1);
+  color: #b3261e;
 }

@@ -7,6 +7,14 @@ import { apiFetch } from "../lib/apiClient";
 import { CambiarEstadoPage } from "./CambiarEstadoPage";
 
 vi.mock("../lib/apiClient", () => ({ apiFetch: vi.fn() }));
+vi.mock("../lib/supabaseClient", () => ({
+  supabase: {
+    auth: {
+      getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
+      signOut: vi.fn().mockResolvedValue({ error: null }),
+    },
+  },
+}));
 
 describe("CambiarEstadoPage", () => {
   it("exige motivo y envía el movimiento elegido", async () => {

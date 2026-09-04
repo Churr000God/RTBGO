@@ -52,3 +52,39 @@ implicar que es un solo historial.
 **Estado actual / Asistencia** (banco de horas, puntualidad, incidencias) — estos SÍ tienen
 respaldo real en el subsistema Tiempo ya cerrado (`saldo`, `ausencia`, `excepcion`, `marca`), no son
 extras.
+
+## `12-alta-usuario` (alta de usuario)
+
+**Card de persona seleccionada** — de más: `número de empleado` (`No. 10428`), `puesto`
+(`Analista de Nómina`), `área` (`Administración`). Mismo caso que en `11`/`10`: no existen en
+`persona` ni en ninguna tabla del modelo actual.
+
+**Tabla "Invitaciones pendientes"** — de más por completo: no hay endpoint que liste
+invitaciones (`POST /api/usuarios` sólo crea). Listarlas, reenviarlas o mostrar su estado
+(`Pendiente`/`Por expirar`) requeriría un endpoint nuevo sobre `auth.users`/GoTrue que no existe
+hoy.
+
+**Layout de navegación superior** (barra horizontal con "Jornada / Personas / Reportes /
+Configuración" en vez del sidebar) — el mockup usa un layout distinto al `AppShell` real del
+proyecto (sidebar fijo). Se descarta: cambiar el layout global es su propia tanda, no de esta
+pantalla puntual.
+
+## `13-cambio-estado` (cambio de estado)
+
+**Card de persona** — mismo caso que `12`: `No. 10428 · Analista de Nómina · Administración` de
+más (número de empleado/puesto/área no existen).
+
+**Campos "Fecha de efecto" y "Reincorporación estimada"** — de más:
+`personas.bitacora_movimiento_persona` (`db/ddl/05_personas_estructura.sql`) sólo tiene
+`fecha_efectiva timestamptz NOT NULL DEFAULT now()`, fijada por el servidor al insertar — no hay
+columna para capturar una fecha de efecto distinta a "ahora", ni una fecha de reincorporación
+estimada. Si se quiere de verdad, es un cambio de esquema (agregar columnas), no sólo de UI.
+
+**"Registra" (`María Rentería · RH`)** — el nombre propio con rol/departamento no existe; lo que
+sí devuelve el backend (`B3` de `SCJ-PRO-02`) es `registrado_por_nombre` = `nombre_usuario`
+(ej. `mariana.alcantara`), sin rol — mismo caso ya documentado para la bitácora de movimientos.
+
+**Panel lateral "Resumen del cambio" / "Al confirmar" / "Historial de estados"** — panel lateral
+nuevo completo, no es un ajuste cosmético de la pantalla existente. El "Historial de estados"
+además depende de la pantalla de bitácora (`14-bitacora-movimientos`, todavía no implementada).
+Layout de navegación superior — mismo caso que `12`, descartado.

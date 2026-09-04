@@ -1,11 +1,34 @@
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
+import { RotateCcw, ShieldAlert, UserX } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
+import { AppShell } from "../layouts/AppShell";
+
+type Persona = {
+  id: string;
+  primer_nombre: string;
+  apellido_paterno: string;
+  estado: string;
+};
+
+const ETIQUETA_ESTADO: Record<string, string> = {
+  activo: "Activa",
+  suspension: "Suspendida",
+  baja_definitiva: "Baja definitiva",
+};
 
 export function CambiarEstadoPage() {
   const { id } = useParams<{ id: string }>();
   const [error, setError] = useState<string | null>(null);
+  const [persona, setPersona] = useState<Persona | null>(null);
+
+  useEffect(() => {
+    apiFetch(`/api/personas/${id}`)
+      .then((r) => r.json())
+      .then(setPersona)
+      .catch(() => undefined);
+  }, [id]);
 
   async function handleSubmit(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
@@ -25,25 +48,89 @@ export function CambiarEstadoPage() {
     window.location.href = `/personas/${id}`;
   }
 
+  const nombreCompleto =
+    persona?.primer_nombre && persona?.apellido_paterno
+      ? `${persona.primer_nombre} ${persona.apellido_paterno}`
+      : null;
+  const iniciales = nombreCompleto
+    ? `${persona!.primer_nombre[0]}${persona!.apellido_paterno[0]}`.toUpperCase()
+    : "";
+
   return (
-    <form onSubmit={handleSubmit} className="contenedor-pagina">
-      <h1>Cambio de estado</h1>
-      <fieldset>
-        <legend>Nuevo estado</legend>
-        <label>
-          <input type="radio" name="tipo_movimiento" value="suspension" required /> Suspensión
-        </label>
-        <label>
-          <input type="radio" name="tipo_movimiento" value="reactivacion" /> Reactivación
-        </label>
-        <label>
-          <input type="radio" name="tipo_movimiento" value="baja_definitiva" /> Baja definitiva
-        </label>
-      </fieldset>
-      <label htmlFor="motivo">Motivo</label>
-      <textarea id="motivo" name="motivo" required />
-      {error && <p role="alert">{error}</p>}
-      <button type="submit">Confirmar</button>
-    </form>
+    <AppShell>
+      <form onSubmit={handleSubmit} className="contenedor-pagina">
+        <nav className="migas">
+          <a href="/personas">Personas</a> / <strong>Cambio de estado</strong>
+        </nav>
+        <h1>Cambio de estado</h1>
+        <p className="subtitulo-pagina">
+          Suspende, reactiva o da de baja a una persona. El motivo queda registrado en el
+          historial y no puede editarse después.
+        </p>
+
+        {nombreCompleto && (
+          <div className="cabecera-persona">
+            <div className="identidad">
+              <span className="avatar-iniciales">{iniciales}</span>
+              <strong>{nombreCompleto}</strong>
+            </div>
+            {persona?.estado && (
+              <span className={`insignia-estado ${persona.estado}`}>
+                {ETIQUETA_ESTADO[persona.estado] ?? persona.estado}
+              </span>
+            )}
+          </div>
+        )}
+
+        <fieldset className="fieldset-formulario">
+          <legend className="encabezado-fieldset">Tipo de cambio</legend>
+          <div className="opciones-seleccionables">
+            <label className="opcion-seleccionable">
+              <input type="radio" name="tipo_movimiento" value="suspension" required />
+              <span className="icono-opcion">
+                <ShieldAlert size={16} aria-hidden="true" />
+              </span>
+              <span className="texto-opcion">
+                <strong>Suspensión temporal</strong>
+                <small>
+                  La persona conserva su historial y deja de marcar jornada hasta su
+                  reactivación.
+                </small>
+              </span>
+            </label>
+            <label className="opcion-seleccionable">
+              <input type="radio" name="tipo_movimiento" value="reactivacion" />
+              <span className="icono-opcion">
+                <RotateCcw size={16} aria-hidden="true" />
+              </span>
+              <span className="texto-opcion">
+                <strong>Reactivación</strong>
+                <small>Devuelve a la persona al estado activo y habilita de nuevo el registro de marcas.</small>
+              </span>
+            </label>
+            <label className="opcion-seleccionable">
+              <input type="radio" name="tipo_movimiento" value="baja_definitiva" />
+              <span className="icono-opcion">
+                <UserX size={16} aria-hidden="true" />
+              </span>
+              <span className="texto-opcion">
+                <strong>Baja definitiva</strong>
+                <small>Cierra la relación laboral. El historial se conserva, pero no admite reactivación.</small>
+              </span>
+            </label>
+          </div>
+        </fieldset>
+
+        <label htmlFor="motivo">Motivo</label>
+        <textarea id="motivo" name="motivo" required />
+        <small className="ayuda-campo">Queda asentado en el historial de la persona y no podrá editarse.</small>
+
+        {error && <p role="alert">{error}</p>}
+        <div className="botonera">
+          <a href={id ? `/personas/${id}` : "/personas"}>Cancelar</a>
+          <button type="submit">Confirmar</button>
+        </div>
+      </form>
+    </AppShell>
   );
 }
