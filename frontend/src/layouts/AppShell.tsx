@@ -1,8 +1,8 @@
 import { useEffect, useState, type ReactNode } from "react";
 
-import { apiFetch } from "../lib/apiClient";
 import { supabase } from "../lib/supabaseClient";
 import { registrarErrorAuth } from "../lib/erroresAuth";
+import { consultarSesion } from "../lib/sesion";
 
 type EstadoAcceso = "verificando" | "permitido";
 
@@ -34,15 +34,14 @@ export function AppShell({ children }: Props) {
     // alguien que ya tenía una sesión bloqueada y navega/recarga directo a una ruta interna
     // (AppShell envuelve todas). Fail-open (mismo criterio que LoginPage, D8 del plan): si
     // /api/sesion falla, no se bloquea — la RLS de Postgres sigue siendo el control real.
+    // consultarSesion() deduplica la petición a nivel de módulo — con StrictMode este efecto
+    // se monta dos veces en dev, y sin deduplicar cada montaje disparaba su propio
+    // GET /api/sesion; por timing entre apiFetch/getSession() y el doble montaje, uno de los
+    // dos podía salir sin token válido y entrar en fail-open de más, no por una falla real.
     let vivo = true;
 
-    apiFetch("/api/sesion")
-      .then(async (respuesta) => {
-        if (!respuesta.ok) {
-          if (vivo) setEstadoAcceso("permitido");
-          return;
-        }
-        const sesion = await respuesta.json();
+    consultarSesion()
+      .then(async (sesion) => {
         if (!vivo) return;
         if (!sesion.acceso_permitido) {
           // Una vez confirmado que NO hay acceso, el redirect tiene que pasar sí o sí — que

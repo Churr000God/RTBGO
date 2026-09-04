@@ -4,7 +4,7 @@ import { AlertCircle, ArrowRight, Eye, EyeOff, Info, Lock, Mail } from "lucide-r
 import { supabase } from "../lib/supabaseClient";
 import { AuthLayout } from "../layouts/AuthLayout";
 import { registrarErrorAuth } from "../lib/erroresAuth";
-import { apiFetch } from "../lib/apiClient";
+import { consultarSesion } from "../lib/sesion";
 import { CONTACTOS } from "../lib/contactos";
 
 const INTENTOS_INICIALES = 5;
@@ -47,15 +47,19 @@ export function LoginPage() {
     // Chequeo de sesión antes de la bifurcación MFA (D9 del plan): no tiene sentido pedir
     // TOTP a alguien que va a terminar bloqueado. Fail-open (D8): si /api/sesion no responde,
     // se loguea y el login sigue normal — es UX, el control de seguridad real es la RLS.
+    // consultarSesion() deduplica la petición a nivel de módulo (mismo mecanismo que
+    // AppShell) — evita la carrera de StrictMode que hacía aterrizar a la misma cuenta a
+    // veces en /configurar-2fa y a veces en /cuenta-suspendida según qué fetch ganaba.
     try {
-      const respuestaSesion = await apiFetch("/api/sesion");
-      if (respuestaSesion.ok) {
-        const sesion = await respuestaSesion.json();
-        if (!sesion.acceso_permitido) {
+      const sesion = await consultarSesion();
+      if (!sesion.acceso_permitido) {
+        try {
           await supabase.auth.signOut();
-          window.location.href = `/cuenta-suspendida?motivo=${sesion.motivo_bloqueo ?? "suspension"}`;
-          return;
+        } catch (errorSignOut) {
+          registrarErrorAuth("LoginPage.signOut", errorSignOut);
         }
+        window.location.href = `/cuenta-suspendida?motivo=${sesion.motivo_bloqueo ?? "suspension"}`;
+        return;
       }
     } catch (errorSesion) {
       registrarErrorAuth("LoginPage.sesion", errorSesion);
