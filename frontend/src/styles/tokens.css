@@ -566,9 +566,11 @@ button.boton-con-icono {
 }
 
 .barra-progreso .relleno {
+  width: 100%;
   height: 100%;
   background: var(--teal);
-  transition: width 1s linear;
+  transform-origin: left;
+  transition: transform 1s linear;
 }
 
 .temporizador-totp p {

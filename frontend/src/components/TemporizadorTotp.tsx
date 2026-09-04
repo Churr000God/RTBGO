@@ -37,7 +37,7 @@ export function TemporizadorTotp({ id }: Props) {
         </span>
       </div>
       <div className="barra-progreso" aria-hidden="true">
-        <div className="relleno" style={{ width: `${porcentaje}%` }} />
+        <div className="relleno" style={{ transform: `scaleX(${porcentaje / 100})` }} />
       </div>
       <p id={id}>El código cambia cada 30 segundos.</p>
     </div>
