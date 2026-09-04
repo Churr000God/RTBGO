@@ -6,44 +6,108 @@ import { apiFetch } from "../lib/apiClient";
 import { FichaPersonaPage } from "./FichaPersonaPage";
 
 vi.mock("../lib/apiClient", () => ({ apiFetch: vi.fn() }));
+vi.mock("../lib/supabaseClient", () => ({
+  supabase: {
+    auth: {
+      getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
+      signOut: vi.fn().mockResolvedValue({ error: null }),
+    },
+  },
+}));
+
+const PERSONA = {
+  id: "11111111-2222-3333-4444-555555555555",
+  primer_nombre: "Mariana",
+  segundo_nombre: "Guadalupe",
+  apellido_paterno: "Alcántara",
+  apellido_materno: "Ruvalcaba",
+  curp: "AARM910427MDFLVR03",
+  rfc: "AARM910427H8A",
+  nss: "62119145338",
+  fecha_nacimiento: "1991-04-27",
+  fecha_ingreso: "2022-03-14",
+  estado: "activo",
+  tipo_contrato: "indefinido",
+  documento_ref: "RTB-2026-001",
+};
+
+const MOVIMIENTOS = [
+  {
+    id: "m1",
+    persona_id: PERSONA.id,
+    tipo_movimiento: "alta",
+    fecha_efectiva: "2022-03-14T09:00:00Z",
+    motivo: null,
+    registrado_por_nombre: null,
+  },
+  {
+    id: "m2",
+    persona_id: PERSONA.id,
+    tipo_movimiento: "suspension",
+    fecha_efectiva: "2023-06-01T09:00:00Z",
+    motivo: "Licencia sin goce de sueldo",
+    registrado_por_nombre: "mariana.renteria",
+  },
+];
+
+function mockApiFetch() {
+  vi.mocked(apiFetch).mockImplementation((path: string) => {
+    if (path.endsWith("/movimientos")) {
+      return Promise.resolve(new Response(JSON.stringify(MOVIMIENTOS)));
+    }
+    return Promise.resolve(new Response(JSON.stringify(PERSONA)));
+  });
+}
+
+function renderPagina() {
+  render(
+    <MemoryRouter initialEntries={[`/personas/${PERSONA.id}`]}>
+      <Routes>
+        <Route path="/personas/:id" element={<FichaPersonaPage />} />
+      </Routes>
+    </MemoryRouter>
+  );
+}
 
 describe("FichaPersonaPage", () => {
-  it("muestra identidad, expediente e historial de estado", async () => {
-    vi.mocked(apiFetch).mockImplementation((path) => {
-      if (path.endsWith("/movimientos")) {
-        return Promise.resolve(
-          new Response(
-            JSON.stringify([
-              { id: "m1", tipo_movimiento: "alta", fecha_efectiva: "2026-01-01T09:00:00Z", motivo: null },
-            ])
-          )
-        );
-      }
-      return Promise.resolve(
-        new Response(
-          JSON.stringify({
-            id: "1",
-            primer_nombre: "Mariana",
-            apellido_paterno: "Alcántara",
-            curp: "AARM910427MDFLVR03",
-            estado: "activo",
-            tipo_contrato: "indefinido",
-            documento_ref: "RTB-2026-001",
-          })
-        )
-      );
-    });
+  it("muestra identidad, datos personales y expediente", async () => {
+    mockApiFetch();
+    renderPagina();
 
-    render(
-      <MemoryRouter initialEntries={["/personas/1"]}>
-        <Routes>
-          <Route path="/personas/:id" element={<FichaPersonaPage />} />
-        </Routes>
-      </MemoryRouter>
+    await waitFor(() =>
+      expect(
+        screen.getAllByText("Mariana Guadalupe Alcántara Ruvalcaba").length
+      ).toBeGreaterThan(0)
     );
 
-    await waitFor(() => expect(screen.getByText(/mariana alcántara/i)).toBeInTheDocument());
-    expect(screen.getByText(/rtb-2026-001/i)).toBeInTheDocument();
-    expect(screen.getByText(/alta/i)).toBeInTheDocument();
+    expect(screen.getByText(PERSONA.rfc, { selector: "strong" })).toBeInTheDocument();
+    expect(screen.getByText(PERSONA.nss, { selector: "strong" })).toBeInTheDocument();
+    expect(screen.getByText("27 abr 1991")).toBeInTheDocument();
+    expect(screen.getByText(PERSONA.documento_ref)).toBeInTheDocument();
+    expect(screen.getByText("Indefinido", { selector: "strong" })).toBeInTheDocument();
+  });
+
+  it("nunca muestra 'Indeterminado' para tipo_contrato (usa el enum real)", async () => {
+    mockApiFetch();
+    renderPagina();
+
+    await waitFor(() =>
+      expect(screen.getByText(PERSONA.documento_ref)).toBeInTheDocument()
+    );
+    expect(screen.queryByText(/indeterminado/i)).not.toBeInTheDocument();
+  });
+
+  it("resume el historial de estado a los últimos movimientos, con autor y link a la bitácora completa", async () => {
+    mockApiFetch();
+    renderPagina();
+
+    await waitFor(() =>
+      expect(screen.getByText(PERSONA.documento_ref)).toBeInTheDocument()
+    );
+
+    expect(screen.getByText("mariana.renteria")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /ver bitácora completa/i })
+    ).toHaveAttribute("href", `/personas/${PERSONA.id}/bitacora`);
   });
 });
