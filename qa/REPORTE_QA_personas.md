@@ -542,9 +542,36 @@ URL a mano.
 Confirmado: es un dead-end real, no un falso positivo del usuario. Enviado a `frontend` para
 agregar un punto de entrada. Pendiente re-verificar cuando avisen.
 
-### Re-verificación tras el fix de frontend
+### Re-verificación tras el fix de frontend — PASS completo
 
-*(pendiente — se completa cuando `frontend` avise que agregó el punto de entrada)*
+Commit `842d797`: botón "Crear acceso a Kairos" en la cabecera de `FichaPersonaPage`,
+condicionado a `persona.tiene_usuario` (nuevo campo expuesto por backend en
+`GET /api/personas/{id}`, commit `0aef661`). Re-probado en vivo con sesión real:
+
+1. **Persona con usuario** (`Sistemas Kairos`, la propia cuenta logueada): botón **no aparece**,
+   sólo "Nuevo movimiento". Correcto.
+2. **Persona sin usuario** (`prueba preuba`, persona de prueba ya existente en la base sin
+   usuario vinculado): botón **sí aparece**, "Crear acceso a Kairos" junto a "Nuevo movimiento".
+3. Click en el botón → navega a `/usuarios/nuevo?persona_id=edaefa1f-...` con el `<select>` de
+   persona **preseleccionado en "prueba preuba"** (no hace falta volver a buscarla). Captura:
+   `qa/capturas/usuarios-nuevo-preseleccionado.jpg`.
+4. Flujo completo de invitación probado de punta a punta: correo + nombre de usuario + "Enviar
+   invitación" → `"Invitación enviada."` en pantalla.
+5. Volviendo a la ficha de esa persona después de crear el usuario: el botón "Crear acceso a
+   Kairos" **ya no aparece** (ahora `tiene_usuario` es `true`) — confirma que el campo se
+   recalcula correctamente tras la invitación, no queda cacheado en falso.
+
+**PASS en los 3 puntos pedidos por `orchestrator`.** Sin regresiones. El hallazgo original del
+usuario queda cerrado.
+
+### Pasada de calidad visual 09-14 (commit `d4e05a4`) — revisión rápida, sin romper nada
+
+Repaso liviano (no exhaustivo, como pidió `orchestrator`) navegando 09 (directorio), 10 (ficha),
+14 (bitácora) con sesión real después de este commit: las tres pantallas cargan y se ven
+correctas, sin errores de consola nuevos, mismos datos que antes (3-4 personas según el momento,
+historial de Cuenta B intacto con sus 5 movimientos). No se detectó ninguna regresión funcional
+en el repaso. No se comparó pixel a pixel contra los mockups de nuevo — eso ya lo habían hecho
+frontend/backend en sus propios commits; esto fue sólo una pasada de humo post-cambio.
 
 ## Pasada de calidad visual — 09/10/11/12/13/14 (2026-09-04)
 
