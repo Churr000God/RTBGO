@@ -20,6 +20,11 @@
 # 'prod pruebas' no existe: la imagen prod del backend no tiene pytest
 # (--no-dev) y el frontend prod es nginx sin npm. Pruebas siempre corren
 # contra las imágenes dev.
+#
+# 'levantar' también bootstrapea el "usuario base" (SCJ-PRO-05) si hace falta: la
+# primera vez, pregunta correo+contraseña (sin eco) para crear su acceso a Kairos;
+# despliegues posteriores del mismo entorno no repreguntan. Requiere 'uv' en el host
+# (habla con Supabase directo, no con los contenedores) -- ver scripts/bootstrap_usuario_base.py.
 
 set -euo pipefail
 
@@ -31,7 +36,7 @@ ENTORNOS_VALIDOS=("dev" "prod")
 ACCIONES_VALIDAS=("levantar" "bajar" "reconstruir" "registros" "pruebas" "estado")
 
 uso() {
-  sed -n '2,22p' "$SCRIPT_ABSOLUTO" | sed 's/^# \{0,1\}//'
+  sed -n '2,27p' "$SCRIPT_ABSOLUTO" | sed 's/^# \{0,1\}//'
   exit 1
 }
 
@@ -123,6 +128,63 @@ exportar_variables_build_frontend() {
   set +a
 }
 
+# Bootstrap del usuario base (SCJ-PRO-05, ver bitácora del corte de puesto_permiso): la
+# única pieza del bootstrap de un despliegue nuevo que no puede ser SQL puro, porque
+# necesita un auth.users real que sólo la Admin API de Supabase puede emitir. Se detecta
+# primero si ya existe (scripts/bootstrap_usuario_base.py verificar) para no repreguntar
+# en despliegues subsecuentes del mismo entorno. Habla directo con Supabase (no con los
+# contenedores), corre en el host vía `uv run` con el entorno de backend/ -- mismo patrón
+# que ya usa el proyecto para el generador de datos sintéticos.
+bootstrap_usuario_base() {
+  set -a
+  # shellcheck disable=SC1091
+  source .env
+  set +a
+
+  local estado
+  estado="$(cd backend && uv run python "$RAIZ/scripts/bootstrap_usuario_base.py" verificar)"
+
+  case "$estado" in
+    EXISTE)
+      return 0
+      ;;
+    FALTA_PERSONA)
+      echo "Aviso: no existe todavía la persona de bootstrap (falta aplicar" >&2
+      echo "  db/ddl/26_puesto_permiso_bootstrap_admin_generico.sql). Se omite el paso" >&2
+      echo "  de usuario base." >&2
+      return 0
+      ;;
+    FALTA) ;;
+    *)
+      echo "Error: respuesta inesperada de bootstrap_usuario_base.py verificar: '$estado'" >&2
+      return 1
+      ;;
+  esac
+
+  echo
+  echo "== Usuario base de bootstrap =="
+  echo "No existe todavía un acceso a Kairos para la persona de bootstrap. Se crea ahora"
+  echo "(sólo se pregunta esta vez -- despliegues posteriores de este entorno no repreguntan)."
+  local correo contrasena contrasena_confirmar resultado
+  read -r -p "Correo del usuario base: " correo
+  read -r -s -p "Contraseña: " contrasena
+  echo
+  read -r -s -p "Confirmar contraseña: " contrasena_confirmar
+  echo
+  if [[ "$contrasena" != "$contrasena_confirmar" ]]; then
+    echo "Error: las contraseñas no coinciden. No se creó el usuario base." >&2
+    unset contrasena contrasena_confirmar
+    return 1
+  fi
+  unset contrasena_confirmar
+
+  (cd backend && BOOTSTRAP_CORREO="$correo" BOOTSTRAP_CONTRASENA="$contrasena" \
+    uv run python "$RAIZ/scripts/bootstrap_usuario_base.py" crear)
+  resultado=$?
+  unset contrasena BOOTSTRAP_CONTRASENA correo
+  return $resultado
+}
+
 # --- acciones ----------------------------------------------------------------
 
 case "$ACCION" in
@@ -132,6 +194,7 @@ case "$ACCION" in
       exportar_variables_build_frontend
     fi
     compose up -d --build
+    bootstrap_usuario_base
     echo
     echo "Servicios arriba ($ENTORNO):"
     if [[ "$ENTORNO" == "dev" ]]; then

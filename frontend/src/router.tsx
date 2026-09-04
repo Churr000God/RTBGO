@@ -24,7 +24,10 @@ import { FichaPersonaPage } from "./pages/FichaPersonaPage";
 import { FichaPuestoPage } from "./pages/FichaPuestoPage";
 import { LoginPage } from "./pages/LoginPage";
 import { OlvideContrasenaPage } from "./pages/OlvideContrasenaPage";
+import { OtorgarPermisoPage } from "./pages/OtorgarPermisoPage";
+import { PermisosPage } from "./pages/PermisosPage";
 import { RestablecerContrasenaPage } from "./pages/RestablecerContrasenaPage";
+import { RevocarPermisoPage } from "./pages/RevocarPermisoPage";
 import { TerminarAsignacionPage } from "./pages/TerminarAsignacionPage";
 import { VerificarTotpRoute } from "./pages/VerificarTotpRoute";
 
@@ -56,4 +59,7 @@ export const router = createBrowserRouter([
   { path: "/estructura/asignaciones/nueva", element: <AltaAsignacionPage /> },
   { path: "/estructura/asignaciones/:id/terminar", element: <TerminarAsignacionPage /> },
   { path: "/estructura/asignaciones/:id/cambiar-puesto", element: <CambiarPuestoAsignacionPage /> },
+  { path: "/estructura/permisos", element: <PermisosPage /> },
+  { path: "/estructura/permisos/otorgar", element: <OtorgarPermisoPage /> },
+  { path: "/estructura/permisos/:id/revocar", element: <RevocarPermisoPage /> },
 ]);

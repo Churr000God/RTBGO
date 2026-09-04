@@ -1,9 +1,16 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle, Loader2, Plus } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
+
+type PuestoPermiso = {
+  id: string;
+  puesto_id: string;
+  codigo: string;
+  activo: boolean;
+};
 
 type Puesto = {
   id: string;
@@ -48,6 +55,8 @@ export function FichaPuestoPage() {
   const [puesto, setPuesto] = useState<Puesto | null>(null);
   const [nombreDepartamento, setNombreDepartamento] = useState<string | null>(null);
   const [nombreSuperior, setNombreSuperior] = useState<string | null>(null);
+  const [permisos, setPermisos] = useState<PuestoPermiso[]>([]);
+  const [estadoPermisos, setEstadoPermisos] = useState<EstadoCarga>("cargando");
   const [estadoCarga, setEstadoCarga] = useState<EstadoCarga>("cargando");
   const [error, setError] = useState<string | null>(null);
 
@@ -79,6 +88,22 @@ export function FichaPuestoPage() {
         } else {
           setNombreSuperior(null);
         }
+
+        // Estado de carga independiente del principal: si esto falla, la ficha degrada a "sin
+        // permisos" en vez de romperse, mismo criterio que nombreDepartamento/nombreSuperior.
+        // /vigentes es el estado actual (con activo real) -- /otorgados es la bitácora de
+        // eventos, no sirve para saber qué tiene el puesto ahora mismo.
+        setEstadoPermisos("cargando");
+        apiFetch("/api/permisos/vigentes")
+          .then((r) => {
+            if (!r.ok) throw new Error(`status ${r.status}`);
+            return r.json();
+          })
+          .then((datos: PuestoPermiso[]) => {
+            setPermisos(datos.filter((p) => p.puesto_id === id && p.activo));
+            setEstadoPermisos("listo");
+          })
+          .catch(() => setEstadoPermisos("error"));
       })
       .catch(() => setEstadoCarga("error"));
   }
@@ -241,6 +266,39 @@ export function FichaPuestoPage() {
             <button type="submit">Guardar</button>
           </div>
         </form>
+
+        <div className="tarjeta-resumen">
+          <div className="fila-cabecera-tarjeta">
+            <h3>Permisos de este puesto</h3>
+            <a
+              href={`/estructura/permisos/otorgar?puesto_id=${puesto.id}`}
+              className="boton-con-icono enlace-etiqueta"
+            >
+              <Plus size={14} aria-hidden="true" />
+              Otorgar permiso
+            </a>
+          </div>
+          {estadoPermisos === "cargando" && (
+            <p className="boton-con-icono">
+              <Loader2 size={14} className="icono-girando" aria-hidden="true" />
+              Cargando permisos…
+            </p>
+          )}
+          {estadoPermisos === "error" && <p>No se pudieron cargar los permisos de este puesto.</p>}
+          {estadoPermisos === "listo" && permisos.length === 0 && (
+            <p>Este puesto no tiene permisos otorgados actualmente.</p>
+          )}
+          {estadoPermisos === "listo" && permisos.length > 0 && (
+            <ul className="lista-historial-resumido">
+              {permisos.map((permiso) => (
+                <li key={permiso.id}>
+                  <span style={{ fontWeight: 600 }}>{permiso.codigo}</span>
+                  <a href={`/estructura/permisos/${permiso.id}/revocar`}>Revocar</a>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
         <div className="tarjeta-resumen">
           <h3>Fechas</h3>

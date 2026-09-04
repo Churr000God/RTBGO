@@ -45,7 +45,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Departamentos", href: "/estructura/departamentos", disponible: true },
       { label: "Puestos", href: "/estructura/puestos", disponible: true },
       { label: "Asignaciones", href: "/estructura/asignaciones", disponible: true },
-      { label: "Permisos", href: "/estructura/permisos", disponible: false },
+      { label: "Permisos", href: "/estructura/permisos", disponible: true },
     ],
   },
   { label: "Marcas", icono: Clock, disponible: false, items: [] },

@@ -35,6 +35,7 @@ function mockApiFetch(overrides: {
   puesto?: Record<string, unknown>;
   departamento?: Record<string, unknown> | null;
   superior?: Record<string, unknown> | null;
+  permisosVigentes?: Response;
   patch?: (path: string, init: RequestInit) => Response | undefined;
 } = {}) {
   const puesto = overrides.puesto ?? PUESTO;
@@ -55,6 +56,9 @@ function mockApiFetch(overrides: {
       return Promise.resolve(
         departamento ? new Response(JSON.stringify(departamento)) : new Response(null, { status: 404 })
       );
+    }
+    if (path === "/api/permisos/vigentes") {
+      return Promise.resolve(overrides.permisosVigentes ?? new Response(JSON.stringify([])));
     }
     if (path === `/api/puestos/${(puesto as typeof PUESTO).reporta_a_id}`) {
       return Promise.resolve(
@@ -226,5 +230,61 @@ describe("FichaPuestoPage", () => {
       expect(screen.getByText(/no se pudo cargar este puesto/i)).toBeInTheDocument()
     );
     expect(screen.getByRole("button", { name: /reintentar/i })).toBeInTheDocument();
+  });
+
+  it("tiene un link 'Otorgar permiso' con deep-link a este puesto", async () => {
+    mockApiFetch();
+    renderPagina();
+
+    await waitFor(() => expect(screen.getAllByText("Ejecutivo de Ventas").length).toBeGreaterThan(0));
+    expect(screen.getByRole("link", { name: /otorgar permiso/i })).toHaveAttribute(
+      "href",
+      `/estructura/permisos/otorgar?puesto_id=${PUESTO.id}`
+    );
+  });
+
+  it("lista los permisos vigentes de este puesto (filtrado por puesto_id+activo) con link a revocar", async () => {
+    mockApiFetch({
+      permisosVigentes: new Response(
+        JSON.stringify([
+          { id: "puesto-permiso-ficticio-1", puesto_id: PUESTO.id, codigo: "permiso_ficticio_uno", activo: true },
+          // de otro puesto — debe excluirse
+          { id: "puesto-permiso-ficticio-2", puesto_id: "otro-puesto-ficticio", codigo: "permiso_ficticio_dos", activo: true },
+          // de este puesto pero inactivo (ya revocado) — debe excluirse
+          { id: "puesto-permiso-ficticio-3", puesto_id: PUESTO.id, codigo: "permiso_ficticio_tres", activo: false },
+        ])
+      ),
+    });
+    renderPagina();
+
+    await waitFor(() => expect(screen.getByText("permiso_ficticio_uno")).toBeInTheDocument());
+    expect(screen.queryByText("permiso_ficticio_dos")).not.toBeInTheDocument();
+    expect(screen.queryByText("permiso_ficticio_tres")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /revocar/i })).toHaveAttribute(
+      "href",
+      "/estructura/permisos/puesto-permiso-ficticio-1/revocar"
+    );
+  });
+
+  it("muestra 'sin permisos otorgados' cuando /vigentes no trae nada para este puesto", async () => {
+    mockApiFetch();
+    renderPagina();
+
+    await waitFor(() => expect(screen.getAllByText("Ejecutivo de Ventas").length).toBeGreaterThan(0));
+    expect(
+      screen.getByText(/este puesto no tiene permisos otorgados actualmente/i)
+    ).toBeInTheDocument();
+  });
+
+  it("degrada a un mensaje propio si /api/permisos/vigentes falla, sin romper el resto de la ficha", async () => {
+    mockApiFetch({ permisosVigentes: new Response(null, { status: 500 }) });
+    renderPagina();
+
+    await waitFor(() => expect(screen.getAllByText("Ejecutivo de Ventas").length).toBeGreaterThan(0));
+    await waitFor(() =>
+      expect(
+        screen.getByText(/no se pudieron cargar los permisos de este puesto/i)
+      ).toBeInTheDocument()
+    );
   });
 });

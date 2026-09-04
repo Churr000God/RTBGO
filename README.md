@@ -135,18 +135,33 @@ psql "$DATABASE_URL" -f db/ddl/17_personas_asignacion.sql
 psql "$DATABASE_URL" -f db/ddl/18_asignacion_trigger_baja_definitiva.sql
 psql "$DATABASE_URL" -f db/ddl/19_asignacion_fn_cambiar_puesto.sql
 psql "$DATABASE_URL" -f db/ddl/20_asignacion_fn_revoca_execute_public.sql
+psql "$DATABASE_URL" -f db/ddl/21_personas_permiso.sql
+psql "$DATABASE_URL" -f db/ddl/22_personas_puesto_permiso.sql
+psql "$DATABASE_URL" -f db/ddl/23_personas_bitacora_puesto_permiso.sql
+psql "$DATABASE_URL" -f db/ddl/24_puesto_permiso_trigger.sql
+psql "$DATABASE_URL" -f db/ddl/25_permiso_migracion_inicial.sql
+psql "$DATABASE_URL" -f db/ddl/26_puesto_permiso_bootstrap_admin_generico.sql
+psql "$DATABASE_URL" -f db/ddl/27_puesto_permiso_mapeo_inicial.sql
+psql "$DATABASE_URL" -f db/ddl/28_bitacora_puesto_permiso_revoca_update_delete.sql
 ```
 
-`10`–`20` son el módulo Estructura Organizacional en construcción (`area`, `departamento`,
-`puesto`, `asignacion`, ver `CLAUDE.md`) — todavía sin `permiso`. `15` agrega una 6ª área
-("Dirección General") y 6 departamentos placeholder que no son estructura real del organigrama —
-sólo existen para que los puestos de dirección tengan dónde colgar (`departamento_id` es
-`NOT NULL`); ver el comentario de cabecera del archivo. `18` es el primer `CREATE OR REPLACE
-FUNCTION` del proyecto — reemplaza el cuerpo de `personas.fn_bitacora_sincroniza_persona()`
-(creada en `05`) para que una baja definitiva también cierre las asignaciones vigentes de la
-persona; el trigger que la dispara no cambia. `19` es el primer RPC del proyecto
-(`personas.fn_asignacion_cambiar_puesto`), `SECURITY INVOKER`, para cerrar+abrir una asignación en
-una sola transacción.
+`10`–`28` cierran el módulo Estructura Organizacional (`area`, `departamento`, `puesto`,
+`asignacion`, `permiso`/`puesto_permiso`, ver `CLAUDE.md`). `15` agrega una 6ª área ("Dirección
+General") y 6 departamentos placeholder que no son estructura real del organigrama — sólo existen
+para que los puestos de dirección tengan dónde colgar (`departamento_id` es `NOT NULL`); ver el
+comentario de cabecera del archivo. `18` es el primer `CREATE OR REPLACE FUNCTION` del proyecto —
+reemplaza el cuerpo de `personas.fn_bitacora_sincroniza_persona()` (creada en `05`) para que una
+baja definitiva también cierre las asignaciones vigentes de la persona; el trigger que la dispara
+no cambia. `19` es el primer RPC del proyecto (`personas.fn_asignacion_cambiar_puesto`),
+`SECURITY INVOKER`, para cerrar+abrir una asignación en una sola transacción; `20` revoca el
+`EXECUTE` que Postgres le otorga a `PUBLIC` por default en todo `CREATE FUNCTION` (hallazgo de
+auditoría de seguridad). `23` nace inmutable (sólo `SELECT`+`INSERT`, sin `UPDATE`/`DELETE`) desde
+el arranque, a diferencia de `09` que tuvo que parchear esa falta después. `26` siembra un puesto
+de bootstrap genérico ("Gerente o Encargado de TI") con los 16 permisos completos, independiente
+del organigrama real — funciona aunque `11`/`13`/`15`/`16` no estén aplicados; **no** crea
+`personas.usuario` (necesita un `auth.users` real, eso vive en `scripts/desplegar.sh`, sesión
+`devops`). `27` es el mapeo real de permisos sobre los puestos ya sembrados del organigrama
+(Responsable de Recursos Humanos, Encargado de TI, Gerente General).
 
 ### 4. Generar datos sintéticos
 

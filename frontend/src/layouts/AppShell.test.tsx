@@ -174,7 +174,10 @@ describe("AppShell", () => {
     window.history.pushState({}, "", "/");
   });
 
-  it("atenúa las entradas no disponibles del grupo con aria-disabled", async () => {
+  it("Estructura organizacional ya no tiene ningún item atenuado (quinto corte: Permisos navegable)", async () => {
+    // Con Permisos habilitado, este grupo se quedó sin items aria-disabled -- el ejemplo de
+    // "atenuado" que cubre este test ahora vive sólo a nivel de grupo (ver el test de "Panel",
+    // más abajo), no de sub-item dentro de un grupo navegable.
     window.history.pushState({}, "", "/estructura/areas");
     vi.mocked(apiFetch).mockResolvedValue(
       new Response(JSON.stringify({ acceso_permitido: true, motivo_bloqueo: null }), { status: 200 })
@@ -187,23 +190,16 @@ describe("AppShell", () => {
     );
 
     await waitFor(() => expect(screen.getByText("Contenido protegido")).toBeInTheDocument());
-    const permisos = screen.getByText("Permisos").closest("[aria-disabled]");
-    expect(permisos).toHaveAttribute("aria-disabled", "true");
-    expect(screen.queryByRole("link", { name: "Permisos" })).not.toBeInTheDocument();
-    // Departamentos, Puestos y Asignaciones ya son navegables (segundo, tercer y cuarto corte
-    // de Estructura organizacional).
-    expect(screen.getByRole("link", { name: "Departamentos" })).toHaveAttribute(
-      "href",
-      "/estructura/departamentos"
-    );
-    expect(screen.getByRole("link", { name: "Puestos" })).toHaveAttribute(
-      "href",
-      "/estructura/puestos"
-    );
-    expect(screen.getByRole("link", { name: "Asignaciones" })).toHaveAttribute(
-      "href",
-      "/estructura/asignaciones"
-    );
+    for (const [nombre, href] of [
+      ["Áreas", "/estructura/areas"],
+      ["Departamentos", "/estructura/departamentos"],
+      ["Puestos", "/estructura/puestos"],
+      ["Asignaciones", "/estructura/asignaciones"],
+      ["Permisos", "/estructura/permisos"],
+    ] as const) {
+      expect(screen.getByRole("link", { name: nombre })).toHaveAttribute("href", href);
+    }
+    expect(screen.queryByText("Próximamente")).not.toBeInTheDocument();
 
     window.history.pushState({}, "", "/");
   });
