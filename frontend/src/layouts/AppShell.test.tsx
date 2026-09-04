@@ -133,4 +133,80 @@ describe("AppShell", () => {
     expect(llamadas).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText("Contenido protegido")).not.toBeInTheDocument();
   });
+
+  it("con acceso permitido, muestra los grupos de navegación colapsados por defecto", async () => {
+    vi.mocked(apiFetch).mockResolvedValue(
+      new Response(JSON.stringify({ acceso_permitido: true, motivo_bloqueo: null }), { status: 200 })
+    );
+
+    render(
+      <AppShell>
+        <p>Contenido protegido</p>
+      </AppShell>
+    );
+
+    await waitFor(() => expect(screen.getByText("Contenido protegido")).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: /personas y usuarios/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /estructura organizacional/i })).toBeInTheDocument();
+    // colapsado por defecto en una ruta fuera de todo grupo: los items no están en el DOM
+    expect(screen.queryByText("Áreas")).not.toBeInTheDocument();
+    expect(screen.queryByText("Directorio")).not.toBeInTheDocument();
+  });
+
+  it("autoexpande el grupo cuya ruta activa cae dentro de él", async () => {
+    window.history.pushState({}, "", "/estructura/areas");
+    vi.mocked(apiFetch).mockResolvedValue(
+      new Response(JSON.stringify({ acceso_permitido: true, motivo_bloqueo: null }), { status: 200 })
+    );
+
+    render(
+      <AppShell>
+        <p>Contenido protegido</p>
+      </AppShell>
+    );
+
+    await waitFor(() => expect(screen.getByText("Contenido protegido")).toBeInTheDocument());
+    const grupo = screen.getByRole("button", { name: /estructura organizacional/i });
+    expect(grupo).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("link", { name: "Áreas" })).toHaveAttribute("href", "/estructura/areas");
+
+    window.history.pushState({}, "", "/");
+  });
+
+  it("atenúa las entradas no disponibles del grupo con aria-disabled", async () => {
+    window.history.pushState({}, "", "/estructura/areas");
+    vi.mocked(apiFetch).mockResolvedValue(
+      new Response(JSON.stringify({ acceso_permitido: true, motivo_bloqueo: null }), { status: 200 })
+    );
+
+    render(
+      <AppShell>
+        <p>Contenido protegido</p>
+      </AppShell>
+    );
+
+    await waitFor(() => expect(screen.getByText("Contenido protegido")).toBeInTheDocument());
+    const departamentos = screen.getByText("Departamentos").closest("[aria-disabled]");
+    expect(departamentos).toHaveAttribute("aria-disabled", "true");
+    expect(screen.queryByRole("link", { name: "Departamentos" })).not.toBeInTheDocument();
+
+    window.history.pushState({}, "", "/");
+  });
+
+  it("un grupo sin items propios (p. ej. Panel) se muestra atenuado y sin botón expandible", async () => {
+    vi.mocked(apiFetch).mockResolvedValue(
+      new Response(JSON.stringify({ acceso_permitido: true, motivo_bloqueo: null }), { status: 200 })
+    );
+
+    render(
+      <AppShell>
+        <p>Contenido protegido</p>
+      </AppShell>
+    );
+
+    await waitFor(() => expect(screen.getByText("Contenido protegido")).toBeInTheDocument());
+    const panel = screen.getByText("Panel").closest("[aria-disabled]");
+    expect(panel).toHaveAttribute("aria-disabled", "true");
+    expect(screen.queryByRole("button", { name: /^panel$/i })).not.toBeInTheDocument();
+  });
 });

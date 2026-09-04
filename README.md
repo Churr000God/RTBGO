@@ -115,7 +115,23 @@ psql "$DATABASE_URL" -f db/ddl/03_parametros_ejemplo.sql
 > Los valores son **de ejemplo**. Las políticas reales se cargan como parámetros en el despliegue y
 > no forman parte del alcance de este proyecto.
 
-### 3. Generar datos sintéticos
+### 3. Crear el esquema `personas` y Estructura Organizacional
+
+```bash
+psql "$DATABASE_URL" -f db/ddl/04_personas.sql
+psql "$DATABASE_URL" -f db/ddl/05_personas_estructura.sql
+psql "$DATABASE_URL" -f db/ddl/06_personas_rls.sql
+psql "$DATABASE_URL" -f db/ddl/07_personas_storage.sql
+psql "$DATABASE_URL" -f db/ddl/08_personas_permisos.sql
+psql "$DATABASE_URL" -f db/ddl/09_personas_bitacora_inmutable.sql
+psql "$DATABASE_URL" -f db/ddl/10_personas_area.sql
+psql "$DATABASE_URL" -f db/ddl/11_area_migracion_inicial.sql
+```
+
+`10`/`11` son el primer corte del módulo Estructura Organizacional (`area`, ver `CLAUDE.md`) —
+sólo la tabla raíz, sin `departamento`/`puesto`/`permiso`/`asignacion`, todavía sin construir.
+
+### 4. Generar datos sintéticos
 
 **Pendiente.** `tools/generador/` está vacío — es el entregable `E5` (`SCJ-GEN-01`), programado para
 el 8 de septiembre. Una vez escrito, se invoca con `uv run python`, no con `python3` directo:
@@ -128,7 +144,7 @@ psql "$DATABASE_URL" -f ../../db/seeds/datos_sinteticos.sql
 
 La semilla fija hace el conjunto reproducible: la misma semilla produce siempre los mismos datos.
 
-### 4. Correr las consultas de validación
+### 5. Correr las consultas de validación
 
 ```bash
 for f in db/consultas/validacion/*.sql; do echo "== $f"; psql "$DATABASE_URL" -f "$f"; done

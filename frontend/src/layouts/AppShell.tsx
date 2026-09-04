@@ -1,4 +1,18 @@
 import { useEffect, useState, type ReactNode } from "react";
+import {
+  BarChart3,
+  Building2,
+  CalendarClock,
+  ChevronDown,
+  ChevronRight,
+  Clock,
+  LayoutGrid,
+  LogOut,
+  Settings,
+  ShieldCheck,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 
 import { supabase } from "../lib/supabaseClient";
 import { registrarErrorAuth } from "../lib/erroresAuth";
@@ -6,14 +20,42 @@ import { consultarSesion } from "../lib/sesion";
 
 type EstadoAcceso = "verificando" | "permitido";
 
-const NAV_ITEMS = [
-  { label: "Panel", href: "/", disponible: false },
-  { label: "Personas", href: "/personas", disponible: true },
-  { label: "Marcas", href: "/marcas", disponible: false },
-  { label: "Jornadas", href: "/jornadas", disponible: false },
-  { label: "Autorizaciones", href: "/autorizaciones", disponible: false },
-  { label: "Reportes", href: "/reportes", disponible: false },
-  { label: "Configuración", href: "/configuracion", disponible: false },
+type NavItem = { label: string; href: string; disponible: boolean };
+
+// `disponible` (a nivel de grupo y de item) es el punto de enganche del gate de permisos
+// futuro (SCJ-PRO-05): el día que exista `puesto_permiso`, este valor pasa a derivarse del
+// set de permisos del caller en vez de estar fijo aquí — por eso la estructura es data-driven
+// (este arreglo) y no JSX hardcodeado por pestaña.
+type NavGroup = { label: string; icono: LucideIcon; disponible: boolean; items: NavItem[] };
+
+const NAV_GROUPS: NavGroup[] = [
+  { label: "Panel", icono: LayoutGrid, disponible: false, items: [] },
+  {
+    label: "Personas y Usuarios",
+    icono: Users,
+    disponible: true,
+    items: [
+      { label: "Directorio", href: "/personas", disponible: true },
+      { label: "Alta de persona", href: "/personas/nueva", disponible: true },
+      { label: "Alta de usuario", href: "/usuarios/nuevo", disponible: true },
+    ],
+  },
+  {
+    label: "Estructura organizacional",
+    icono: Building2,
+    disponible: true,
+    items: [
+      { label: "Áreas", href: "/estructura/areas", disponible: true },
+      { label: "Departamentos", href: "/estructura/departamentos", disponible: false },
+      { label: "Puestos", href: "/estructura/puestos", disponible: false },
+      { label: "Permisos", href: "/estructura/permisos", disponible: false },
+    ],
+  },
+  { label: "Marcas", icono: Clock, disponible: false, items: [] },
+  { label: "Jornadas", icono: CalendarClock, disponible: false, items: [] },
+  { label: "Autorizaciones", icono: ShieldCheck, disponible: false, items: [] },
+  { label: "Reportes", icono: BarChart3, disponible: false, items: [] },
+  { label: "Configuración", icono: Settings, disponible: false, items: [] },
 ];
 
 type Props = { children: ReactNode };
@@ -22,6 +64,26 @@ export function AppShell({ children }: Props) {
   const rutaActual = typeof window !== "undefined" ? window.location.pathname : "";
   const [correoUsuario, setCorreoUsuario] = useState<string | null>(null);
   const [estadoAcceso, setEstadoAcceso] = useState<EstadoAcceso>("verificando");
+  const [gruposAbiertos, setGruposAbiertos] = useState<Set<string>>(
+    () =>
+      new Set(
+        NAV_GROUPS.filter((grupo) =>
+          grupo.items.some((item) => item.disponible && rutaActual.startsWith(item.href)),
+        ).map((grupo) => grupo.label),
+      ),
+  );
+
+  function alternarGrupo(label: string) {
+    setGruposAbiertos((anterior) => {
+      const siguiente = new Set(anterior);
+      if (siguiente.has(label)) {
+        siguiente.delete(label);
+      } else {
+        siguiente.add(label);
+      }
+      return siguiente;
+    });
+  }
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -87,7 +149,7 @@ export function AppShell({ children }: Props) {
     <div style={{ display: "flex", minHeight: "100vh" }}>
       <aside
         style={{
-          flex: "0 0 240px",
+          flex: "0 0 260px",
           background: "var(--navy)",
           color: "white",
           padding: "1.5rem 1rem",
@@ -98,35 +160,74 @@ export function AppShell({ children }: Props) {
         <strong
           style={{
             fontFamily: "var(--font-titulo)",
-            fontSize: "1.25rem",
+            fontSize: "1.35rem",
             display: "block",
             marginBottom: "2rem",
+            padding: "0 0.5rem",
           }}
         >
           Kairos
         </strong>
-        <nav style={{ flex: 1 }}>
-          {NAV_ITEMS.map((item) => {
-            const activo = item.disponible && item.href !== "/" && rutaActual.startsWith(item.href);
+        <nav style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+          {NAV_GROUPS.map((grupo) => {
+            const Icono = grupo.icono;
+
+            if (grupo.items.length === 0) {
+              return (
+                <div key={grupo.label} className="nav-item-plano" aria-disabled={!grupo.disponible}>
+                  <Icono size={18} aria-hidden="true" />
+                  {grupo.label}
+                </div>
+              );
+            }
+
+            const abierto = gruposAbiertos.has(grupo.label);
+            const grupoActivo = grupo.items.some(
+              (item) => item.disponible && rutaActual.startsWith(item.href),
+            );
+            const ChevronIcono = abierto ? ChevronDown : ChevronRight;
+
             return (
-              <a
-                key={item.label}
-                href={item.disponible ? item.href : undefined}
-                aria-disabled={!item.disponible}
-                style={{
-                  display: "block",
-                  padding: "0.6rem 0.75rem",
-                  borderRadius: "8px",
-                  marginBottom: "0.25rem",
-                  color: item.disponible ? "white" : "rgba(255,255,255,0.35)",
-                  background: activo ? "var(--teal)" : "transparent",
-                  textDecoration: "none",
-                  cursor: item.disponible ? "pointer" : "default",
-                  pointerEvents: item.disponible ? "auto" : "none",
-                }}
-              >
-                {item.label}
-              </a>
+              <div className="nav-grupo" key={grupo.label}>
+                <button
+                  type="button"
+                  className={`nav-grupo-titulo${grupoActivo ? " nav-grupo-titulo--activo" : ""}`}
+                  onClick={() => alternarGrupo(grupo.label)}
+                  aria-expanded={abierto}
+                >
+                  <Icono size={18} aria-hidden="true" />
+                  {grupo.label}
+                  <ChevronIcono size={16} aria-hidden="true" />
+                </button>
+                {abierto && (
+                  <div className="nav-subitems">
+                    {grupo.items.map((item) => {
+                      if (!item.disponible) {
+                        return (
+                          <div
+                            key={item.label}
+                            className="nav-subitem nav-subitem--atenuado"
+                            aria-disabled="true"
+                          >
+                            {item.label}
+                            <span className="etiqueta-proximamente">Próximamente</span>
+                          </div>
+                        );
+                      }
+                      const activo = rutaActual.startsWith(item.href);
+                      return (
+                        <a
+                          key={item.href}
+                          href={item.href}
+                          className={`nav-subitem${activo ? " nav-subitem--activo" : ""}`}
+                        >
+                          {item.label}
+                        </a>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             );
           })}
         </nav>
@@ -136,16 +237,8 @@ export function AppShell({ children }: Props) {
               {correoUsuario}
             </p>
           )}
-          <button
-            type="button"
-            onClick={cerrarSesion}
-            style={{
-              background: "transparent",
-              border: "1px solid rgba(255,255,255,0.35)",
-              color: "white",
-              width: "100%",
-            }}
-          >
+          <button type="button" onClick={cerrarSesion} className="boton-cerrar-sesion">
+            <LogOut size={16} aria-hidden="true" />
             Cerrar sesión
           </button>
         </div>

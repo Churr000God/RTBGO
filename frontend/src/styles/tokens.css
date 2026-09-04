@@ -1411,3 +1411,103 @@ a.boton-con-icono {
   color: var(--navy-medio);
   max-width: 26rem;
 }
+
+/* ─── §sidebar agrupado ─── */
+/* Sidebar de AppShell reestructurado en grupos desplegables (módulo → sus vistas) — el punto
+   donde después se engancha el filtrado por permisos de SCJ-PRO-05 (`disponible` por grupo e
+   ítem). Estilos movidos aquí desde inline: con grupos anidados (título + chevron + subitems)
+   ya no daba para seguir como objetos de estilo en AppShell.tsx. */
+
+.nav-item-plano {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  margin-bottom: 0.15rem;
+  font-size: 0.92rem;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.nav-grupo {
+  margin-bottom: 0.15rem;
+}
+
+.nav-grupo-titulo {
+  all: unset;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.nav-grupo-titulo--activo {
+  color: #fff;
+}
+
+.nav-grupo-titulo svg:last-child {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.nav-subitems {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.3rem 0 0.5rem 2.1rem;
+}
+
+.nav-subitem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.45rem 0.65rem;
+  border-radius: 6px;
+  font-size: 0.86rem;
+  color: rgba(255, 255, 255, 0.85);
+  text-decoration: none;
+}
+
+.nav-subitem--activo {
+  background: var(--teal);
+  color: #fff;
+  font-weight: 600;
+}
+
+.nav-subitem--atenuado {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.etiqueta-proximamente {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: rgba(173, 149, 81, 0.9);
+  border: 1px solid rgba(173, 149, 81, 0.4);
+  border-radius: 999px;
+  padding: 0.1rem 0.4rem;
+  white-space: nowrap;
+}
+
+.boton-cerrar-sesion {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  color: #fff;
+  width: 100%;
+  padding: 0.6rem;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-family: var(--font-cuerpo);
+}
