@@ -50,4 +50,25 @@ describe("AltaPersonaPage", () => {
     const cuerpo = JSON.parse(llamadaPost[1]!.body as string);
     expect(cuerpo.curp).toBe("AARM910427MDFLVR03");
   });
+
+  it("normaliza CURP y RFC a mayúsculas aunque se tipeen en minúsculas", async () => {
+    vi.mocked(apiFetch).mockImplementation((path: string) => {
+      if (path === "/api/sesion") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ acceso_permitido: true, motivo_bloqueo: null }))
+        );
+      }
+      return Promise.resolve(new Response(JSON.stringify({ id: "1" }), { status: 201 }));
+    });
+
+    render(<AltaPersonaPage />);
+    const curp = await screen.findByLabelText(/curp/i);
+    const rfc = screen.getByLabelText(/rfc/i);
+
+    await userEvent.type(curp, "aarm910427mdflvr03");
+    await userEvent.type(rfc, "aarm910427h8a");
+
+    expect(curp).toHaveValue("AARM910427MDFLVR03");
+    expect(rfc).toHaveValue("AARM910427H8A");
+  });
 });

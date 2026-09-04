@@ -1,8 +1,12 @@
-import { type FormEvent, useState } from "react";
+import { type ChangeEvent, type FormEvent, useState } from "react";
 import { ArrowRight, Briefcase, Folder, User } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
+
+function aMayusculas(evento: ChangeEvent<HTMLInputElement>) {
+  evento.currentTarget.value = evento.currentTarget.value.toUpperCase();
+}
 
 export function AltaPersonaPage() {
   const [error, setError] = useState<string | null>(null);
@@ -76,12 +80,26 @@ export function AltaPersonaPage() {
             </div>
             <div className="campo">
               <label htmlFor="curp">CURP</label>
-              <input id="curp" name="curp" required maxLength={18} />
+              <input
+                id="curp"
+                name="curp"
+                required
+                maxLength={18}
+                style={{ textTransform: "uppercase" }}
+                onChange={aMayusculas}
+              />
               <small className="ayuda-campo">18 caracteres</small>
             </div>
             <div className="campo">
               <label htmlFor="rfc">RFC</label>
-              <input id="rfc" name="rfc" required maxLength={13} />
+              <input
+                id="rfc"
+                name="rfc"
+                required
+                maxLength={13}
+                style={{ textTransform: "uppercase" }}
+                onChange={aMayusculas}
+              />
               <small className="ayuda-campo">13 caracteres con homoclave</small>
             </div>
             <div className="campo">
