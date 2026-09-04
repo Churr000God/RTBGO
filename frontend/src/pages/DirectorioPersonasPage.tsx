@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, Plus, Search } from "lucide-react";
+import { AlertCircle, Loader2, Plus, Search, Users } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
@@ -168,7 +168,12 @@ export function DirectorioPersonasPage() {
           </select>
         </div>
 
-        {estadoCarga === "cargando" && <p>Cargando personas…</p>}
+        {estadoCarga === "cargando" && (
+          <p className="boton-con-icono">
+            <Loader2 size={16} className="icono-girando" aria-hidden="true" />
+            Cargando personas…
+          </p>
+        )}
 
         {estadoCarga === "error" && (
           <div className="tarjeta-error" role="alert">
@@ -184,7 +189,10 @@ export function DirectorioPersonasPage() {
         )}
 
         {estadoCarga === "listo" && filtradas.length === 0 && (
-          <p>No hay personas registradas o tu cuenta no tiene acceso al padrón.</p>
+          <div className="estado-vacio">
+            <Users size={28} aria-hidden="true" />
+            <p>No hay personas registradas o tu cuenta no tiene acceso al padrón.</p>
+          </div>
         )}
 
         {estadoCarga === "listo" && filtradas.length > 0 && (

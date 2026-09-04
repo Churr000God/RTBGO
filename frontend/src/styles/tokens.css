@@ -8,6 +8,7 @@
   --oro: #ad9551;
   --font-titulo: "Playfair Display", serif;
   --font-cuerpo: "Inter", system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
   --radio-tarjeta: 14px;
   --sombra-tarjeta: 0 2px 10px rgba(0, 43, 91, 0.05);
   --ancho-tarjeta-auth: 26.25rem;
@@ -88,6 +89,15 @@ button {
   border-radius: 10px;
   border: none;
   cursor: pointer;
+  transition: background-color 150ms ease, transform 100ms ease;
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+button:disabled {
+  cursor: default;
 }
 
 button[type="submit"] {
@@ -120,6 +130,14 @@ th, td {
   text-align: left;
   padding: 0.75rem 1rem;
   border-bottom: 1px solid rgba(0, 43, 91, 0.08);
+}
+
+tbody tr {
+  transition: background-color 120ms ease;
+}
+
+tbody tr:hover {
+  background: var(--superficie);
 }
 
 th {
@@ -327,8 +345,11 @@ th {
   text-align: center;
 }
 
-button.boton-con-icono,
-a.boton-con-icono {
+.boton-con-icono {
+  /* Sin scopear a button/a: ya se usaba en <p> para las líneas de "Cargando…"/"Generando
+     código…" con un ícono girando (Configurar2FAPage), pero el selector sólo cubría
+     button/a — el ícono y el texto nunca quedaban centrados en flex ahí, sólo caían en
+     flujo inline normal. Una clase, cualquier elemento. */
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -346,10 +367,15 @@ a.boton-con-icono {
   border-radius: 10px;
   font-weight: 600;
   font-size: 0.95rem;
+  transition: background-color 150ms ease, transform 100ms ease;
 }
 
 .boton-primario:hover {
   background: var(--navy-medio);
+}
+
+.boton-primario:active {
+  transform: scale(0.98);
 }
 
 .medidor-fuerza {
@@ -1009,6 +1035,7 @@ a.boton-con-icono {
 .metrica strong {
   font-family: var(--font-titulo);
   font-size: 1.6rem;
+  font-variant-numeric: tabular-nums;
   color: var(--navy);
 }
 
@@ -1096,6 +1123,7 @@ a.boton-con-icono {
 .metricas-cabecera strong {
   font-family: var(--font-titulo);
   font-size: 1.25rem;
+  font-variant-numeric: tabular-nums;
   color: var(--navy);
 }
 
@@ -1190,6 +1218,7 @@ a.boton-con-icono {
   display: block;
   font-family: var(--font-titulo);
   font-size: 1.4rem;
+  font-variant-numeric: tabular-nums;
   color: var(--navy);
 }
 
@@ -1284,9 +1313,17 @@ a.boton-con-icono {
   font-weight: 600;
 }
 
+/* CURP/RFC/NSS son identificadores, no prosa — el mono + tracking los hace más fáciles de
+   leer/verificar carácter por carácter, tanto tipeándolos (formulario) como mostrándolos
+   (ficha). Mismo --font-mono que .pildora-monoespaciada, un solo lugar. */
+.campo-identificador {
+  font-family: var(--font-mono);
+  letter-spacing: 0.03em;
+}
+
 .pildora-monoespaciada {
   display: inline-block;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-mono);
   background: var(--superficie);
   border: 1px solid rgba(0, 43, 91, 0.15);
   border-radius: 8px;
@@ -1357,4 +1394,20 @@ a.boton-con-icono {
   margin: 0;
   font-size: 0.85rem;
   color: var(--navy-medio);
+}
+
+.estado-vacio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 3rem 1rem;
+  color: rgba(0, 43, 91, 0.35);
+  text-align: center;
+}
+
+.estado-vacio p {
+  margin: 0;
+  color: var(--navy-medio);
+  max-width: 26rem;
 }

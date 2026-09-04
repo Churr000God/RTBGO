@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import { ArrowRight, Lock, Search } from "lucide-react";
+import { ArrowRight, Loader2, Lock, Search } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
@@ -135,7 +135,12 @@ export function BitacoraMovimientosPage() {
           quién lo ejecutó y el motivo declarado.
         </p>
 
-        {estadoCarga === "cargando" && <p>Cargando bitácora…</p>}
+        {estadoCarga === "cargando" && (
+          <p className="boton-con-icono">
+            <Loader2 size={16} className="icono-girando" aria-hidden="true" />
+            Cargando bitácora…
+          </p>
+        )}
 
         {estadoCarga === "error" && (
           <p role="alert">No se pudo cargar la bitácora de esta persona.</p>

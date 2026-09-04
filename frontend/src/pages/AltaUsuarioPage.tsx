@@ -1,5 +1,5 @@
 import { type FormEvent, useEffect, useState } from "react";
-import { AlertCircle, Mail, Send, User } from "lucide-react";
+import { AlertCircle, Loader2, Mail, Send, User } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
@@ -72,7 +72,12 @@ export function AltaUsuarioPage() {
           Selecciona a una persona ya registrada y envíale una invitación de acceso.
         </p>
 
-        {estadoPersonas === "cargando" && <p>Cargando personas…</p>}
+        {estadoPersonas === "cargando" && (
+          <p className="boton-con-icono">
+            <Loader2 size={16} className="icono-girando" aria-hidden="true" />
+            Cargando personas…
+          </p>
+        )}
 
         {estadoPersonas === "error" && (
           <div className="tarjeta-error" role="alert">

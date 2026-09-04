@@ -517,3 +517,86 @@ normal y el error de credenciales sí se probaron hoy (arriba). 2FA/restablecer 
 TOTP embebido no se re-corrió completo en esta sesión porque requiere una cuenta con
 usuario/persona real para probar el flujo end-to-end dentro del `AppShell` — queda incluido en el
 bloqueo de arriba, se retoma con las mismas cuentas.
+
+## Hallazgo reportado por el usuario — `/usuarios/nuevo` sin punto de entrada en la navegación
+
+Fecha: 2026-09-04 (después del cierre de la tanda anterior). `orchestrator` ya investigó y
+confirmó la causa en código: la ruta existe y funciona (ver 12 arriba), pero no hay **ningún**
+link hacia ella en ningún lugar de la app — ni en el sidebar de `AppShell`, ni en el botón de
+acción del directorio de personas, ni en la ficha de persona. Sólo es alcanzable escribiendo la
+URL a mano.
+
+**Síntoma confirmado en vivo, dos puntos de contraste distintos:**
+
+1. **Sidebar (`AppShell`)** — los únicos ítems son Panel/Personas/Marcas/Jornadas/
+   Autorizaciones/Reportes/Configuración, y de esos sólo "Personas" tiene `href` real (los demás
+   son placeholders `disponible: false`, `href: null`). No hay ítem "Usuarios" en ningún lado.
+2. **`/personas` (directorio)** — el único botón de creación es "Agregar persona"
+   (`/personas/nueva`). Confirmado programáticamente: `[...document.querySelectorAll('a')]` en la
+   página no devuelve ningún `href` a `/usuarios/nuevo`. Captura:
+   `qa/capturas/sin-entrada-usuarios-directorio.jpg`.
+3. **`/personas/:id` (ficha)** — los únicos enlaces de acción son "Nuevo movimiento" y "Ver
+   bitácora completa". Tampoco hay nada para invitar/crear un usuario para esa persona. Captura:
+   `qa/capturas/sin-entrada-usuarios-ficha.jpg`.
+
+Confirmado: es un dead-end real, no un falso positivo del usuario. Enviado a `frontend` para
+agregar un punto de entrada. Pendiente re-verificar cuando avisen.
+
+### Re-verificación tras el fix de frontend
+
+*(pendiente — se completa cuando `frontend` avise que agregó el punto de entrada)*
+
+## Pasada de calidad visual — 09/10/11/12/13/14 (2026-09-04)
+
+Pedido del usuario: mejorar la fidelidad/calidad visual de estas 6 pantallas usando las skills
+de diseño del workspace, **sin agregar ningún dato ni campo que no exista en la base real**
+(`personas.persona`/`expediente`/`usuario`/`bitacora_movimiento_persona`) — puesto, área, número
+de empleado, banco de horas, asistencia, etc. siguen descartados, documentados en
+`diseno_paginas/personas/NOTAS_campos_extra_mockups.md`.
+
+**Skill usada:** `redesign-existing-projects` (audita el proyecto existente y aplica mejoras
+dirigidas sin reescribir desde cero — encaja mejor que las opciones orientadas a landing
+pages/marketing, que no aplican a un panel interno de RH). La mayoría de su checklist tampoco
+aplica acá (glassmorphism, parallax, gradientes de marketing, hero sections) — se descartó
+explícitamente todo lo que no fuera pulido puro de lo que ya se muestra, para no contradecir el
+trabajo de fidelidad a los mockups "Kairos" ya hecho en tandas anteriores.
+
+**Cambios aplicados, todos en `tokens.css` + las 6 páginas (ningún dato/campo nuevo):**
+
+1. **Números tabulares** (`font-variant-numeric: tabular-nums`) en las cifras de métricas del
+   directorio (09), la cabecera de la bitácora y su resumen lateral (14) — evita que los dígitos
+   salten de ancho si el valor cambia.
+2. **Tipografía monoespaciada para identificadores** (`--font-mono` nuevo en `:root`, clase
+   `.campo-identificador`): CURP/RFC/NSS/`documento_ref` en el formulario de alta (11) y en la
+   ficha de persona (10) — son identificadores para verificar carácter por carácter, no prosa.
+   Reutiliza el mismo token que ya usaba `.pildora-monoespaciada` (antes hardcodeado ahí nomás).
+3. **Feedback de presión en botones** (`:active { transform: scale(0.98) }`) en `button`,
+   `.boton-primario` — antes sólo había estado `:hover`, sin señal táctil al hacer clic.
+4. **Hover en filas de tabla** (`tbody tr:hover`) — el directorio (09) no daba ninguna señal
+   visual de que las filas son clickeables antes de posarse justo sobre el link del nombre.
+5. **Estados de carga consistentes**: Directorio (09), Ficha (10), Bitácora (14) y Alta de
+   usuario (12) mostraban un `<p>Cargando…</p>` plano; ahora usan el mismo patrón de ícono
+   girando (`Loader2` + `.icono-girando`) que ya existía en `Configurar2FAPage` — antes era el
+   único lugar que lo usaba.
+6. **Bug real encontrado de paso**: `.boton-con-icono` estaba scopeada sólo a `button`/`a`
+   (`button.boton-con-icono, a.boton-con-icono`) — el propio `Configurar2FAPage` ya la aplicaba
+   sobre un `<p>` para su "Generando código…" y nunca había tenido el `display:inline-flex` real
+   (el ícono y el texto caían en flujo inline normal, sin el `gap`/alineación pensados).
+   Generalizada la clase a cualquier elemento — arregla ese caso viejo de paso, además de los
+   nuevos "Cargando…" que ahora también la usan.
+7. **Estado vacío del directorio** con ícono (`Users`, mudo) además del texto — antes era sólo
+   una oración suelta.
+8. **Login centrado verticalmente en pantallas grandes** — ver la tarea 1 más arriba, mismo
+   commit distinto (`226d4c4`).
+
+**Explícitamente NO tocado** (para no reintroducir lo ya descartado ni salirse de "pulido
+visual"): ningún campo/columna nueva, ninguna reestructuración de layout (sin paneles laterales
+nuevos, sin wizards), sin tipografías de marca nuevas (Playfair/Inter ya tienen carácter propio,
+no son el "Inter genérico" que la skill señala como problema), sin gradientes/glassmorphism/grain
+(no encajan con la identidad "Kairos" ya validada contra los mockups de auth).
+
+`npm test`: 88/88 verde. `tsc -b`: sin errores. Verificado a mano contra localhost: mayúsculas +
+monoespaciado en CURP al tipear, botón de login sin regresión visual, estado de error de
+Directorio sin romperse. No se pudo verificar el estado vacío con datos reales (sin sesión ni
+backend arriba en el momento de la verificación) — confiado en la revisión de código + el mismo
+patrón ya usado en otras páginas.

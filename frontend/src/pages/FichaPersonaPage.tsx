@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { AlertCircle, RefreshCw } from "lucide-react";
+import { AlertCircle, Loader2, RefreshCw } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
@@ -87,7 +87,10 @@ export function FichaPersonaPage() {
     return (
       <AppShell>
         <p className="contenedor-pagina" style={{ marginTop: "2.5rem" }}>
-          Cargando…
+          <span className="boton-con-icono">
+            <Loader2 size={16} className="icono-girando" aria-hidden="true" />
+            Cargando…
+          </span>
         </p>
       </AppShell>
     );
@@ -163,15 +166,15 @@ export function FichaPersonaPage() {
             </div>
             <div className="dato">
               <span>CURP</span>
-              <strong>{persona.curp}</strong>
+              <strong className="campo-identificador">{persona.curp}</strong>
             </div>
             <div className="dato">
               <span>RFC</span>
-              <strong>{persona.rfc}</strong>
+              <strong className="campo-identificador">{persona.rfc}</strong>
             </div>
             <div className="dato">
               <span>NSS</span>
-              <strong>{persona.nss}</strong>
+              <strong className="campo-identificador">{persona.nss}</strong>
             </div>
             <div className="dato">
               <span>Fecha de nacimiento</span>

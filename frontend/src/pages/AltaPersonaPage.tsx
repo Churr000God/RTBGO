@@ -85,6 +85,7 @@ export function AltaPersonaPage() {
                 name="curp"
                 required
                 maxLength={18}
+                className="campo-identificador"
                 style={{ textTransform: "uppercase" }}
                 onChange={aMayusculas}
               />
@@ -97,6 +98,7 @@ export function AltaPersonaPage() {
                 name="rfc"
                 required
                 maxLength={13}
+                className="campo-identificador"
                 style={{ textTransform: "uppercase" }}
                 onChange={aMayusculas}
               />
@@ -104,7 +106,7 @@ export function AltaPersonaPage() {
             </div>
             <div className="campo">
               <label htmlFor="nss">NSS</label>
-              <input id="nss" name="nss" required maxLength={11} />
+              <input id="nss" name="nss" required maxLength={11} className="campo-identificador" />
               <small className="ayuda-campo">11 dígitos</small>
             </div>
           </div>
@@ -153,7 +155,13 @@ export function AltaPersonaPage() {
           </legend>
           <div className="campo">
             <label htmlFor="documento_ref">documento_ref</label>
-            <input id="documento_ref" name="documento_ref" placeholder="RTB-__-__" required />
+            <input
+              id="documento_ref"
+              name="documento_ref"
+              placeholder="RTB-__-__"
+              required
+              className="campo-identificador"
+            />
             <small className="ayuda-campo">Formato RTB-__-__ · folio del expediente físico</small>
           </div>
         </fieldset>
