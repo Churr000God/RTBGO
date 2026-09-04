@@ -57,5 +57,7 @@ def ficha_persona(persona_id: str, db: Client = Depends(get_caller_client)) -> d
         .execute()
         .data
     )
-    expediente = fila.pop("expediente")
+    # Persona insertada sin pasar por POST /api/personas (ej. datos de prueba por SQL directo)
+    # puede no tener fila en expediente — el embed de PostgREST devuelve null, no {}.
+    expediente = fila.pop("expediente") or {}
     return {**fila, **expediente}
