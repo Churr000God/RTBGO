@@ -45,14 +45,15 @@ backend y un frontend que lo exponen. Ver `README.md` y `docs/00-contexto/SCJ-CT
   `--no-dev` (sin pytest) y el frontend prod es nginx sirviendo el bundle (sin npm/node); el script
   corta con un mensaje explícito en vez de fallar con un error de `docker exec`. Las pruebas
   siempre corren con `dev pruebas`.
-- **Tests:** backend `uv run pytest` (7 casos), frontend `npm test` (9 casos). Ambos corren igual
+- **Tests:** backend `uv run pytest` (16 casos), frontend `npm test` (87 casos). Ambos corren igual
   dentro de los contenedores (`./scripts/desplegar.sh <entorno> pruebas`).
 - **Módulo Personas y Usuarios (`SCJ-PRO-01`/`SCJ-PRO-02`):** entregado el 3 de septiembre de 2026,
   de punta a punta (backend + frontend + DDL de `personas`). Puesto/área/departamento/permiso/
   asignación quedaron **fuera de alcance a propósito** — no asumir tablas ni endpoints de eso.
-  **El QA manual pantalla por pantalla contra los 14 mockups de `diseno_paginas/personas/` sigue
-  pendiente** — el módulo se mergeó a `main` antes de correrlo (decisión explícita del usuario);
-  ver `bitacora/2026-09-03_dockerizacion.md`.
+  **QA manual completado el 4 de septiembre de 2026** contra las 14 pantallas de
+  `diseno_paginas/personas/` (incluida la bitácora de movimientos, pantalla nueva); sumó el
+  endpoint `GET /api/sesion` para el enforcement real de cuenta suspendida (antes sólo existía
+  el bloqueo de RLS, sin feedback en la UI). Ver `bitacora/2026-09-04_qa_personas_mockups.md`.
 
 ## Arquitectura y módulos
 
