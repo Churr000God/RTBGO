@@ -3,6 +3,7 @@ import { AlertCircle, ArrowRight, Loader2, ShieldCheck } from "lucide-react";
 
 import { AuthLayout } from "../layouts/AuthLayout";
 import { supabase } from "../lib/supabaseClient";
+import { registrarErrorAuth } from "../lib/erroresAuth";
 import { VerificarTotpPage } from "./VerificarTotpPage";
 
 const INSIGNIA_PASO = { icono: ShieldCheck, texto: "Paso 2 de 3 · Seguridad" };
@@ -17,6 +18,7 @@ export function Configurar2FAPage() {
   useEffect(() => {
     supabase.auth.mfa.listFactors().then(({ data, error: errorListado }) => {
       if (errorListado) {
+        registrarErrorAuth("Configurar2FAPage.listFactors", errorListado);
         setError("No se pudo comprobar el estado de tu verificación en dos pasos.");
         return;
       }
@@ -27,6 +29,7 @@ export function Configurar2FAPage() {
       }
       supabase.auth.mfa.enroll({ factorType: "totp" }).then(({ data: enrolado, error: errorEnroll }) => {
         if (errorEnroll || !enrolado) {
+          registrarErrorAuth("Configurar2FAPage.enroll", errorEnroll);
           setError("No se pudo generar el código. Intenta de nuevo.");
           return;
         }

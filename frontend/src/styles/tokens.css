@@ -237,6 +237,18 @@ th {
   margin-bottom: 1rem;
 }
 
+.insignia--neutra {
+  background: rgba(0, 43, 91, 0.08);
+  color: var(--navy-medio);
+  margin-bottom: 1rem;
+}
+
+.insignia--aviso {
+  background: rgba(173, 149, 81, 0.15);
+  color: var(--oro);
+  margin-bottom: 1rem;
+}
+
 .tarjeta-error {
   background: #fdecea;
   border: 1px solid rgba(179, 38, 30, 0.2);

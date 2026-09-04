@@ -4,6 +4,7 @@ import { AlertCircle, ArrowLeft, ArrowRight, ShieldCheck } from "lucide-react";
 import { AuthLayout } from "../layouts/AuthLayout";
 import { supabase } from "../lib/supabaseClient";
 import { verificarTotp } from "../lib/mfa";
+import { registrarErrorAuth } from "../lib/erroresAuth";
 import { CasilleroCodigo } from "../components/CasilleroCodigo";
 import { TemporizadorTotp } from "../components/TemporizadorTotp";
 
@@ -66,7 +67,7 @@ export function VerificarTotpPage({
     const { error: errorVerificar } = await verificarTotp(factorId, codigo);
     setEnviando(false);
     if (errorVerificar) {
-      console.error("VerificarTotpPage.verificar", errorVerificar);
+      registrarErrorAuth("VerificarTotpPage.verificar", errorVerificar);
       setError(mensajeErrorTotp(errorVerificar));
       setCodigo("");
       setIntento((n) => n + 1);

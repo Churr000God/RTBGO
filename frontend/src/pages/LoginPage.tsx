@@ -3,6 +3,7 @@ import { AlertCircle, ArrowRight, Eye, EyeOff, Lock, Mail } from "lucide-react";
 
 import { supabase } from "../lib/supabaseClient";
 import { AuthLayout } from "../layouts/AuthLayout";
+import { registrarErrorAuth } from "../lib/erroresAuth";
 
 const INTENTOS_INICIALES = 5;
 const BLOQUEO_MS = 15 * 60 * 1000;
@@ -27,6 +28,7 @@ export function LoginPage() {
       password: String(formulario.get("contrasena")),
     });
     if (errorLogin) {
+      registrarErrorAuth("LoginPage.signInWithPassword", errorLogin);
       const restantes = intentosRestantes - 1;
       if (restantes <= 0) {
         setBloqueadoHasta(Date.now() + BLOQUEO_MS);
