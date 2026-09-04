@@ -98,8 +98,10 @@ flowchart TD
 
 - **B0 lo ejecuta Diego a mano** (`UPDATE` directo en Supabase), mismo patrón interino que
   `SCJ-PRO-01`.
-- **T2 (bitácora) no tiene trigger automatizado todavía** — pendiente de programar, igual que A3
-  de `SCJ-PRO-01`.
+- **T2 (bitácora) ya tiene trigger automatizado**: `trg_bitacora_sincroniza_persona`
+  (`db/ddl/05_personas_estructura.sql:109`) sincroniza `persona.estado`/`fecha_baja` en cada
+  `INSERT`. Además, desde `db/ddl/09_personas_bitacora_inmutable.sql` la bitácora es de solo
+  inserción de verdad (`UPDATE`/`DELETE` bloqueados incluso para `service_role`).
 - **RLS, TTL de 15 min y "Enforce single session per user" no están configurados todavía** en el
   proyecto Supabase real — quedan pendientes de aplicar antes de que este proceso sea efectivo en
   producción.
