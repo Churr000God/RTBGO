@@ -12,6 +12,8 @@ const MENSAJES: Record<string, string> = {
   otp_expired: "Este enlace venció. Solicitá uno nuevo.",
   reauthentication_needed: "Supabase pide reautenticación para este cambio.",
   over_request_rate_limit: "Demasiados intentos. Esperá unos minutos.",
+  over_email_send_rate_limit:
+    "Ya te enviamos un enlace hace un momento. Esperá unos segundos antes de pedir otro.",
 };
 
 /**

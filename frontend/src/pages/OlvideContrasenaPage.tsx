@@ -1,18 +1,26 @@
 import { type FormEvent, useState } from "react";
-import { Clock, KeyRound, Mail, Send } from "lucide-react";
+import { AlertCircle, Clock, KeyRound, Mail, Send } from "lucide-react";
 
 import { AuthLayout } from "../layouts/AuthLayout";
 import { supabase } from "../lib/supabaseClient";
+import { mensajeDeErrorAuth, registrarErrorAuth } from "../lib/erroresAuth";
 
 export function OlvideContrasenaPage() {
   const [enviado, setEnviado] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     const correo = String(new FormData(evento.currentTarget).get("correo"));
-    await supabase.auth.resetPasswordForEmail(correo, {
+    const { error: errorEnvio } = await supabase.auth.resetPasswordForEmail(correo, {
       redirectTo: `${window.location.origin}/restablecer-contrasena`,
     });
+    if (errorEnvio) {
+      registrarErrorAuth("OlvideContrasenaPage.resetPasswordForEmail", errorEnvio);
+      setError(mensajeDeErrorAuth(errorEnvio, "No se pudo enviar el enlace. Intentá de nuevo."));
+      return;
+    }
+    setError(null);
     setEnviado(true);
   }
 
@@ -27,6 +35,15 @@ export function OlvideContrasenaPage() {
       ) : (
         <>
           <p>Escribe tu correo corporativo y te enviaremos un enlace para crear una nueva.</p>
+          {error && (
+            <div className="tarjeta-error" role="alert">
+              <strong>
+                <AlertCircle size={16} aria-hidden="true" />
+                No se pudo enviar el enlace
+              </strong>
+              <p>{error}</p>
+            </div>
+          )}
           <form onSubmit={handleSubmit}>
             <label htmlFor="correo">Correo electrónico</label>
             <div className="campo-con-icono">
