@@ -3,6 +3,10 @@
 # (ver CLAUDE.md, README.md §"Cómo levantar el proyecto") — backend y frontend
 # le hablan directo por internet, usando las credenciales de sus .env.
 #
+# Las VITE_* (incluidas VITE_CONTACTO_*, correos de contacto de la app) se
+# leen de frontend/.env vía env_file -- en prod van como build args, ver
+# docker-compose.prod.yml.
+#
 # Uso: ./scripts/desplegar.sh dev levantar   (o "docker compose up -d --build")
 
 services:

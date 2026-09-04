@@ -65,6 +65,13 @@ Llena `DATABASE_URL` con la cadena de conexión del proyecto (Dashboard → Proj
 Database → Connection string), las dos llaves de API (Project Settings → API) en `.env`, y las
 mismas llaves con prefijo `VITE_` en `frontend/.env`. Ambos `.env` ya están en `.gitignore`.
 
+`frontend/.env` también trae `VITE_CONTACTO_RH_CORREO`, `VITE_CONTACTO_SISTEMAS_CORREO`,
+`VITE_CONTACTO_ADMINISTRACION_CORREO` y `VITE_CONTACTO_DIRECCION_CORREO` — los correos de contacto
+que la app muestra en login/2FA/recuperación/cuenta suspendida, uno por destinatario. Son
+variables sólo de frontend (el backend no envía correos, delega 100% en Supabase Auth). En dev se
+leen de `frontend/.env`; en prod son de **build** (van como build arg, igual que las demás
+`VITE_*`) — cambiar el valor exige `--build`, no basta reiniciar el contenedor.
+
 ### Vía A — Docker (recomendada, un comando)
 
 ```bash
