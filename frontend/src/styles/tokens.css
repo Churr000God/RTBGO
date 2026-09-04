@@ -1084,9 +1084,21 @@ a.boton-con-icono {
   flex: 1 1 16rem;
 }
 
-.barra-filtros select {
+.barra-filtros select,
+.barra-filtros input[type="date"] {
   width: auto;
   min-width: 10rem;
+}
+
+/* AsignacionesPage: 5 controles en la misma barra (buscador + estado + 2 fechas + orden) —
+   sin agrupar, el buscador (flex:1 1 16rem) domina la fila y los 4 controles auto/min-width
+   quedan sueltos detrás en el wrap. Agrupados en un solo bloque que envuelve junto, separado
+   del buscador por el gap normal de .barra-filtros. */
+.grupo-filtros-secundarios {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.85rem;
 }
 
 .persona-celda {

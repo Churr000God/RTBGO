@@ -131,13 +131,22 @@ psql "$DATABASE_URL" -f db/ddl/13_departamento_migracion_inicial.sql
 psql "$DATABASE_URL" -f db/ddl/14_personas_puesto.sql
 psql "$DATABASE_URL" -f db/ddl/15_estructura_placeholders_direccion.sql
 psql "$DATABASE_URL" -f db/ddl/16_puesto_migracion_inicial.sql
+psql "$DATABASE_URL" -f db/ddl/17_personas_asignacion.sql
+psql "$DATABASE_URL" -f db/ddl/18_asignacion_trigger_baja_definitiva.sql
+psql "$DATABASE_URL" -f db/ddl/19_asignacion_fn_cambiar_puesto.sql
+psql "$DATABASE_URL" -f db/ddl/20_asignacion_fn_revoca_execute_public.sql
 ```
 
-`10`–`16` son el módulo Estructura Organizacional en construcción (`area`, `departamento`,
-`puesto`, ver `CLAUDE.md`) — todavía sin `permiso`/`asignacion`. `15` agrega una 6ª área
+`10`–`20` son el módulo Estructura Organizacional en construcción (`area`, `departamento`,
+`puesto`, `asignacion`, ver `CLAUDE.md`) — todavía sin `permiso`. `15` agrega una 6ª área
 ("Dirección General") y 6 departamentos placeholder que no son estructura real del organigrama —
 sólo existen para que los puestos de dirección tengan dónde colgar (`departamento_id` es
-`NOT NULL`); ver el comentario de cabecera del archivo.
+`NOT NULL`); ver el comentario de cabecera del archivo. `18` es el primer `CREATE OR REPLACE
+FUNCTION` del proyecto — reemplaza el cuerpo de `personas.fn_bitacora_sincroniza_persona()`
+(creada en `05`) para que una baja definitiva también cierre las asignaciones vigentes de la
+persona; el trigger que la dispara no cambia. `19` es el primer RPC del proyecto
+(`personas.fn_asignacion_cambiar_puesto`), `SECURITY INVOKER`, para cerrar+abrir una asignación en
+una sola transacción.
 
 ### 4. Generar datos sintéticos
 

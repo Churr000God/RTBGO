@@ -144,7 +144,7 @@ PERSONA_ID = "11111111-1111-1111-1111-111111111111"
 AUTH_USER_ID = "22222222-2222-2222-2222-222222222222"
 
 
-def _fake_db_ficha(fila_persona, filas_usuario=None):
+def _fake_db_ficha(fila_persona, filas_usuario=None, filas_asignacion=None):
     fake_client = MagicMock()
     tabla_mock = fake_client.postgrest.schema.return_value.table
 
@@ -157,6 +157,10 @@ def _fake_db_ficha(fila_persona, filas_usuario=None):
         elif nombre_tabla == "usuario":
             tabla.select.return_value.eq.return_value.execute.return_value.data = (
                 filas_usuario or []
+            )
+        elif nombre_tabla == "asignacion":
+            tabla.select.return_value.eq.return_value.is_.return_value.execute.return_value.data = (
+                filas_asignacion or []
             )
         return tabla
 
@@ -228,3 +232,84 @@ def test_ficha_persona_sin_expediente_ni_usuario_no_crashea():
     assert cuerpo["tipo_contrato"] is None
     assert cuerpo["tiene_usuario"] is False
     assert cuerpo["documento_ref"] is None
+
+
+def test_ficha_persona_incluye_puestos_vigentes_aplanados():
+    fake_client = _fake_db_ficha(
+        fila_persona={
+            "id": PERSONA_ID,
+            "primer_nombre": "Mariana",
+            "segundo_nombre": None,
+            "apellido_paterno": "Alcántara",
+            "apellido_materno": None,
+            "curp": "AARM910427MDFLVR03",
+            "rfc": "AARM910427H8A",
+            "nss": "62119145338",
+            "fecha_nacimiento": "1991-04-27",
+            "fecha_ingreso": "2026-01-01",
+            "estado": "activo",
+            "expediente": None,
+        },
+        filas_asignacion=[
+            {
+                "id": "asignacion-ficticia-1",
+                "puesto": {
+                    "id": "puesto-ficticio-1",
+                    "nombre_puesto": "Puesto Ficticio Uno",
+                    "departamento": {
+                        "nombre_departamento": "Departamento Ficticio Uno",
+                        "area": {"nombre_area": "Área Ficticia Uno"},
+                    },
+                },
+            }
+        ],
+    )
+    app.dependency_overrides[get_caller_client] = lambda: fake_client
+
+    client = TestClient(app)
+    response = client.get(
+        f"/api/personas/{PERSONA_ID}",
+        headers={"Authorization": "Bearer fake-token"},
+    )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200
+    puestos_vigentes = response.json()["puestos_vigentes"]
+    assert len(puestos_vigentes) == 1
+    assert puestos_vigentes[0] == {
+        "asignacion_id": "asignacion-ficticia-1",
+        "puesto_id": "puesto-ficticio-1",
+        "nombre_puesto": "Puesto Ficticio Uno",
+        "nombre_departamento": "Departamento Ficticio Uno",
+        "nombre_area": "Área Ficticia Uno",
+    }
+
+
+def test_ficha_persona_sin_asignaciones_devuelve_puestos_vigentes_vacio():
+    fake_client = _fake_db_ficha(
+        fila_persona={
+            "id": PERSONA_ID,
+            "primer_nombre": "Mariana",
+            "segundo_nombre": None,
+            "apellido_paterno": "Alcántara",
+            "apellido_materno": None,
+            "curp": "AARM910427MDFLVR03",
+            "rfc": "AARM910427H8A",
+            "nss": "62119145338",
+            "fecha_nacimiento": "1991-04-27",
+            "fecha_ingreso": "2026-01-01",
+            "estado": "activo",
+            "expediente": None,
+        },
+    )
+    app.dependency_overrides[get_caller_client] = lambda: fake_client
+
+    client = TestClient(app)
+    response = client.get(
+        f"/api/personas/{PERSONA_ID}",
+        headers={"Authorization": "Bearer fake-token"},
+    )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200
+    assert response.json()["puestos_vigentes"] == []

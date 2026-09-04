@@ -22,6 +22,7 @@ from app.routers import sesion  # noqa: E402
 from app.routers import areas  # noqa: E402
 from app.routers import departamentos  # noqa: E402
 from app.routers import puestos  # noqa: E402
+from app.routers import asignaciones  # noqa: E402
 
 app.include_router(personas.router)
 app.include_router(usuarios.router)
@@ -30,6 +31,7 @@ app.include_router(sesion.router)
 app.include_router(areas.router)
 app.include_router(departamentos.router)
 app.include_router(puestos.router)
+app.include_router(asignaciones.router)
 
 
 @app.get("/salud")

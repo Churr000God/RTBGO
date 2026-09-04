@@ -34,11 +34,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Personas y Usuarios",
     icono: Users,
     disponible: true,
-    items: [
-      { label: "Directorio", href: "/personas", disponible: true },
-      { label: "Alta de persona", href: "/personas/nueva", disponible: true },
-      { label: "Alta de usuario", href: "/usuarios/nuevo", disponible: true },
-    ],
+    items: [{ label: "Directorio", href: "/personas", disponible: true }],
   },
   {
     label: "Estructura organizacional",
@@ -48,6 +44,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Áreas", href: "/estructura/areas", disponible: true },
       { label: "Departamentos", href: "/estructura/departamentos", disponible: true },
       { label: "Puestos", href: "/estructura/puestos", disponible: true },
+      { label: "Asignaciones", href: "/estructura/asignaciones", disponible: true },
       { label: "Permisos", href: "/estructura/permisos", disponible: false },
     ],
   },

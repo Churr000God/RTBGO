@@ -40,7 +40,16 @@ class PersonaOut(BaseModel):
     estado: str
 
 
+class PuestoVigente(BaseModel):
+    asignacion_id: str
+    puesto_id: str
+    nombre_puesto: str
+    nombre_departamento: str
+    nombre_area: str
+
+
 class PersonaConExpediente(PersonaOut):
     tipo_contrato: str | None = None
     documento_ref: str | None = None
     tiene_usuario: bool = False
+    puestos_vigentes: list[PuestoVigente] = []

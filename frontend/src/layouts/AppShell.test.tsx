@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -189,8 +190,8 @@ describe("AppShell", () => {
     const permisos = screen.getByText("Permisos").closest("[aria-disabled]");
     expect(permisos).toHaveAttribute("aria-disabled", "true");
     expect(screen.queryByRole("link", { name: "Permisos" })).not.toBeInTheDocument();
-    // Departamentos y Puestos ya son navegables (segundo y tercer corte de Estructura
-    // organizacional).
+    // Departamentos, Puestos y Asignaciones ya son navegables (segundo, tercer y cuarto corte
+    // de Estructura organizacional).
     expect(screen.getByRole("link", { name: "Departamentos" })).toHaveAttribute(
       "href",
       "/estructura/departamentos"
@@ -199,8 +200,31 @@ describe("AppShell", () => {
       "href",
       "/estructura/puestos"
     );
+    expect(screen.getByRole("link", { name: "Asignaciones" })).toHaveAttribute(
+      "href",
+      "/estructura/asignaciones"
+    );
 
     window.history.pushState({}, "", "/");
+  });
+
+  it("el grupo Personas y Usuarios sólo trae Directorio (alta de persona/usuario se dejaron de listar ahí)", async () => {
+    vi.mocked(apiFetch).mockResolvedValue(
+      new Response(JSON.stringify({ acceso_permitido: true, motivo_bloqueo: null }), { status: 200 })
+    );
+
+    render(
+      <AppShell>
+        <p>Contenido protegido</p>
+      </AppShell>
+    );
+
+    await waitFor(() => expect(screen.getByText("Contenido protegido")).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: /personas y usuarios/i }));
+
+    expect(screen.getByRole("link", { name: "Directorio" })).toHaveAttribute("href", "/personas");
+    expect(screen.queryByText("Alta de persona")).not.toBeInTheDocument();
+    expect(screen.queryByText("Alta de usuario")).not.toBeInTheDocument();
   });
 
   it("un grupo sin items propios (p. ej. Panel) se muestra atenuado y sin botón expandible", async () => {

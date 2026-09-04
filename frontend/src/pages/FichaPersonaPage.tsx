@@ -1,10 +1,18 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { AlertCircle, KeyRound, Loader2, RefreshCw } from "lucide-react";
+import { AlertCircle, KeyRound, Loader2, Plus, RefreshCw, Repeat } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
 import { derivarTransiciones, type Estado, type Movimiento } from "../lib/movimientos";
+
+type PuestoVigente = {
+  asignacion_id: string;
+  puesto_id: string;
+  nombre_puesto: string;
+  nombre_departamento: string;
+  nombre_area: string;
+};
 
 type Persona = {
   id: string;
@@ -21,6 +29,15 @@ type Persona = {
   tipo_contrato: string | null;
   documento_ref: string | null;
   tiene_usuario: boolean;
+  puestos_vigentes: PuestoVigente[];
+};
+
+type Asignacion = {
+  id: string;
+  persona_id: string;
+  nombre_puesto: string;
+  vigente_desde: string;
+  vigente_hasta: string | null;
 };
 
 const ETIQUETA_ESTADO: Record<Estado, string> = {
@@ -57,6 +74,7 @@ export function FichaPersonaPage() {
   const { id } = useParams<{ id: string }>();
   const [persona, setPersona] = useState<Persona | null>(null);
   const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
+  const [asignaciones, setAsignaciones] = useState<Asignacion[]>([]);
   const [estadoCarga, setEstadoCarga] = useState<EstadoCarga>("cargando");
 
   function cargar() {
@@ -70,10 +88,15 @@ export function FichaPersonaPage() {
         if (!r.ok) throw new Error(`status ${r.status}`);
         return r.json();
       }),
+      apiFetch("/api/asignaciones").then((r) => {
+        if (!r.ok) throw new Error(`status ${r.status}`);
+        return r.json();
+      }),
     ])
-      .then(([datosPersona, datosMovimientos]: [Persona, Movimiento[]]) => {
+      .then(([datosPersona, datosMovimientos, datosAsignaciones]: [Persona, Movimiento[], Asignacion[]]) => {
         setPersona(datosPersona);
         setMovimientos(datosMovimientos);
+        setAsignaciones(datosAsignaciones.filter((a) => a.persona_id === id));
         setEstadoCarga("listo");
       })
       .catch(() => setEstadoCarga("error"));
@@ -129,6 +152,9 @@ export function FichaPersonaPage() {
   const estado = persona.estado as Estado;
 
   const ultimosMovimientos = [...derivarTransiciones(movimientos)].reverse().slice(0, 3);
+  const ultimosPuestos = [...asignaciones]
+    .sort((a, b) => new Date(b.vigente_desde).getTime() - new Date(a.vigente_desde).getTime())
+    .slice(0, 3);
 
   return (
     <AppShell>
@@ -216,6 +242,71 @@ export function FichaPersonaPage() {
               </strong>
             </div>
           </div>
+        </div>
+
+        <div className="tarjeta-resumen">
+          <div className="fila-cabecera-tarjeta">
+            <h3>Asignación actual</h3>
+            <a
+              href={`/estructura/asignaciones/nueva?persona_id=${persona.id}`}
+              className="boton-con-icono enlace-etiqueta"
+            >
+              <Plus size={14} aria-hidden="true" />
+              Nueva asignación
+            </a>
+          </div>
+          {persona.puestos_vigentes.length === 0 ? (
+            <p>Sin puesto asignado actualmente.</p>
+          ) : (
+            <ul className="lista-historial-resumido">
+              {persona.puestos_vigentes.map((puestoVigente) => (
+                <li key={puestoVigente.asignacion_id}>
+                  <span style={{ fontWeight: 600 }}>{puestoVigente.nombre_puesto}</span>
+                  <span className="fecha-historial">
+                    {puestoVigente.nombre_departamento} · {puestoVigente.nombre_area}
+                  </span>
+                  <div className="botonera" style={{ justifyContent: "flex-start" }}>
+                    <a href={`/estructura/asignaciones/${puestoVigente.asignacion_id}/terminar`}>Terminar</a>
+                    <a
+                      href={`/estructura/asignaciones/${puestoVigente.asignacion_id}/cambiar-puesto`}
+                      className="boton-con-icono boton-primario"
+                    >
+                      <Repeat size={14} aria-hidden="true" />
+                      Cambiar de puesto
+                    </a>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="tarjeta-resumen">
+          <div className="fila-cabecera-tarjeta">
+            <h3>Historial de puestos</h3>
+            <a href={`/personas/${persona.id}/bitacora-asignaciones`} className="enlace-etiqueta">
+              Ver bitácora completa →
+            </a>
+          </div>
+          {ultimosPuestos.length === 0 ? (
+            <p>Sin asignaciones registradas todavía.</p>
+          ) : (
+            <ul className="lista-historial-resumido">
+              {ultimosPuestos.map((asignacion) => (
+                <li key={asignacion.id}>
+                  <span className={`insignia ${asignacion.vigente_hasta ? "insignia--neutra" : "insignia--exito"}`}>
+                    {asignacion.vigente_hasta ? "Terminada" : "Vigente"}
+                  </span>
+                  <span>{asignacion.nombre_puesto}</span>
+                  <span className="fecha-historial">
+                    {formatearFecha(asignacion.vigente_desde)}
+                    {" — "}
+                    {asignacion.vigente_hasta ? formatearFecha(asignacion.vigente_hasta) : "hoy"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         <div className="tarjeta-resumen">

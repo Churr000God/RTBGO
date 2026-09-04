@@ -70,4 +70,32 @@ def ficha_persona(persona_id: str, db: Client = Depends(get_caller_client)) -> d
         .data
     )
 
-    return {**fila, **expediente, "tiene_usuario": tiene_usuario}
+    asignaciones_vigentes = (
+        db.postgrest.schema("personas")
+        .table("asignacion")
+        .select(
+            "id, puesto:puesto_id(id, nombre_puesto, "
+            "departamento:departamento_id(nombre_departamento, area:area_id(nombre_area)))"
+        )
+        .eq("persona_id", persona_id)
+        .is_("vigente_hasta", "null")
+        .execute()
+        .data
+    )
+    puestos_vigentes = [
+        {
+            "asignacion_id": asignacion["id"],
+            "puesto_id": asignacion["puesto"]["id"],
+            "nombre_puesto": asignacion["puesto"]["nombre_puesto"],
+            "nombre_departamento": asignacion["puesto"]["departamento"]["nombre_departamento"],
+            "nombre_area": asignacion["puesto"]["departamento"]["area"]["nombre_area"],
+        }
+        for asignacion in asignaciones_vigentes
+    ]
+
+    return {
+        **fila,
+        **expediente,
+        "tiene_usuario": tiene_usuario,
+        "puestos_vigentes": puestos_vigentes,
+    }
