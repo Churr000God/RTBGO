@@ -64,8 +64,23 @@ def test_listar_personas():
             "nss": "62119145338",
             "fecha_nacimiento": "1991-04-27",
             "fecha_ingreso": "2026-01-01",
+            "fecha_baja": None,
             "estado": "activo",
-        }
+        },
+        {
+            "id": "44444444-4444-4444-4444-444444444444",
+            "primer_nombre": "Jorge",
+            "segundo_nombre": None,
+            "apellido_paterno": "Del Bosque",
+            "apellido_materno": None,
+            "curp": "DBJJ850101HDFLRR07",
+            "rfc": "DBJJ850101H8A",
+            "nss": "12345678901",
+            "fecha_nacimiento": "1985-01-01",
+            "fecha_ingreso": "2020-01-01",
+            "fecha_baja": "2026-06-15",
+            "estado": "baja_definitiva",
+        },
     ]
     app.dependency_overrides[get_caller_client] = lambda: fake_client
 
@@ -74,7 +89,10 @@ def test_listar_personas():
 
     app.dependency_overrides.clear()
     assert response.status_code == 200
-    assert len(response.json()) == 1
+    cuerpo = response.json()
+    assert len(cuerpo) == 2
+    assert cuerpo[0]["fecha_baja"] is None
+    assert cuerpo[1]["fecha_baja"] == "2026-06-15"
 
 
 def test_ficha_persona_incluye_expediente():

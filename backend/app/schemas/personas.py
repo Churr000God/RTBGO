@@ -28,6 +28,7 @@ class PersonaOut(BaseModel):
     nss: str
     fecha_nacimiento: date
     fecha_ingreso: date
+    fecha_baja: date | None = None
     estado: str
 
 
