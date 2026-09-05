@@ -42,7 +42,11 @@ const PUESTOS = [
   },
 ];
 
-function mockApiFetch(respuestaPuestos: Response, respuestaDepartamentos?: Response) {
+function mockApiFetch(
+  respuestaPuestos: Response,
+  respuestaDepartamentos?: Response,
+  respuestaAsignaciones?: Response,
+) {
   vi.mocked(apiFetch).mockImplementation((path: string) => {
     if (path === "/api/sesion") {
       return Promise.resolve(
@@ -51,6 +55,9 @@ function mockApiFetch(respuestaPuestos: Response, respuestaDepartamentos?: Respo
     }
     if (path === "/api/departamentos") {
       return Promise.resolve(respuestaDepartamentos ?? new Response(JSON.stringify(DEPARTAMENTOS)));
+    }
+    if (path === "/api/asignaciones") {
+      return Promise.resolve(respuestaAsignaciones ?? new Response(JSON.stringify([])));
     }
     return Promise.resolve(respuestaPuestos);
   });
@@ -79,8 +86,9 @@ describe("DirectorioPuestosPage", () => {
     expect(screen.getByText("5")).toBeInTheDocument();
     expect(screen.getByText("Activo", { selector: "span.insignia" })).toBeInTheDocument();
     expect(screen.getByText("Inactivo", { selector: "span.insignia" })).toBeInTheDocument();
-    // sólo dos llamadas propias de la página (+ la del guard de sesión): sin fetch extra por puesto
-    expect(apiFetch).toHaveBeenCalledTimes(3);
+    // tres llamadas propias de la página (puestos, departamentos, asignaciones para el
+    // organigrama) + la del guard de sesión: sin fetch extra por puesto
+    expect(apiFetch).toHaveBeenCalledTimes(4);
   });
 
   it("calcula las métricas (total, activos, inactivos)", async () => {
@@ -134,5 +142,75 @@ describe("DirectorioPuestosPage", () => {
       expect(screen.getByText(/no se pudo cargar el listado de puestos/i)).toBeInTheDocument()
     );
     expect(screen.getByRole("button", { name: /reintentar/i })).toBeInTheDocument();
+  });
+
+  describe("organigrama (híbrido: árbol grande con toggle + click filtra el catálogo)", () => {
+    const ASIGNACION_VIGENTE = { puesto_id: "puesto-1", vigente_hasta: null };
+
+    it("por defecto muestra el catálogo; la pestaña 'Organigrama' muestra el árbol de puestos", async () => {
+      mockApiFetch(new Response(JSON.stringify(PUESTOS)), undefined, new Response(JSON.stringify([])));
+      render(<DirectorioPuestosPage />);
+
+      await waitFor(() => expect(screen.getAllByText("Director Comercial").length).toBeGreaterThan(0));
+      expect(screen.getByRole("tab", { name: "Catálogo" })).toHaveAttribute("aria-selected", "true");
+
+      await userEvent.click(screen.getByRole("tab", { name: "Organigrama" }));
+
+      expect(screen.getByRole("tab", { name: "Organigrama" })).toHaveAttribute(
+        "aria-selected",
+        "true"
+      );
+      // el árbol muestra ambos puestos (activo e inactivo) — el catálogo de la tabla ya no está
+      expect(screen.getAllByText("Director Comercial").length).toBeGreaterThan(0);
+      expect(screen.getByText("Ejecutivo de Ventas")).toBeInTheDocument();
+      expect(screen.queryByRole("cell")).not.toBeInTheDocument();
+    });
+
+    it("click en un nodo vuelve al catálogo, filtrado a ese puesto y su rama, con chip removible", async () => {
+      mockApiFetch(
+        new Response(JSON.stringify(PUESTOS)),
+        undefined,
+        new Response(JSON.stringify([ASIGNACION_VIGENTE]))
+      );
+      render(<DirectorioPuestosPage />);
+
+      await waitFor(() => expect(screen.getAllByText("Director Comercial").length).toBeGreaterThan(0));
+      await userEvent.click(screen.getByRole("tab", { name: "Organigrama" }));
+      await userEvent.click(screen.getByText("Director Comercial"));
+
+      expect(screen.getByRole("tab", { name: "Catálogo" })).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByText(/filtrado por: director comercial y su equipo/i)).toBeInTheDocument();
+      // Director Comercial es la raíz -- su rama incluye a Ejecutivo de Ventas, así que ambos siguen
+      expect(screen.getByText("Ejecutivo de Ventas")).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole("button", { name: /quitar filtro/i }));
+      expect(screen.queryByText(/filtrado por:/i)).not.toBeInTheDocument();
+    });
+
+    it("en el organigrama, un puesto sin asignaciones vigentes muestra el total de plazas sin fracción de ocupadas", async () => {
+      mockApiFetch(new Response(JSON.stringify(PUESTOS)), undefined, new Response(JSON.stringify([])));
+      render(<DirectorioPuestosPage />);
+
+      await waitFor(() => expect(screen.getAllByText("Director Comercial").length).toBeGreaterThan(0));
+      await userEvent.click(screen.getByRole("tab", { name: "Organigrama" }));
+
+      const nodo = screen.getByText("Director Comercial").closest('[role="button"]')!;
+      expect(nodo).toHaveTextContent("1 plazas");
+    });
+
+    it("con una asignación vigente, el nodo muestra ocupadas/plazas", async () => {
+      mockApiFetch(
+        new Response(JSON.stringify(PUESTOS)),
+        undefined,
+        new Response(JSON.stringify([ASIGNACION_VIGENTE]))
+      );
+      render(<DirectorioPuestosPage />);
+
+      await waitFor(() => expect(screen.getAllByText("Director Comercial").length).toBeGreaterThan(0));
+      await userEvent.click(screen.getByRole("tab", { name: "Organigrama" }));
+
+      const nodo = screen.getByText("Director Comercial").closest('[role="button"]')!;
+      expect(nodo).toHaveTextContent("1/1 ocupadas");
+    });
   });
 });
