@@ -31,6 +31,8 @@ router = APIRouter(prefix="/api/departamentos", tags=["departamentos"])
 MENSAJE_DEPARTAMENTO_DUPLICADO = "Ya existe un departamento con ese nombre."
 MENSAJE_DEPARTAMENTO_NO_ENCONTRADO = "Departamento no encontrado."
 MENSAJE_AREA_INVALIDA = "El área no existe o está inactiva."
+MENSAJE_TIENE_PUESTOS_ACTIVOS = "No se puede desactivar: tiene puestos activos."
+MENSAJE_REACTIVACION_INVALIDA = "No se puede reactivar: el área no está activa."
 
 
 @router.get("", response_model=list[DepartamentoOut])
@@ -137,9 +139,42 @@ def cambiar_estado_departamento(
     _permiso: None = Depends(requiere_permiso("departamento_edicion")),
 ) -> dict:
     """SCJ-PRO-06 DD1 (desactivar) / RD1 (reactivar)."""
-    # TODO SCJ-PRO-06 DD1: cuando exista personas.puesto, rechazar la desactivación
-    # (activo=False) si algún puesto hijo de este departamento sigue activo=true. Hoy no hay
-    # tabla puesto que consultar.
+    departamento_actual = (
+        db.postgrest.schema("personas")
+        .table("departamento")
+        .select("area_id")
+        .eq("id", departamento_id)
+        .execute()
+        .data
+    )
+    if not departamento_actual:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, MENSAJE_DEPARTAMENTO_NO_ENCONTRADO)
+
+    if not datos.activo:
+        puestos_activos = (
+            db.postgrest.schema("personas")
+            .table("puesto")
+            .select("id")
+            .eq("departamento_id", departamento_id)
+            .eq("activo", True)
+            .execute()
+            .data
+        )
+        if puestos_activos:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, MENSAJE_TIENE_PUESTOS_ACTIVOS)
+    else:
+        area_id = departamento_actual[0]["area_id"]
+        area = (
+            db.postgrest.schema("personas")
+            .table("area")
+            .select("activo")
+            .eq("id", area_id)
+            .execute()
+            .data
+        )
+        if not area or not area[0]["activo"]:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, MENSAJE_REACTIVACION_INVALIDA)
+
     fila = (
         db.postgrest.schema("personas")
         .table("departamento")
@@ -153,6 +188,4 @@ def cambiar_estado_departamento(
         .execute()
         .data
     )
-    if not fila:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, MENSAJE_DEPARTAMENTO_NO_ENCONTRADO)
     return fila[0]

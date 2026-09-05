@@ -26,6 +26,9 @@ router = APIRouter(prefix="/api/areas", tags=["areas"])
 
 MENSAJE_AREA_DUPLICADA = "Ya existe un área con ese nombre."
 MENSAJE_AREA_NO_ENCONTRADA = "Área no encontrada."
+MENSAJE_TIENE_DEPARTAMENTOS_ACTIVOS = (
+    "No se puede desactivar: tiene departamentos activos."
+)
 
 
 @router.get("", response_model=list[AreaOut])
@@ -119,9 +122,21 @@ def cambiar_estado_area(
     _permiso: None = Depends(requiere_permiso("area_edicion")),
 ) -> dict:
     """SCJ-PRO-06 DA1 (desactivar) / RA1 (reactivar)."""
-    # TODO SCJ-PRO-06 DA1: cuando exista personas.departamento, rechazar la desactivación
-    # (activo=False) si algún departamento hijo de esta área sigue activo=true. Hoy no hay
-    # tabla departamento que consultar.
+    if not datos.activo:
+        departamentos_activos = (
+            db.postgrest.schema("personas")
+            .table("departamento")
+            .select("id")
+            .eq("area_id", area_id)
+            .eq("activo", True)
+            .execute()
+            .data
+        )
+        if departamentos_activos:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY, MENSAJE_TIENE_DEPARTAMENTOS_ACTIVOS
+            )
+
     fila = (
         db.postgrest.schema("personas")
         .table("area")

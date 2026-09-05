@@ -22,6 +22,8 @@ router = APIRouter(prefix="/api/puestos", tags=["puestos"])
 MENSAJE_PUESTO_NO_ENCONTRADO = "Puesto no encontrado."
 MENSAJE_DEPARTAMENTO_INVALIDO = "El departamento no existe o está inactivo."
 MENSAJE_SUPERIOR_INVALIDO = "El puesto superior no existe."
+MENSAJE_TIENE_ASIGNACION_VIGENTE = "No se puede desactivar: tiene una asignación vigente."
+MENSAJE_TIENE_PERMISOS_ACTIVOS = "No se puede desactivar: tiene permisos activos otorgados."
 MENSAJE_TIENE_SUBORDINADOS = "No se puede desactivar: tiene puestos subordinados activos."
 MENSAJE_REACTIVACION_INVALIDA = (
     "No se puede reactivar: el departamento o el puesto superior no están activos."
@@ -148,7 +150,7 @@ def cambiar_estado_puesto(
     db: Client = Depends(get_caller_client),
     _permiso: None = Depends(requiere_permiso("puesto_edicion")),
 ) -> dict:
-    """SCJ-PRO-06 DP4 (desactivar) / RP1 (reactivar)."""
+    """SCJ-PRO-06 DP1/DP3/DP4 (desactivar) / RP1 (reactivar)."""
     puesto_actual = (
         db.postgrest.schema("personas")
         .table("puesto")
@@ -160,9 +162,33 @@ def cambiar_estado_puesto(
     if not puesto_actual:
         raise HTTPException(status.HTTP_404_NOT_FOUND, MENSAJE_PUESTO_NO_ENCONTRADO)
 
-    # TODO SCJ-PRO-06 DP1/DP3: rechazar la desactivación si el puesto tiene asignación
-    # vigente o puesto_permiso activo. Hoy no existen esas tablas que consultar.
     if not datos.activo:
+        asignacion_vigente = (
+            db.postgrest.schema("personas")
+            .table("asignacion")
+            .select("id")
+            .eq("puesto_id", puesto_id)
+            .is_("vigente_hasta", "null")
+            .execute()
+            .data
+        )
+        if asignacion_vigente:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY, MENSAJE_TIENE_ASIGNACION_VIGENTE
+            )
+
+        permisos_activos = (
+            db.postgrest.schema("personas")
+            .table("puesto_permiso")
+            .select("id")
+            .eq("puesto_id", puesto_id)
+            .eq("activo", True)
+            .execute()
+            .data
+        )
+        if permisos_activos:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, MENSAJE_TIENE_PERMISOS_ACTIVOS)
+
         subordinados_activos = (
             db.postgrest.schema("personas")
             .table("puesto")

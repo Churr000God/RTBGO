@@ -5,6 +5,7 @@ from postgrest.exceptions import APIError
 
 from app.deps import CallerIdentity, get_caller_client, get_caller_identity
 from app.main import app
+from app.routers.areas import MENSAJE_TIENE_DEPARTAMENTOS_ACTIVOS
 
 AREA_ID = "33333333-3333-3333-3333-333333333333"
 
@@ -35,6 +36,11 @@ def _tabla_gate(nombre_tabla):
         tabla.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = [
             {"puesto_id": GATE_PUESTO_ID}
         ]
+    elif nombre_tabla == "departamento":
+        # cambiar_estado_area (SCJ-PRO-06 DA1) consulta departamentos activos de la misma área
+        # antes de desactivar -- sin bloqueo por omisión, cada test que quiera probar el 422
+        # sobreescribe esta tabla con su propio side_effect.
+        tabla.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = []
     return tabla
 
 
@@ -222,6 +228,35 @@ def test_desactivar_area():
     assert response.json()["activo"] is False
     datos_actualizados = tabla_area.update.call_args_list[0].args[0]
     assert datos_actualizados["activo"] is False
+
+
+def test_desactivar_area_con_departamentos_activos_devuelve_422():
+    tabla_area = MagicMock()
+    fake_client = MagicMock()
+
+    def side_effect(nombre_tabla):
+        if nombre_tabla == "departamento":
+            tabla = MagicMock()
+            tabla.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = [
+                {"id": "departamento-activo-1"}
+            ]
+            return tabla
+        return tabla_area if nombre_tabla == "area" else _tabla_gate(nombre_tabla)
+
+    fake_client.postgrest.schema.return_value.table.side_effect = side_effect
+    app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
+
+    client = TestClient(app)
+    response = client.patch(
+        f"/api/areas/{AREA_ID}/estado",
+        json={"activo": False},
+        headers={"Authorization": "Bearer fake-token"},
+    )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 422
+    assert response.json()["detail"] == MENSAJE_TIENE_DEPARTAMENTOS_ACTIVOS
 
 
 def test_reactivar_area():

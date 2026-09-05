@@ -5,6 +5,10 @@ from postgrest.exceptions import APIError
 
 from app.deps import CallerIdentity, get_caller_client, get_caller_identity
 from app.main import app
+from app.routers.departamentos import (
+    MENSAJE_REACTIVACION_INVALIDA,
+    MENSAJE_TIENE_PUESTOS_ACTIVOS,
+)
 
 AREA_ID = "33333333-3333-3333-3333-333333333333"
 DEPARTAMENTO_ID = "55555555-5555-5555-5555-555555555555"
@@ -333,13 +337,24 @@ def test_renombrar_departamento_no_encontrado():
 
 def test_desactivar_departamento():
     tabla_departamento = MagicMock()
+    tabla_departamento.select.return_value.eq.return_value.execute.return_value.data = [
+        {"area_id": AREA_ID}
+    ]
     tabla_departamento.update.return_value.eq.return_value.execute.return_value.data = [
         _fila_departamento(activo=False)
     ]
+    tabla_puesto = MagicMock()
+    tabla_puesto.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = []
     fake_client = MagicMock()
-    fake_client.postgrest.schema.return_value.table.side_effect = (
-        lambda nombre: tabla_departamento if nombre == "departamento" else _tabla_gate(nombre)
-    )
+
+    def side_effect(nombre_tabla):
+        if nombre_tabla == "departamento":
+            return tabla_departamento
+        if nombre_tabla == "puesto":
+            return tabla_puesto
+        return _tabla_gate(nombre_tabla)
+
+    fake_client.postgrest.schema.return_value.table.side_effect = side_effect
     app.dependency_overrides[get_caller_client] = lambda: fake_client
     _override_identidad()
 
@@ -355,15 +370,60 @@ def test_desactivar_departamento():
     assert response.json()["activo"] is False
 
 
+def test_desactivar_departamento_con_puestos_activos_devuelve_422():
+    tabla_departamento = MagicMock()
+    tabla_departamento.select.return_value.eq.return_value.execute.return_value.data = [
+        {"area_id": AREA_ID}
+    ]
+    tabla_puesto = MagicMock()
+    tabla_puesto.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = [
+        {"id": "puesto-activo-1"}
+    ]
+    fake_client = MagicMock()
+
+    def side_effect(nombre_tabla):
+        if nombre_tabla == "departamento":
+            return tabla_departamento
+        if nombre_tabla == "puesto":
+            return tabla_puesto
+        return _tabla_gate(nombre_tabla)
+
+    fake_client.postgrest.schema.return_value.table.side_effect = side_effect
+    app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
+
+    client = TestClient(app)
+    response = client.patch(
+        f"/api/departamentos/{DEPARTAMENTO_ID}/estado",
+        json={"activo": False},
+        headers={"Authorization": "Bearer fake-token"},
+    )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 422
+    assert response.json()["detail"] == MENSAJE_TIENE_PUESTOS_ACTIVOS
+
+
 def test_reactivar_departamento():
     tabla_departamento = MagicMock()
+    tabla_departamento.select.return_value.eq.return_value.execute.return_value.data = [
+        {"area_id": AREA_ID}
+    ]
     tabla_departamento.update.return_value.eq.return_value.execute.return_value.data = [
         _fila_departamento(activo=True)
     ]
+    tabla_area = MagicMock()
+    tabla_area.select.return_value.eq.return_value.execute.return_value.data = [{"activo": True}]
     fake_client = MagicMock()
-    fake_client.postgrest.schema.return_value.table.side_effect = (
-        lambda nombre: tabla_departamento if nombre == "departamento" else _tabla_gate(nombre)
-    )
+
+    def side_effect(nombre_tabla):
+        if nombre_tabla == "departamento":
+            return tabla_departamento
+        if nombre_tabla == "area":
+            return tabla_area
+        return _tabla_gate(nombre_tabla)
+
+    fake_client.postgrest.schema.return_value.table.side_effect = side_effect
     app.dependency_overrides[get_caller_client] = lambda: fake_client
     _override_identidad()
 
@@ -379,9 +439,41 @@ def test_reactivar_departamento():
     assert response.json()["activo"] is True
 
 
+def test_reactivar_departamento_area_inactiva_devuelve_422():
+    tabla_departamento = MagicMock()
+    tabla_departamento.select.return_value.eq.return_value.execute.return_value.data = [
+        {"area_id": AREA_ID}
+    ]
+    tabla_area = MagicMock()
+    tabla_area.select.return_value.eq.return_value.execute.return_value.data = [{"activo": False}]
+    fake_client = MagicMock()
+
+    def side_effect(nombre_tabla):
+        if nombre_tabla == "departamento":
+            return tabla_departamento
+        if nombre_tabla == "area":
+            return tabla_area
+        return _tabla_gate(nombre_tabla)
+
+    fake_client.postgrest.schema.return_value.table.side_effect = side_effect
+    app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
+
+    client = TestClient(app)
+    response = client.patch(
+        f"/api/departamentos/{DEPARTAMENTO_ID}/estado",
+        json={"activo": True},
+        headers={"Authorization": "Bearer fake-token"},
+    )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 422
+    assert response.json()["detail"] == MENSAJE_REACTIVACION_INVALIDA
+
+
 def test_cambiar_estado_departamento_no_encontrado():
     tabla_departamento = MagicMock()
-    tabla_departamento.update.return_value.eq.return_value.execute.return_value.data = []
+    tabla_departamento.select.return_value.eq.return_value.execute.return_value.data = []
     fake_client = MagicMock()
     fake_client.postgrest.schema.return_value.table.side_effect = (
         lambda nombre: tabla_departamento if nombre == "departamento" else _tabla_gate(nombre)

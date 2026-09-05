@@ -4,6 +4,12 @@ from fastapi.testclient import TestClient
 
 from app.deps import CallerIdentity, get_caller_client, get_caller_identity
 from app.main import app
+from app.routers.puestos import (
+    MENSAJE_REACTIVACION_INVALIDA,
+    MENSAJE_TIENE_ASIGNACION_VIGENTE,
+    MENSAJE_TIENE_PERMISOS_ACTIVOS,
+    MENSAJE_TIENE_SUBORDINADOS,
+)
 
 DEPARTAMENTO_ID = "55555555-5555-5555-5555-555555555555"
 PUESTO_ID = "77777777-7777-7777-7777-777777777777"
@@ -299,11 +305,60 @@ def test_actualizar_puesto_no_encontrado():
     assert response.status_code == 404
 
 
+def test_desactivar_puesto_con_asignacion_vigente_devuelve_422():
+    fake_client = _fake_client_secuencia(
+        _entradas_gate()
+        + [
+            ("puesto", _tabla_select_simple([{"departamento_id": DEPARTAMENTO_ID, "reporta_a_id": None}])),
+            ("asignacion", _tabla_select_eq_is([{"id": "asignacion-vigente-1"}])),
+        ]
+    )
+    app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
+
+    client = TestClient(app)
+    response = client.patch(
+        f"/api/puestos/{PUESTO_ID}/estado",
+        json={"activo": False},
+        headers={"Authorization": "Bearer fake-token"},
+    )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 422
+    assert response.json()["detail"] == MENSAJE_TIENE_ASIGNACION_VIGENTE
+
+
+def test_desactivar_puesto_con_permiso_activo_devuelve_422():
+    fake_client = _fake_client_secuencia(
+        _entradas_gate()
+        + [
+            ("puesto", _tabla_select_simple([{"departamento_id": DEPARTAMENTO_ID, "reporta_a_id": None}])),
+            ("asignacion", _tabla_select_eq_is([])),
+            ("puesto_permiso", _tabla_select_doble_eq([{"id": "puesto-permiso-1"}])),
+        ]
+    )
+    app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
+
+    client = TestClient(app)
+    response = client.patch(
+        f"/api/puestos/{PUESTO_ID}/estado",
+        json={"activo": False},
+        headers={"Authorization": "Bearer fake-token"},
+    )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 422
+    assert response.json()["detail"] == MENSAJE_TIENE_PERMISOS_ACTIVOS
+
+
 def test_desactivar_puesto_con_subordinados_activos_devuelve_422():
     fake_client = _fake_client_secuencia(
         _entradas_gate()
         + [
             ("puesto", _tabla_select_simple([{"departamento_id": DEPARTAMENTO_ID, "reporta_a_id": None}])),
+            ("asignacion", _tabla_select_eq_is([])),
+            ("puesto_permiso", _tabla_select_doble_eq([])),
             ("puesto", _tabla_select_doble_eq([{"id": "subordinado-1"}])),
         ]
     )
@@ -319,6 +374,7 @@ def test_desactivar_puesto_con_subordinados_activos_devuelve_422():
 
     app.dependency_overrides.clear()
     assert response.status_code == 422
+    assert response.json()["detail"] == MENSAJE_TIENE_SUBORDINADOS
 
 
 def test_desactivar_puesto_sin_subordinados_devuelve_200():
@@ -326,6 +382,8 @@ def test_desactivar_puesto_sin_subordinados_devuelve_200():
         _entradas_gate()
         + [
             ("puesto", _tabla_select_simple([{"departamento_id": DEPARTAMENTO_ID, "reporta_a_id": None}])),
+            ("asignacion", _tabla_select_eq_is([])),
+            ("puesto_permiso", _tabla_select_doble_eq([])),
             ("puesto", _tabla_select_doble_eq([])),
             ("puesto", _tabla_update([_fila_puesto(activo=False, reporta_a_id=None)])),
         ]
@@ -365,6 +423,7 @@ def test_reactivar_puesto_departamento_inactivo_devuelve_422():
 
     app.dependency_overrides.clear()
     assert response.status_code == 422
+    assert response.json()["detail"] == MENSAJE_REACTIVACION_INVALIDA
 
 
 def test_reactivar_puesto_superior_inactivo_devuelve_422():
@@ -393,6 +452,7 @@ def test_reactivar_puesto_superior_inactivo_devuelve_422():
 
     app.dependency_overrides.clear()
     assert response.status_code == 422
+    assert response.json()["detail"] == MENSAJE_REACTIVACION_INVALIDA
 
 
 def test_reactivar_puesto_valido_devuelve_200():
