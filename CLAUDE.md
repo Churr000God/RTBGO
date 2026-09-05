@@ -45,11 +45,11 @@ backend y un frontend que lo exponen. Ver `README.md` y `docs/00-contexto/SCJ-CT
   `--no-dev` (sin pytest) y el frontend prod es nginx sirviendo el bundle (sin npm/node); el script
   corta con un mensaje explícito en vez de fallar con un error de `docker exec`. Las pruebas
   siempre corren con `dev pruebas`.
-- **Tests:** backend `uv run pytest` (117 casos), frontend `npm test` (221 casos). Ambos corren
-  igual dentro de los contenedores (`./scripts/desplegar.sh <entorno> pruebas`). Cobertura
-  instrumentada desde el 4 de septiembre de 2026: `uv run pytest --cov=app --cov-report=term-missing`
-  (backend, 97%) y `npm run test:coverage` / `npm test -- --coverage` (frontend, 92.4% líneas / 82.5%
-  ramas) — medición habilitada, sin umbral mínimo forzado todavía. `backend/.coverage` y
+- **Tests:** backend `uv run pytest` (126 casos), frontend `npm test` (285 casos, 42 archivos).
+  Ambos corren igual dentro de los contenedores (`./scripts/desplegar.sh <entorno> pruebas`).
+  Cobertura instrumentada desde el 4 de septiembre de 2026: `uv run pytest --cov=app
+  --cov-report=term-missing` (backend) y `npm run test:coverage` / `npm test -- --coverage`
+  (frontend) — medición habilitada, sin umbral mínimo forzado todavía. `backend/.coverage` y
   `frontend/coverage/` son artefactos generados, no se versionan.
 - **CI:** `.github/workflows/ci.yml` (agregado 4 de septiembre de 2026) corre backend (`uv run
   pytest`) y frontend (`vitest run`) en cada push/PR — sin secrets de Supabase (todos los tests
@@ -108,6 +108,18 @@ backend y un frontend que lo exponen. Ver `README.md` y `docs/00-contexto/SCJ-CT
   routers; 21 índices FK nuevos (`db/ddl/30_indices_fk.sql`); cobertura instrumentada (ver más
   arriba); CI agregado (ver más arriba). Ver `bitacora/2026-09-04_pase_mejora_cross_stack_equipo.md`
   para el detalle completo, incluido el hallazgo de seguridad crítico documentado abajo.
+- **QA en vivo + protección del puesto administrador (5 de septiembre de 2026):** el usuario probó
+  la app en el navegador y pidió una larga serie de ajustes de UI en Estructura Organizacional y
+  Permisos (organigrama interactivo por `reporta_a_id` — componente compartido
+  `frontend/src/components/Organigrama.tsx`, CSS/SVG puro sin librería de diagramas, usado en
+  `AsignacionesPage`/`DirectorioPuestosPage`; patrón de carga real con `Button`
+  `cargando`/`textoCargando` que bloquea doble submit, aplicado a 17 pantallas). De paso, dos
+  hallazgos reales: (1) "Encargado de TI" (puesto real del organigrama, `16_*.sql`) y "Gerente o
+  Encargado de TI" (fixture de bootstrap, `26_*.sql`) eran dos conceptos separados a propósito que
+  parecían un duplicado — unificados en el seed, quedó sólo el segundo; (2) pedido de seguridad
+  para que el puesto administrador (`personas.puesto.es_administrador_generico`, columna nueva,
+  inmutable por trigger) no pueda quedar sin acceso — ver gotcha abajo. Ver
+  `bitacora/2026-09-05_pulido_permisos_estructura_y_proteccion_admin.md` para el detalle completo.
 
 ## Arquitectura y módulos
 
@@ -152,7 +164,7 @@ Cada una vive en su propio documento de decisión — no se duplican aquí, sól
   `http://localhost:5173` fijo a mano — esa configuración no vive en este repositorio. Al pasar a
   producción (`docker compose … prod`, frontend en `:8080`) hay que actualizarla ahí también, o
   los links de invitación/recuperación de contraseña no aterrizan en la app.
-- El DDL corre hasta `db/ddl/31_*.sql`. `personas.permiso`
+- El DDL corre hasta `db/ddl/32_*.sql`. `personas.permiso`
   es la única tabla del proyecto con clave natural (`codigo varchar PRIMARY KEY`) en vez de `uuid`
   — decisión deliberada, fiel a la redacción literal de `SCJ-PRO-05`, no un descuido a corregir.
 - Las tablas de bitácora inmutables (`bitacora_movimiento_persona`,
@@ -186,6 +198,19 @@ Cada una vive en su propio documento de decisión — no se duplican aquí, sól
   router usa `get_caller_client` en vez de `service_role`, la policy RLS de esas tablas es la
   autorización real, no un respaldo — hay que validar el permiso específico ahí, no sólo "¿está
   activo?".
+- **El puesto administrador (`personas.puesto.es_administrador_generico`) no puede quedar sin
+  acceso, por diseño.** Columna booleana (`32_puesto_administrador_generico_proteccion.sql`),
+  inmutable después del backfill inicial (trigger `BEFORE UPDATE`, mismo patrón que las bitácoras
+  inmutables) — ni con `puesto_edicion` se le puede apagar el flag por PostgREST directo. Bloqueada
+  en RLS, sin excepción (ni auto-acción, ni de otro puesto con el permiso correspondiente): revocar
+  cualquier permiso, terminar o reasignar la asignación de quien lo ocupa, y desactivar el puesto.
+  `fn_asignacion_cambiar_puesto` no necesitó cambio propio (`SECURITY INVOKER`, pasa por el mismo
+  `UPDATE` que ya cubre la policy de `asignacion`). Backend tiene el chequeo espejo en los 4
+  endpoints correspondientes (`revocar_permiso`, `terminar_asignacion`,
+  `cambiar_puesto_asignacion`, `cambiar_estado_puesto`) sólo para dar un `422` legible — RLS es la
+  que efectivamente lo impide. Reglas documentadas en `SCJ-PRO-04/05/06 §V`. **Si se agrega un
+  vector de mutación nuevo sobre `puesto`/`asignacion`/`puesto_permiso` en el futuro, hay que
+  evaluar si también puede sacarle acceso al puesto administrador y protegerlo igual.**
 
 ## Historial de decisiones
 
