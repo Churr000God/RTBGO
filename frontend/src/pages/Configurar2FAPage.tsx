@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertCircle, ArrowRight, Loader2, ShieldCheck } from "lucide-react";
 
 import { AuthLayout } from "../layouts/AuthLayout";
@@ -14,8 +14,18 @@ export function Configurar2FAPage() {
   const [listoParaVerificar, setListoParaVerificar] = useState(false);
   const [yaConfigurado, setYaConfigurado] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const yaEjecutado = useRef(false);
 
   useEffect(() => {
+    // Guard contra el doble-montaje de efectos de React.StrictMode en dev: enroll() no es
+    // idempotente (crea un factor TOTP nuevo cada vez) — sin este guard, el segundo montaje
+    // volvía a llamar enroll() antes de que el primer factor quedara verificado y Supabase
+    // respondía 422 mfa_factor_name_conflict. Mismo problema que ya se resolvió en
+    // lib/sesion.ts (consultarSesion), pero acá basta un guard por componente: sólo hay un
+    // consumidor de este efecto, no hace falta deduplicar a nivel de módulo.
+    if (yaEjecutado.current) return;
+    yaEjecutado.current = true;
+
     supabase.auth.mfa.listFactors().then(({ data, error: errorListado }) => {
       if (errorListado) {
         registrarErrorAuth("Configurar2FAPage.listFactors", errorListado);
