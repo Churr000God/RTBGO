@@ -8,7 +8,7 @@ FROM python:3.11-slim AS base
 
 # uv se copia del binario oficial en vez de instalarse con pip — más rápido y
 # reproducible (misma técnica que recomienda la doc de Astral).
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
+COPY --from=ghcr.io/astral-sh/uv:0.12.5 /uv /uvx /usr/local/bin/
 
 WORKDIR /app
 
