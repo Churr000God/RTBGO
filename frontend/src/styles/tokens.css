@@ -1822,13 +1822,18 @@ a.boton-con-icono {
 
 .arbol-organigrama {
   display: flex;
-  justify-content: center;
   overflow-x: auto;
-  padding-bottom: 0.5rem;
+  padding: 0.5rem 1.5rem;
 }
 
+/* margin:auto en el hijo en vez de justify-content:center en el contenedor: centrado vía
+   justify-content en un flex con overflow dispareja el desborde hacia el lado de "inicio" y
+   los navegadores no lo dejan alcanzar con scroll (el árbol quedaba cortado del lado
+   izquierdo, con aire de sobra del derecho — bug real reportado). margin:auto sí reparte el
+   desborde simétrico y scrollable de los dos lados. */
 .arbol-organigrama > ul {
   display: inline-flex;
+  margin: 0 auto;
   padding-top: 0;
 }
 
