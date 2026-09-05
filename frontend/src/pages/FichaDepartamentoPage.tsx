@@ -1,6 +1,6 @@
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle, Loader2, Search } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
@@ -23,7 +23,35 @@ type Area = {
   nombre_area: string;
 };
 
+type Puesto = {
+  id: string;
+  departamento_id: string;
+  activo: boolean;
+};
+
+type Asignacion = {
+  persona_id: string;
+  persona_nombre: string;
+  nombre_puesto: string;
+  nombre_departamento: string;
+  vigente_hasta: string | null;
+};
+
+type PersonaAgrupada = {
+  persona_id: string;
+  persona_nombre: string;
+  puestos: string[];
+};
+
 type EstadoCarga = "cargando" | "listo" | "error";
+type EstadoCatalogo = "cargando" | "listo" | "error" | "sin_permiso";
+
+function normalizar(texto: string): string {
+  return texto
+    .normalize("NFD")
+    .replace(new RegExp("[\\u0300-\\u036f]", "g"), "")
+    .toLowerCase();
+}
 
 function formatearFecha(fecha?: string | null): string {
   if (!fecha) return "—";
@@ -48,6 +76,11 @@ export function FichaDepartamentoPage() {
   const [nombreArea, setNombreArea] = useState<string | null>(null);
   const [estadoCarga, setEstadoCarga] = useState<EstadoCarga>("cargando");
   const [error, setError] = useState<string | null>(null);
+  const [estadoPuestos, setEstadoPuestos] = useState<EstadoCatalogo>("cargando");
+  const [puestosActivos, setPuestosActivos] = useState(0);
+  const [estadoAsignaciones, setEstadoAsignaciones] = useState<EstadoCatalogo>("cargando");
+  const [asignaciones, setAsignaciones] = useState<Asignacion[]>([]);
+  const [busqueda, setBusqueda] = useState("");
 
   function cargar() {
     setEstadoCarga("cargando");
@@ -59,10 +92,49 @@ export function FichaDepartamentoPage() {
       .then((datosDepartamento: Departamento) => {
         setDepartamento(datosDepartamento);
         setEstadoCarga("listo");
-        return apiFetch(`/api/areas/${datosDepartamento.area_id}`)
+        apiFetch(`/api/areas/${datosDepartamento.area_id}`)
           .then((r) => (r.ok ? r.json() : null))
           .then((datosArea: Area | null) => setNombreArea(datosArea?.nombre_area ?? null))
           .catch(() => setNombreArea(null));
+
+        // Los dos catálogos de abajo tienen gates de permiso propios (puesto_lectura/edicion,
+        // asignacion_lectura/edicion) — distintos entre sí y del departamento_lectura/edicion
+        // que ya exige esta página. Se piden por separado y degradan por separado: uno puede
+        // fallar sin tumbar al otro ni al resto de la ficha.
+        setEstadoPuestos("cargando");
+        apiFetch("/api/puestos")
+          .then((r) => {
+            if (r.status === 403) throw new Error("sin_permiso");
+            if (!r.ok) throw new Error(`status ${r.status}`);
+            return r.json();
+          })
+          .then((datosPuestos: Puesto[]) => {
+            setPuestosActivos(
+              datosPuestos.filter((p) => p.departamento_id === datosDepartamento.id && p.activo).length,
+            );
+            setEstadoPuestos("listo");
+          })
+          .catch((e: Error) => setEstadoPuestos(e.message === "sin_permiso" ? "sin_permiso" : "error"));
+
+        // nombre_departamento es único en todo el catálogo (AltaDepartamentoPage ya lo exige
+        // así) — filtrar por ese nombre denormalizado en /api/asignaciones deja este pedido
+        // totalmente independiente de si /api/puestos respondió o no.
+        setEstadoAsignaciones("cargando");
+        apiFetch("/api/asignaciones")
+          .then((r) => {
+            if (r.status === 403) throw new Error("sin_permiso");
+            if (!r.ok) throw new Error(`status ${r.status}`);
+            return r.json();
+          })
+          .then((datosAsignaciones: Asignacion[]) => {
+            setAsignaciones(
+              datosAsignaciones.filter(
+                (a) => a.nombre_departamento === datosDepartamento.nombre_departamento && !a.vigente_hasta,
+              ),
+            );
+            setEstadoAsignaciones("listo");
+          })
+          .catch((e: Error) => setEstadoAsignaciones(e.message === "sin_permiso" ? "sin_permiso" : "error"));
       })
       .catch(() => setEstadoCarga("error"));
   }
@@ -71,6 +143,39 @@ export function FichaDepartamentoPage() {
     cargar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  // Una persona puede tener 2 asignaciones activas en puestos distintos del mismo departamento
+  // — se agrupa por persona_id para que aparezca una sola vez, con todos sus puestos.
+  const personasAgrupadas = useMemo(() => {
+    const mapa = new Map<string, PersonaAgrupada>();
+    for (const a of asignaciones) {
+      const existente = mapa.get(a.persona_id);
+      if (existente) {
+        existente.puestos.push(a.nombre_puesto);
+      } else {
+        mapa.set(a.persona_id, {
+          persona_id: a.persona_id,
+          persona_nombre: a.persona_nombre,
+          puestos: [a.nombre_puesto],
+        });
+      }
+    }
+    return [...mapa.values()].sort((a, b) => a.persona_nombre.localeCompare(b.persona_nombre));
+  }, [asignaciones]);
+
+  const personasFiltradas = useMemo(() => {
+    const consulta = normalizar(busqueda.trim());
+    if (!consulta) return personasAgrupadas;
+    return personasAgrupadas.filter((p) => normalizar(p.persona_nombre).includes(consulta));
+  }, [personasAgrupadas, busqueda]);
+
+  const desglosePorPuesto = useMemo(() => {
+    const conteo = new Map<string, number>();
+    for (const a of asignaciones) {
+      conteo.set(a.nombre_puesto, (conteo.get(a.nombre_puesto) ?? 0) + 1);
+    }
+    return [...conteo.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  }, [asignaciones]);
 
   async function handleRenombrar(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
@@ -173,6 +278,97 @@ export function FichaDepartamentoPage() {
         </div>
 
         {error && <p role="alert">{error}</p>}
+
+        <div className="layout-bitacora">
+          <Card>
+            <h3>Personas del departamento</h3>
+            {estadoAsignaciones === "sin_permiso" && (
+              <p>No tienes permiso para ver las personas de este departamento.</p>
+            )}
+            {estadoAsignaciones === "error" && (
+              <p>No se pudieron cargar las personas de este departamento.</p>
+            )}
+            {estadoAsignaciones === "cargando" && (
+              <p className="boton-con-icono">
+                <Loader2 size={14} className="icono-girando" aria-hidden="true" />
+                Cargando personas…
+              </p>
+            )}
+            {estadoAsignaciones === "listo" && (
+              <>
+                <div className="campo-con-icono">
+                  <Search size={16} className="icono-campo" aria-hidden="true" />
+                  <input
+                    type="search"
+                    placeholder="Buscar por nombre"
+                    value={busqueda}
+                    onChange={(evento) => setBusqueda(evento.target.value)}
+                    aria-label="Buscar por nombre"
+                  />
+                </div>
+                {personasAgrupadas.length === 0 && (
+                  <p>Este departamento no tiene personas asignadas actualmente.</p>
+                )}
+                {personasAgrupadas.length > 0 && personasFiltradas.length === 0 && (
+                  <p>Ninguna persona coincide con la búsqueda.</p>
+                )}
+                {personasFiltradas.length > 0 && (
+                  <ul className="lista-historial-resumido">
+                    {personasFiltradas.map((persona) => (
+                      <li key={persona.persona_id}>
+                        <a href={`/personas/${persona.persona_id}`}>{persona.persona_nombre}</a>
+                        <span className="autor-historial">{persona.puestos.join(", ")}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            )}
+          </Card>
+
+          <aside>
+            <Card>
+              <h3>Resumen</h3>
+              <div className="rejilla-resumen">
+                <div>
+                  <strong>{estadoPuestos === "listo" ? puestosActivos : "—"}</strong>
+                  <span>Puestos activos</span>
+                </div>
+                <div>
+                  <strong>{estadoAsignaciones === "listo" ? personasAgrupadas.length : "—"}</strong>
+                  <span>Personas asignadas</span>
+                </div>
+              </div>
+              {estadoPuestos === "sin_permiso" && (
+                <small className="ayuda-campo">Sin permiso para ver puestos.</small>
+              )}
+              {estadoPuestos === "error" && (
+                <small className="ayuda-campo">No se pudo cargar el conteo de puestos.</small>
+              )}
+            </Card>
+
+            <Card>
+              <h3>Por puesto</h3>
+              {estadoAsignaciones === "sin_permiso" && (
+                <p>No tienes permiso para ver el desglose por puesto.</p>
+              )}
+              {estadoAsignaciones === "error" && <p>No se pudo cargar el desglose por puesto.</p>}
+              {estadoAsignaciones === "listo" && desglosePorPuesto.length === 0 && (
+                <p>Sin personas asignadas por puesto todavía.</p>
+              )}
+              {estadoAsignaciones === "listo" && desglosePorPuesto.length > 0 && (
+                <ul className="lista-historial-resumido">
+                  {desglosePorPuesto.map(([nombrePuesto, cantidad]) => (
+                    <li key={nombrePuesto}>
+                      <span>{nombrePuesto}</span>
+                      <Badge variante="neutra">{cantidad}</Badge>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          </aside>
+        </div>
 
         <Card>
           <h3>Área</h3>
