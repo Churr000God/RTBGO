@@ -1728,3 +1728,201 @@ a.boton-con-icono {
   font-size: 0.88rem;
   font-family: var(--font-cuerpo);
 }
+
+/* ─── §pestañas ─── */
+/* Primer control de pestañas del proyecto (organigrama vs. tabla en Asignaciones/Puestos) —
+   genérico a propósito, no específico de organigrama, por si otra pantalla necesita el mismo
+   patrón de vistas alternas más adelante. */
+
+.pestanas {
+  display: inline-flex;
+  gap: 0.2rem;
+  background: var(--blanco);
+  border: 1px solid rgba(0, 43, 91, 0.1);
+  border-radius: 999px;
+  padding: 0.3rem;
+  margin-bottom: 1.5rem;
+}
+
+.pestana {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.5rem 1.2rem;
+  border-radius: 999px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--navy-medio);
+  background: transparent;
+  border: none;
+  font-family: var(--font-cuerpo);
+  cursor: pointer;
+}
+
+.pestana--activa {
+  background: var(--teal);
+  color: white;
+}
+
+/* ─── §chip de filtro ─── */
+/* Filtro activo removible (ej. "Filtrado por: Gerencia Comercial y su equipo") — el click en
+   un nodo del organigrama que aterriza en la tabla ya filtrada necesita mostrar y poder
+   deshacer ese filtro sin volver al árbol. */
+
+.chip-filtro {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(21, 152, 149, 0.12);
+  color: var(--teal);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.45rem 0.75rem;
+  border-radius: 999px;
+  margin-bottom: 1.25rem;
+}
+
+.chip-filtro button {
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+/* ─── §organigrama ─── */
+/* Árbol de puestos armado desde reporta_a_id (mismo dato que backend/app/permisos.py usa para
+   la herencia de permisos) — SVG/CSS puro, sin librería de diagramas nueva: el árbol completo
+   del proyecto es chico (~15-20 puestos, ver mapa_hijos_por_puesto), no justifica una
+   dependencia pensada para grafos grandes con pan/zoom/drag. Recipe clásico de líneas
+   conectoras vía pseudo-elementos — cada nivel es un <ul>, cada puesto un <li>. */
+
+.bosque-organigrama {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.arbol-organigrama,
+.arbol-organigrama ul,
+.arbol-organigrama li {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  position: relative;
+}
+
+.arbol-organigrama {
+  display: flex;
+  justify-content: center;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+}
+
+.arbol-organigrama > ul {
+  display: inline-flex;
+  padding-top: 0;
+}
+
+.arbol-organigrama ul ul {
+  display: flex;
+  padding-top: 24px;
+}
+
+.arbol-organigrama li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 12px 0 12px;
+}
+
+.arbol-organigrama li::before,
+.arbol-organigrama li::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 50%;
+  width: 50%;
+  height: 24px;
+  border-top: 2px solid rgba(0, 43, 91, 0.25);
+}
+
+.arbol-organigrama li::after {
+  right: auto;
+  left: 50%;
+  border-left: 2px solid rgba(0, 43, 91, 0.25);
+}
+
+.arbol-organigrama li:only-child::after,
+.arbol-organigrama li:only-child::before {
+  display: none;
+}
+
+.arbol-organigrama li:only-child {
+  padding-top: 0;
+}
+
+.arbol-organigrama li:first-child::before,
+.arbol-organigrama li:last-child::after {
+  border: 0 none;
+}
+
+.arbol-organigrama li:last-child::before {
+  border-right: 2px solid rgba(0, 43, 91, 0.25);
+  border-radius: 0 6px 0 0;
+}
+
+.arbol-organigrama li:first-child::after {
+  border-radius: 6px 0 0 0;
+}
+
+.arbol-organigrama ul ul::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  border-left: 2px solid rgba(0, 43, 91, 0.25);
+  width: 0;
+  height: 24px;
+}
+
+.nodo-organigrama {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  background: var(--blanco);
+  border: 1px solid rgba(0, 43, 91, 0.15);
+  border-radius: 10px;
+  padding: 0.7rem 1rem;
+  box-shadow: 0 1px 4px rgba(0, 43, 91, 0.06);
+  min-width: 9rem;
+  cursor: pointer;
+}
+
+.nodo-organigrama:hover,
+.nodo-organigrama:focus-visible {
+  border-color: var(--teal);
+}
+
+.nodo-organigrama--raiz {
+  border-color: var(--oro);
+  background: rgba(173, 149, 81, 0.06);
+}
+
+.nodo-organigrama--inactivo {
+  opacity: 0.6;
+}
+
+.nodo-organigrama strong {
+  font-size: 0.86rem;
+  color: var(--navy);
+  text-align: center;
+}
+
+.nodo-organigrama-conteo {
+  font-size: 0.72rem;
+  color: var(--navy-medio);
+  font-variant-numeric: tabular-nums;
+}

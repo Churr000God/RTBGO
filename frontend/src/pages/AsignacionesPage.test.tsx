@@ -51,6 +51,44 @@ function mockApiFetch(respuesta: Response) {
   });
 }
 
+const PUESTOS = [
+  {
+    id: "puesto-raiz-ficticio",
+    nombre_puesto: "Dirección Ficticia",
+    reporta_a_id: null,
+    activo: true,
+    plazas_totales: 1,
+  },
+  {
+    id: "puesto-ficticio-1",
+    nombre_puesto: "Puesto Ficticio Uno",
+    reporta_a_id: "puesto-raiz-ficticio",
+    activo: true,
+    plazas_totales: 1,
+  },
+  {
+    id: "puesto-ficticio-2",
+    nombre_puesto: "Puesto Ficticio Dos",
+    reporta_a_id: "puesto-raiz-ficticio",
+    activo: true,
+    plazas_totales: 1,
+  },
+];
+
+function mockApiFetchConOrganigrama(asignaciones: Response, puestos: Response | unknown[] = PUESTOS) {
+  vi.mocked(apiFetch).mockImplementation((path: string) => {
+    if (path === "/api/sesion") {
+      return Promise.resolve(
+        new Response(JSON.stringify({ acceso_permitido: true, motivo_bloqueo: null }))
+      );
+    }
+    if (path === "/api/puestos") {
+      return Promise.resolve(puestos instanceof Response ? puestos : new Response(JSON.stringify(puestos)));
+    }
+    return Promise.resolve(asignaciones);
+  });
+}
+
 describe("AsignacionesPage", () => {
   beforeEach(() => {
     vi.mocked(apiFetch).mockReset();
@@ -150,5 +188,77 @@ describe("AsignacionesPage", () => {
       ).toBeInTheDocument()
     );
     expect(screen.getByRole("button", { name: /reintentar/i })).toBeInTheDocument();
+  });
+
+  describe("organigrama (híbrido: árbol grande con toggle + click filtra la tabla)", () => {
+    it("por defecto muestra la tabla; la pestaña 'Organigrama' muestra el árbol de puestos", async () => {
+      mockApiFetchConOrganigrama(new Response(JSON.stringify(ASIGNACIONES)));
+      render(<AsignacionesPage />);
+
+      await waitFor(() => expect(filaPersona(/Persona Ficticia Uno/)).toBeInTheDocument());
+      expect(screen.getByRole("tab", { name: "Tabla" })).toHaveAttribute("aria-selected", "true");
+
+      await userEvent.click(screen.getByRole("tab", { name: "Organigrama" }));
+
+      expect(screen.getByRole("tab", { name: "Organigrama" })).toHaveAttribute(
+        "aria-selected",
+        "true"
+      );
+      expect(screen.getByText("Dirección Ficticia")).toBeInTheDocument();
+      expect(screen.getByText("Puesto Ficticio Uno")).toBeInTheDocument();
+      expect(filaPersonaQuery(/Persona Ficticia Uno/)).not.toBeInTheDocument();
+    });
+
+    it("click en un nodo del organigrama vuelve a la tabla, filtrada a ese puesto y su rama, con chip removible", async () => {
+      mockApiFetchConOrganigrama(new Response(JSON.stringify(ASIGNACIONES)));
+      render(<AsignacionesPage />);
+
+      await waitFor(() => expect(filaPersona(/Persona Ficticia Uno/)).toBeInTheDocument());
+      await userEvent.click(screen.getByRole("tab", { name: "Organigrama" }));
+      await userEvent.click(screen.getByText("Puesto Ficticio Uno"));
+
+      // volvió a la vista de tabla sola
+      expect(screen.getByRole("tab", { name: "Tabla" })).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByText(/filtrado por: puesto ficticio uno y su equipo/i)).toBeInTheDocument();
+      expect(filaPersona(/Persona Ficticia Uno/)).toBeInTheDocument();
+      // Persona Ficticia Dos está en Puesto Ficticio Dos, otra rama — se excluye
+      expect(filaPersonaQuery(/Persona Ficticia Dos/)).not.toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole("button", { name: /quitar filtro/i }));
+
+      expect(screen.queryByText(/filtrado por:/i)).not.toBeInTheDocument();
+      expect(filaPersona(/Persona Ficticia Dos/)).toBeInTheDocument();
+    });
+
+    it("el buscador del organigrama filtra el árbol conservando el camino hacia un descendiente que coincide", async () => {
+      mockApiFetchConOrganigrama(new Response(JSON.stringify(ASIGNACIONES)));
+      render(<AsignacionesPage />);
+
+      await waitFor(() => expect(filaPersona(/Persona Ficticia Uno/)).toBeInTheDocument());
+      await userEvent.click(screen.getByRole("tab", { name: "Organigrama" }));
+      await waitFor(() => expect(screen.getByText("Puesto Ficticio Uno")).toBeInTheDocument());
+
+      await userEvent.type(
+        screen.getByLabelText(/buscar puesto en el organigrama/i),
+        "ficticio uno"
+      );
+
+      expect(screen.getByText("Dirección Ficticia")).toBeInTheDocument();
+      expect(screen.getByText("Puesto Ficticio Uno")).toBeInTheDocument();
+      expect(screen.queryByText("Puesto Ficticio Dos")).not.toBeInTheDocument();
+    });
+
+    it("si GET /api/puestos da 403, la pestaña Organigrama avisa sin romper la tabla", async () => {
+      mockApiFetchConOrganigrama(
+        new Response(JSON.stringify(ASIGNACIONES)),
+        new Response(null, { status: 403 })
+      );
+      render(<AsignacionesPage />);
+
+      await waitFor(() => expect(filaPersona(/Persona Ficticia Uno/)).toBeInTheDocument());
+      await userEvent.click(screen.getByRole("tab", { name: "Organigrama" }));
+
+      expect(screen.getByText("No tienes permiso para ver el organigrama.")).toBeInTheDocument();
+    });
   });
 });

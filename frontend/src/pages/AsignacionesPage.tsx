@@ -6,6 +6,13 @@ import { AppShell } from "../layouts/AppShell";
 import { Button } from "../components/Button";
 import { Badge } from "../components/Badge";
 import { Input } from "../components/Input";
+import {
+  construirBosque,
+  descendientesIncluidoSiMismo,
+  filtrarBosque,
+  Organigrama,
+  type PuestoOrganigrama,
+} from "../components/Organigrama";
 
 type Asignacion = {
   id: string;
@@ -20,6 +27,8 @@ type Asignacion = {
 };
 
 type EstadoCarga = "cargando" | "listo" | "error";
+type EstadoCatalogo = "cargando" | "listo" | "error" | "sin_permiso";
+type FiltroRama = { puestoId: string; nombrePuesto: string };
 
 function normalizar(texto: string): string {
   return texto
@@ -48,6 +57,11 @@ export function AsignacionesPage() {
   const [orden, setOrden] = useState<"desc" | "asc">("desc");
   const [filtroDesde, setFiltroDesde] = useState("");
   const [filtroHasta, setFiltroHasta] = useState("");
+  const [vista, setVista] = useState<"tabla" | "organigrama">("tabla");
+  const [busquedaOrganigrama, setBusquedaOrganigrama] = useState("");
+  const [filtroRama, setFiltroRama] = useState<FiltroRama | null>(null);
+  const [puestos, setPuestos] = useState<PuestoOrganigrama[]>([]);
+  const [estadoPuestos, setEstadoPuestos] = useState<EstadoCatalogo>("cargando");
 
   function cargar() {
     setEstadoCarga("cargando");
@@ -61,12 +75,47 @@ export function AsignacionesPage() {
         setEstadoCarga("listo");
       })
       .catch(() => setEstadoCarga("error"));
+
+    // Gate propio (puesto_lectura/edicion) — el organigrama es dato de puesto, no de
+    // asignación, y se pide y degrada por separado del historial de arriba.
+    setEstadoPuestos("cargando");
+    apiFetch("/api/puestos")
+      .then((r) => {
+        if (r.status === 403) throw new Error("sin_permiso");
+        if (!r.ok) throw new Error(`status ${r.status}`);
+        return r.json();
+      })
+      .then((datos: PuestoOrganigrama[]) => {
+        setPuestos(datos);
+        setEstadoPuestos("listo");
+      })
+      .catch((e: Error) => setEstadoPuestos(e.message === "sin_permiso" ? "sin_permiso" : "error"));
   }
 
   useEffect(() => {
     cargar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const ocupadasPorPuesto = useMemo(() => {
+    const conteo: Record<string, number> = {};
+    for (const a of asignaciones) {
+      if (a.vigente_hasta) continue;
+      conteo[a.puesto_id] = (conteo[a.puesto_id] ?? 0) + 1;
+    }
+    return conteo;
+  }, [asignaciones]);
+
+  const bosque = useMemo(() => construirBosque(puestos), [puestos]);
+  const bosqueFiltrado = useMemo(
+    () => filtrarBosque(bosque, busquedaOrganigrama.trim().toLowerCase()),
+    [bosque, busquedaOrganigrama],
+  );
+
+  function handleSeleccionarPuesto(puesto: PuestoOrganigrama) {
+    setFiltroRama({ puestoId: puesto.id, nombrePuesto: puesto.nombre_puesto });
+    setVista("tabla");
+  }
 
   const metricas = useMemo(
     () => ({
@@ -75,6 +124,13 @@ export function AsignacionesPage() {
       terminadas: asignaciones.filter((a) => a.vigente_hasta).length,
     }),
     [asignaciones],
+  );
+
+  // Independiente de si /api/puestos falló o no: si no hay puestos cargados, la rama filtrada
+  // queda vacía (conjunto sólo con el propio puesto_id) en vez de romper el filtro.
+  const ramaFiltrada = useMemo(
+    () => (filtroRama ? descendientesIncluidoSiMismo(puestos, filtroRama.puestoId) : null),
+    [puestos, filtroRama],
   );
 
   const filtradas = useMemo(() => {
@@ -97,9 +153,10 @@ export function AsignacionesPage() {
         const fechaVigenteDesde = new Date(a.vigente_desde);
         const coincideDesde = !desde || fechaVigenteDesde >= desde;
         const coincideHasta = !hasta || fechaVigenteDesde <= hasta;
-        return coincideBusqueda && coincideEstado && coincideDesde && coincideHasta;
+        const coincideRama = !ramaFiltrada || ramaFiltrada.has(a.puesto_id);
+        return coincideBusqueda && coincideEstado && coincideDesde && coincideHasta && coincideRama;
       });
-  }, [asignaciones, busqueda, filtroEstado, orden, filtroDesde, filtroHasta]);
+  }, [asignaciones, busqueda, filtroEstado, orden, filtroDesde, filtroHasta, ramaFiltrada]);
 
   const agrupadasPorAnio = useMemo(() => {
     const grupos = new Map<string, Asignacion[]>();
@@ -132,6 +189,80 @@ export function AsignacionesPage() {
             Nueva asignación
           </Button>
         </div>
+
+        <div className="pestanas" role="tablist" aria-label="Vista de asignaciones">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={vista === "tabla"}
+            className={`pestana${vista === "tabla" ? " pestana--activa" : ""}`}
+            onClick={() => setVista("tabla")}
+          >
+            Tabla
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={vista === "organigrama"}
+            className={`pestana${vista === "organigrama" ? " pestana--activa" : ""}`}
+            onClick={() => setVista("organigrama")}
+          >
+            Organigrama
+          </button>
+        </div>
+
+        {vista === "organigrama" && (
+          <div role="tabpanel">
+            {estadoPuestos === "sin_permiso" && <p>No tienes permiso para ver el organigrama.</p>}
+            {estadoPuestos === "error" && <p>No se pudo cargar el organigrama.</p>}
+            {estadoPuestos === "cargando" && (
+              <p className="boton-con-icono">
+                <Loader2 size={16} className="icono-girando" aria-hidden="true" />
+                Cargando organigrama…
+              </p>
+            )}
+            {estadoPuestos === "listo" && (
+              <>
+                <div className="campo-con-icono">
+                  <Search size={16} className="icono-campo" aria-hidden="true" />
+                  <input
+                    type="search"
+                    placeholder="Buscar puesto en el organigrama"
+                    value={busquedaOrganigrama}
+                    onChange={(evento) => setBusquedaOrganigrama(evento.target.value)}
+                    aria-label="Buscar puesto en el organigrama"
+                  />
+                </div>
+                {bosque.length > 0 && bosqueFiltrado.length === 0 && (
+                  <p>Ningún puesto coincide con la búsqueda.</p>
+                )}
+                {bosque.length === 0 && <p>No hay puestos registrados todavía.</p>}
+                {bosqueFiltrado.length > 0 && (
+                  <Organigrama
+                    bosque={bosqueFiltrado}
+                    ocupadasPorPuesto={ocupadasPorPuesto}
+                    onSeleccionarPuesto={handleSeleccionarPuesto}
+                  />
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {vista === "tabla" && (
+        <div role="tabpanel">
+        {filtroRama && (
+          <div className="chip-filtro">
+            Filtrado por: {filtroRama.nombrePuesto} y su equipo
+            <button
+              type="button"
+              onClick={() => setFiltroRama(null)}
+              aria-label={`Quitar filtro por ${filtroRama.nombrePuesto}`}
+            >
+              ×
+            </button>
+          </div>
+        )}
 
         <div className="banda-metricas">
           <div className="metrica">
@@ -271,6 +402,8 @@ export function AsignacionesPage() {
               ))}
             </div>
           </div>
+        )}
+        </div>
         )}
       </div>
     </AppShell>
