@@ -1,12 +1,19 @@
 # Proceso — Otorgar/revocar permiso a puesto
 
 **Sistema de Control de Jornada**
-Folio SCJ-PRO-05 · Versión 1.0 · 4 de septiembre de 2026
+Folio SCJ-PRO-05 · Versión 2.0 · 4 de septiembre de 2026
 
 Quinto documento de la serie `SCJ-PRO`, subsistema **Personas y Usuarios** — módulo
 Asignaciones/áreas/puestos/permisos. Cubre el proceso más sensible del módulo: quién puede darle
 un permiso a un puesto (`puesto_permiso`), y las dos protecciones que evitan que ese acto se use
 para ampliar los propios permisos o para dejar al sistema sin nadie que pueda repartirlos.
+
+> **Cambió en V2.0:** el §VII decía "nada de este proceso está construido" — eso ya no es cierto.
+> El proceso se implementó de punta a punta el mismo día de la V1.0 (backend `routers/permisos.py`,
+> `UNIQUE(puesto_id, codigo)` en DDL, frontend `OtorgarPermisoPage`/`RevocarPermisoPage`), y el
+> documento nunca se actualizó después. `security` verificó línea por línea (4 de septiembre de
+> 2026) que las 3 reglas de negocio de §V están implementadas exactamente como se describen acá,
+> sin desviación. Contradice contenido ya escrito (mayor, no menor), de ahí el bump a V2.0.
 
 ---
 
@@ -115,10 +122,26 @@ flowchart TD
 
 ---
 
-## VII. Estado actual — sin implementar
+## VII. Estado actual — implementado
 
-Nada de este proceso está construido. `puesto_permiso` y `bitacora_movimiento_puesto_permiso`
-existen sólo en el diagrama Lucid V2 (`9015128f-275f-4c42-bf86-85eb41a329f6`).
+Todo el proceso está construido, de punta a punta, desde el corte de `puesto_permiso` (4 de
+septiembre de 2026, commits desde `d3997cb`):
+
+- **DB:** `personas.puesto_permiso` y `personas.bitacora_movimiento_puesto_permiso`
+  (`22_personas_puesto_permiso.sql`, `23_personas_bitacora_puesto_permiso.sql`), con
+  `UNIQUE(puesto_id, codigo)` (`uq_puesto_permiso_puesto_codigo`, resolviendo el punto §VI) y el
+  trigger de sincronización G8/R5 (`24_puesto_permiso_trigger.sql`).
+- **Backend:** `backend/app/routers/permisos.py` — `POST /api/permisos/otorgar` y
+  `POST /api/permisos/revocar` implementan G0-G8 y R0-R5 exactamente como se describen en §III/§IV,
+  incluidas las tres reglas de §V (bloqueo directo, bloqueo por herencia sobre la unión de todos
+  los puestos vigentes, protección de última fila de `puesto_permiso_edicion`).
+- **Frontend:** `OtorgarPermisoPage`, `RevocarPermisoPage`, `PermisosPage`.
+- **RLS:** las escrituras de `puesto_permiso`/`bitacora_movimiento_puesto_permiso` exigen
+  `puesto_permiso_edicion` real (`31_personas_rls_permiso_especifico.sql`, 4 de septiembre de
+  2026), no sólo estar activo.
+
+Verificado línea por línea contra este documento por `security` el 4 de septiembre de 2026, sin
+desviaciones.
 
 **Arranque del sistema — quién otorga el primer `puesto_permiso_edicion`.** La precondición §II.1
 exige que quien otorga ya tenga el permiso; al nacer el sistema nadie lo tiene todavía — mismo
@@ -136,15 +159,14 @@ Sistemas por el proceso normal, una vez sembrado Sistemas.
 
 ## VIII. Siguiente paso
 
-Con `SCJ-PRO-03`, `SCJ-PRO-04` y `SCJ-PRO-05` cerrados, el módulo Asignaciones/áreas/puestos/
-permisos tiene sus tres procesos principales cubiertos. Queda pendiente:
+Con `SCJ-PRO-03`, `SCJ-PRO-04`, `SCJ-PRO-05` y `SCJ-PRO-06` cerrados e implementados, el módulo
+Asignaciones/áreas/puestos/permisos tiene sus cuatro procesos principales cubiertos, tanto en
+diseño como en código. Queda pendiente:
 
-- Baja/desactivación de área/departamento/puesto — regla ya confirmada (`SCJ-PRO-03 §V`: sólo se
-  desactiva si no tiene información asociada activa río abajo), sin flujo paso a paso todavía.
 - Decidir con el usuario si falta algún otro proceso del módulo antes de compilar el plan de
   implementación (`SCJ-MOD` + `SCJ-DEC` + estos `SCJ-PRO`) y actualizar el Sprint Backlog de Notion
   (ver `[[notion-sprint-backlog-scj]]`).
 
 ---
 
-*Proceso · Folio SCJ-PRO-05 · V1.0*
+*Proceso · Folio SCJ-PRO-05 · V2.0*

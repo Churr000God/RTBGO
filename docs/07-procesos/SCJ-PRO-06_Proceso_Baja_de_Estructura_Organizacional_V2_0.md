@@ -1,12 +1,22 @@
 # Proceso — Baja/desactivación de estructura organizacional (área / departamento / puesto)
 
 **Sistema de Control de Jornada**
-Folio SCJ-PRO-06 · Versión 1.0 · 4 de septiembre de 2026
+Folio SCJ-PRO-06 · Versión 2.0 · 4 de septiembre de 2026
 
 Sexto documento de la serie `SCJ-PRO`, subsistema **Personas y Usuarios** — módulo
 Asignaciones/áreas/puestos/permisos. Cierra el módulo: cubre desactivar (`activo = false`) y
 reactivar (`activo = true`) área, departamento y puesto, precisando la regla ya anunciada en
 `SCJ-PRO-03 §V` ("no se desactiva si tiene información asociada activa río abajo").
+
+> **Cambió en V2.0:** el §VI decía "nada de este proceso está construido". Los endpoints
+> `PATCH /api/{areas,departamentos,puestos}/{id}/estado` y el frontend ya existían desde el corte
+> de `area`, pero con las validaciones DA1/DD1/RD1/DP1/DP3 marcadas `TODO` porque las tablas que
+> necesitaban consultar (`departamento`, `puesto`, `asignacion`, `puesto_permiso`) no existían
+> todavía en ese momento. El 4 de septiembre de 2026, con esas tablas ya construidas, `backend`
+> cerró las 5 validaciones pendientes; `testing` sumó los casos de rechazo (incluido el mensaje de
+> error exacto de cada uno) y confirmó 100% de cobertura en los 3 routers; `security` revisó que
+> ninguna abre un gap de permisos. Contradice contenido ya escrito (mayor, no menor), de ahí el
+> bump a V2.0.
 
 ---
 
@@ -109,21 +119,36 @@ flowchart TD
 
 ---
 
-## VI. Estado actual — sin implementar
+## VI. Estado actual — implementado
 
-Nada de este proceso está construido. Depende de que `SCJ-PRO-03`, `04` y `05` se implementen
-primero (usa las mismas tablas: `area`, `departamento`, `puesto`, `asignacion`, `puesto_permiso`).
+Construido de punta a punta:
+
+- **Backend:** `PATCH /api/areas/{id}/estado`, `PATCH /api/departamentos/{id}/estado`,
+  `PATCH /api/puestos/{id}/estado` en `backend/app/routers/{areas,departamentos,puestos}.py` —
+  DA1/RA1, DD1/RD1, DP1/DP3/DP4/RP1 implementados exactamente como se describen en §III/§IV
+  (4 de septiembre de 2026).
+- **Frontend:** botones "Desactivar"/"Reactivar" en `FichaAreaPage`, `FichaDepartamentoPage`,
+  `FichaPuestoPage`, ya conectados a estos endpoints.
+- **DB:** ninguna tabla ni columna nueva — usa `area`/`departamento`/`puesto`/`asignacion`/
+  `puesto_permiso` ya existentes. Índices de las columnas FK que consultan estas validaciones
+  (`departamento.area_id`, `puesto.departamento_id`, `asignacion.puesto_id`) en
+  `30_indices_fk.sql`.
+- **RLS:** las escrituras de `.../estado` exigen `area_edicion`/`departamento_edicion`/
+  `puesto_edicion` real (`31_personas_rls_permiso_especifico.sql`), no sólo estar activo.
+
+Tests: 5 casos nuevos de rechazo (uno por regla) más los ya existentes de camino feliz, 100% de
+cobertura de líneas en los 3 routers.
 
 ---
 
 ## VII. Siguiente paso
 
-Con `SCJ-PRO-03` a `06` cerrados, el módulo **Asignaciones/áreas/puestos/permisos** tiene su
-diseño de procesos completo — alta, asignación, permisos y baja de los tres catálogos. Sigue:
-actualizar el Sprint Backlog de Notion (`[[notion-sprint-backlog-scj]]`) reflejando este avance, y
-de ahí compilar el plan de implementación (`SCJ-MOD` + `SCJ-DEC` + estos `SCJ-PRO-03/04/05/06`)
-para pasarlo a ejecución.
+Con `SCJ-PRO-03` a `06` cerrados e implementados, el módulo **Asignaciones/áreas/puestos/permisos**
+tiene su diseño de procesos completo — alta, asignación, permisos y baja de los tres catálogos —
+y todo construido en código. Sigue: actualizar el Sprint Backlog de Notion
+(`[[notion-sprint-backlog-scj]]`) reflejando este avance, y decidir con el usuario si falta algún
+otro proceso del módulo.
 
 ---
 
-*Proceso · Folio SCJ-PRO-06 · V1.0*
+*Proceso · Folio SCJ-PRO-06 · V2.0*
