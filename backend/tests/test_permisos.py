@@ -445,6 +445,7 @@ def test_revocar_ultima_fila_activa_de_puesto_permiso_edicion_devuelve_422():
                     [{"id": PUESTO_PERMISO_ID, "puesto_id": PUESTO_DESTINO_ID, "codigo": "puesto_permiso_edicion"}]
                 ),
             ),
+            ("puesto", _tabla_select_simple([{"es_administrador_generico": False}])),
             ("puesto_permiso", _tabla_select_doble_eq([{"id": PUESTO_PERMISO_ID}])),
         ]
     )
@@ -462,6 +463,33 @@ def test_revocar_ultima_fila_activa_de_puesto_permiso_edicion_devuelve_422():
     assert "sin nadie que pueda repartir permisos" in response.json()["detail"]
 
 
+def test_revocar_puesto_administrador_generico_devuelve_422():
+    fake_client = _fake_client_secuencia(
+        _entradas_gate()
+        + [
+            (
+                "puesto_permiso",
+                _tabla_select_simple(
+                    [{"id": PUESTO_PERMISO_ID, "puesto_id": PUESTO_DESTINO_ID, "codigo": "permiso_ficticio_uno"}]
+                ),
+            ),
+            ("puesto", _tabla_select_simple([{"es_administrador_generico": True}])),
+        ]
+    )
+    _override_identidad(fake_client)
+
+    client = TestClient(app)
+    response = client.post(
+        "/api/permisos/revocar",
+        json={"puesto_permiso_id": PUESTO_PERMISO_ID},
+        headers={"Authorization": "Bearer fake-token"},
+    )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 422
+    assert "puesto administrador" in response.json()["detail"]
+
+
 def test_revocar_exitoso_cuando_quedan_otras_filas_activas():
     fake_client = _fake_client_secuencia(
         _entradas_gate()
@@ -472,6 +500,7 @@ def test_revocar_exitoso_cuando_quedan_otras_filas_activas():
                     [{"id": PUESTO_PERMISO_ID, "puesto_id": PUESTO_DESTINO_ID, "codigo": "puesto_permiso_edicion"}]
                 ),
             ),
+            ("puesto", _tabla_select_simple([{"es_administrador_generico": False}])),
             (
                 "puesto_permiso",
                 _tabla_select_doble_eq([{"id": PUESTO_PERMISO_ID}, {"id": "puesto-permiso-ficticio-2"}]),
@@ -506,6 +535,7 @@ def test_revocar_permiso_no_edicion_no_valida_ultima_fila():
                     [{"id": PUESTO_PERMISO_ID, "puesto_id": PUESTO_DESTINO_ID, "codigo": "permiso_ficticio_uno"}]
                 ),
             ),
+            ("puesto", _tabla_select_simple([{"es_administrador_generico": False}])),
             ("bitacora_movimiento_puesto_permiso", _tabla_insert_sin_dato()),
             ("puesto_permiso", _tabla_select_simple([_fila_puesto_permiso(codigo="permiso_ficticio_uno", activo=False)])),
         ]

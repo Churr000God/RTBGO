@@ -42,6 +42,9 @@ MENSAJE_PUESTO_PERMISO_NO_ENCONTRADO = "puesto_permiso no encontrado."
 MENSAJE_ULTIMA_FILA_EDICION = (
     "No se puede revocar: dejaría al sistema sin nadie que pueda repartir permisos."
 )
+MENSAJE_ADMINISTRADOR_SIN_ACCESO = (
+    "No se puede revocar: dejaría al puesto administrador sin acceso."
+)
 
 
 PERMISOS_LECTURA_O_EDICION = (
@@ -202,6 +205,17 @@ def revocar_permiso(
     if not fila:
         raise HTTPException(status.HTTP_404_NOT_FOUND, MENSAJE_PUESTO_PERMISO_NO_ENCONTRADO)
     puesto_id, codigo = fila[0]["puesto_id"], fila[0]["codigo"]
+
+    puesto = (
+        db.postgrest.schema("personas")
+        .table("puesto")
+        .select("es_administrador_generico")
+        .eq("id", puesto_id)
+        .execute()
+        .data
+    )
+    if puesto and puesto[0]["es_administrador_generico"]:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, MENSAJE_ADMINISTRADOR_SIN_ACCESO)
 
     if codigo == CODIGO_PUESTO_PERMISO_EDICION:
         activas = (

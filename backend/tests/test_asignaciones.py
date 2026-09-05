@@ -324,7 +324,8 @@ def test_terminar_asignacion_exitosa():
     fake_client = _fake_client_secuencia(
         _entradas_gate()
         + [
-            ("asignacion", _tabla_select_simple([{"vigente_hasta": None}])),
+            ("asignacion", _tabla_select_simple([{"puesto_id": PUESTO_ID, "vigente_hasta": None}])),
+            ("puesto", _tabla_select_simple([{"es_administrador_generico": False}])),
             ("asignacion", _tabla_update([_fila_asignacion_plana(vigente_hasta="2026-07-01")])),
         ]
     )
@@ -341,6 +342,28 @@ def test_terminar_asignacion_exitosa():
     app.dependency_overrides.clear()
     assert response.status_code == 200
     assert response.json()["vigente_hasta"] == "2026-07-01"
+
+
+def test_terminar_asignacion_puesto_administrador_generico_devuelve_422():
+    fake_client = _fake_client_secuencia(
+        _entradas_gate()
+        + [
+            ("asignacion", _tabla_select_simple([{"puesto_id": PUESTO_ID, "vigente_hasta": None}])),
+            ("puesto", _tabla_select_simple([{"es_administrador_generico": True}])),
+        ]
+    )
+    app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
+
+    client = TestClient(app)
+    response = client.patch(
+        f"/api/asignaciones/{ASIGNACION_ID}/terminar",
+        json={"vigente_hasta": "2026-07-01"},
+        headers={"Authorization": "Bearer fake-token"},
+    )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 422
 
 
 def _cuerpo_cambiar_puesto():
@@ -415,6 +438,7 @@ def test_cambiar_puesto_rpc_con_asignacion_cerrada_o_inexistente_devuelve_422():
         + [
             ("puesto", _tabla_select_simple([{"id": PUESTO_NUEVO_ID, "activo": True, "plazas_totales": 2}])),
             ("asignacion", _tabla_select_eq_is([])),
+            ("asignacion", _tabla_select_simple([])),
         ]
     )
     fake_client.postgrest.schema.return_value.rpc.return_value.execute.side_effect = APIError(
@@ -443,6 +467,8 @@ def test_cambiar_puesto_exitoso_rpc_devuelve_dict_plano():
         + [
             ("puesto", _tabla_select_simple([{"id": PUESTO_NUEVO_ID, "activo": True, "plazas_totales": 2}])),
             ("asignacion", _tabla_select_eq_is([])),
+            ("asignacion", _tabla_select_simple([{"puesto_id": PUESTO_ID}])),
+            ("puesto", _tabla_select_simple([{"es_administrador_generico": False}])),
         ]
     )
     fake_client.postgrest.schema.return_value.rpc.return_value.execute.return_value.data = _fila_asignacion_plana(
@@ -469,6 +495,31 @@ def test_cambiar_puesto_exitoso_rpc_devuelve_dict_plano():
             "p_fecha": "2026-07-01",
         },
     )
+
+
+def test_cambiar_puesto_origen_administrador_generico_devuelve_422():
+    fake_client = _fake_client_secuencia(
+        _entradas_gate()
+        + [
+            ("puesto", _tabla_select_simple([{"id": PUESTO_NUEVO_ID, "activo": True, "plazas_totales": 2}])),
+            ("asignacion", _tabla_select_eq_is([])),
+            ("asignacion", _tabla_select_simple([{"puesto_id": PUESTO_ID}])),
+            ("puesto", _tabla_select_simple([{"es_administrador_generico": True}])),
+        ]
+    )
+    app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
+
+    client = TestClient(app)
+    response = client.post(
+        f"/api/asignaciones/{ASIGNACION_ID}/cambiar-puesto",
+        json=_cuerpo_cambiar_puesto(),
+        headers={"Authorization": "Bearer fake-token"},
+    )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 422
+    fake_client.postgrest.schema.return_value.rpc.assert_not_called()
 
 
 def test_alta_asignacion_sin_permiso_devuelve_403():

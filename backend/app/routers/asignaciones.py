@@ -34,6 +34,9 @@ MENSAJE_PERSONA_INVALIDA = "La persona no existe o no está activa."
 MENSAJE_PUESTO_INVALIDO = "El puesto no existe o está inactivo."
 MENSAJE_PLAZAS_LLENAS = "El puesto no tiene plazas libres."
 MENSAJE_ASIGNACION_VIGENTE_DUPLICADA = "Esta persona ya tiene una asignación vigente a ese puesto."
+MENSAJE_ADMINISTRADOR_SIN_ACCESO = (
+    "No se puede hacer esto: dejaría al puesto administrador sin acceso."
+)
 
 SELECT_CON_DETALLE = (
     "*, persona:persona_id(primer_nombre, apellido_paterno), "
@@ -95,6 +98,22 @@ def _validar_puesto_con_plazas_libres(db: Client, puesto_id: str) -> None:
     )
     if len(ocupadas) >= puesto[0]["plazas_totales"]:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, MENSAJE_PLAZAS_LLENAS)
+
+
+def _validar_puesto_no_es_administrador_generico(db: Client, puesto_id: str) -> None:
+    """Chequeo espejo (UX) de db/ddl/32_puesto_administrador_generico_proteccion.sql bloque 5 --
+    la RLS real de personas.asignacion es la que efectivamente lo impide; esto sólo evita que la
+    app reciba un error crudo de violación de policy en vez de un 422 legible."""
+    puesto = (
+        db.postgrest.schema("personas")
+        .table("puesto")
+        .select("es_administrador_generico")
+        .eq("id", puesto_id)
+        .execute()
+        .data
+    )
+    if puesto and puesto[0]["es_administrador_generico"]:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, MENSAJE_ADMINISTRADOR_SIN_ACCESO)
 
 
 @router.get("", response_model=list[AsignacionConDetalle])
@@ -174,7 +193,7 @@ def terminar_asignacion(
     actual = (
         db.postgrest.schema("personas")
         .table("asignacion")
-        .select("vigente_hasta")
+        .select("puesto_id, vigente_hasta")
         .eq("id", asignacion_id)
         .execute()
         .data
@@ -183,6 +202,7 @@ def terminar_asignacion(
         raise HTTPException(status.HTTP_404_NOT_FOUND, MENSAJE_ASIGNACION_NO_ENCONTRADA)
     if actual[0]["vigente_hasta"] is not None:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, MENSAJE_ASIGNACION_YA_CERRADA)
+    _validar_puesto_no_es_administrador_generico(db, actual[0]["puesto_id"])
 
     return (
         db.postgrest.schema("personas")
@@ -215,6 +235,17 @@ def cambiar_puesto_asignacion(
     verificado en vivo contra Supabase: PostgREST devuelve un objeto JSON plano, no una lista
     de un elemento, así que resultado.data ya es el dict de la nueva asignación."""
     _validar_puesto_con_plazas_libres(db, datos.puesto_nuevo_id)
+
+    origen = (
+        db.postgrest.schema("personas")
+        .table("asignacion")
+        .select("puesto_id")
+        .eq("id", asignacion_id)
+        .execute()
+        .data
+    )
+    if origen:
+        _validar_puesto_no_es_administrador_generico(db, origen[0]["puesto_id"])
 
     try:
         resultado = (

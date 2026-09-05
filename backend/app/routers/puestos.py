@@ -28,6 +28,9 @@ MENSAJE_TIENE_SUBORDINADOS = "No se puede desactivar: tiene puestos subordinados
 MENSAJE_REACTIVACION_INVALIDA = (
     "No se puede reactivar: el departamento o el puesto superior no están activos."
 )
+MENSAJE_ADMINISTRADOR_SIN_ACCESO = (
+    "No se puede desactivar: dejaría al puesto administrador sin acceso."
+)
 
 
 @router.get("", response_model=list[PuestoOut])
@@ -154,7 +157,7 @@ def cambiar_estado_puesto(
     puesto_actual = (
         db.postgrest.schema("personas")
         .table("puesto")
-        .select("departamento_id, reporta_a_id")
+        .select("departamento_id, reporta_a_id, es_administrador_generico")
         .eq("id", puesto_id)
         .execute()
         .data
@@ -163,6 +166,13 @@ def cambiar_estado_puesto(
         raise HTTPException(status.HTTP_404_NOT_FOUND, MENSAJE_PUESTO_NO_ENCONTRADO)
 
     if not datos.activo:
+        # Chequeo espejo (UX) de db/ddl/32_puesto_administrador_generico_proteccion.sql bloque 6
+        # -- va ANTES de DP1/DP3 porque es más específico (identifica el puesto directamente, sin
+        # necesidad de consultar asignacion/puesto_permiso). La RLS real es la que efectivamente
+        # lo impide.
+        if puesto_actual[0]["es_administrador_generico"]:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, MENSAJE_ADMINISTRADOR_SIN_ACCESO)
+
         asignacion_vigente = (
             db.postgrest.schema("personas")
             .table("asignacion")
