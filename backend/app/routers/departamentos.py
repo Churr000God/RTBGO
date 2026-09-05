@@ -17,6 +17,7 @@ from postgrest.exceptions import APIError
 from supabase import Client
 
 from app.deps import get_caller_client
+from app.errores import manejar_violacion_unicidad
 from app.permisos import requiere_permiso
 from app.schemas.departamentos import (
     DepartamentoCreate,
@@ -27,7 +28,6 @@ from app.schemas.departamentos import (
 
 router = APIRouter(prefix="/api/departamentos", tags=["departamentos"])
 
-UNIQUE_VIOLATION = "23505"
 MENSAJE_DEPARTAMENTO_DUPLICADO = "Ya existe un departamento con ese nombre."
 MENSAJE_DEPARTAMENTO_NO_ENCONTRADO = "Departamento no encontrado."
 MENSAJE_AREA_INVALIDA = "El área no existe o está inactiva."
@@ -78,9 +78,7 @@ def alta_departamento(
             .data[0]
         )
     except APIError as error:
-        if error.code == UNIQUE_VIOLATION:
-            raise HTTPException(status.HTTP_409_CONFLICT, MENSAJE_DEPARTAMENTO_DUPLICADO) from error
-        raise
+        manejar_violacion_unicidad(error, MENSAJE_DEPARTAMENTO_DUPLICADO)
 
 
 @router.get("/{departamento_id}", response_model=DepartamentoOut)
@@ -125,9 +123,7 @@ def renombrar_departamento(
             .data
         )
     except APIError as error:
-        if error.code == UNIQUE_VIOLATION:
-            raise HTTPException(status.HTTP_409_CONFLICT, MENSAJE_DEPARTAMENTO_DUPLICADO) from error
-        raise
+        manejar_violacion_unicidad(error, MENSAJE_DEPARTAMENTO_DUPLICADO)
     if not fila:
         raise HTTPException(status.HTTP_404_NOT_FOUND, MENSAJE_DEPARTAMENTO_NO_ENCONTRADO)
     return fila[0]

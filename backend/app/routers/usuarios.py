@@ -4,12 +4,12 @@ from supabase import Client
 
 from app.config import Settings, get_settings
 from app.deps import get_caller_client, get_service_client
+from app.errores import manejar_violacion_unicidad
 from app.permisos import requiere_permiso
 from app.schemas.usuarios import UsuarioCreate, UsuarioOut
 
 router = APIRouter(prefix="/api/usuarios", tags=["usuarios"])
 
-UNIQUE_VIOLATION = "23505"
 MENSAJE_USUARIO_DUPLICADO = "Esta persona ya tiene un usuario asociado."
 
 
@@ -67,8 +67,6 @@ def alta_usuario(
         # insert falla por cualquier motivo, no sólo la carrera de uq_usuario_persona -- se
         # revierte siempre para no dejar cuentas de Auth sueltas.
         db.auth.admin.delete_user(invite.user.id)
-        if error.code == UNIQUE_VIOLATION:
-            raise HTTPException(status.HTTP_409_CONFLICT, MENSAJE_USUARIO_DUPLICADO) from error
-        raise
+        manejar_violacion_unicidad(error, MENSAJE_USUARIO_DUPLICADO)
 
     return usuario

@@ -18,12 +18,12 @@ from postgrest.exceptions import APIError
 from supabase import Client
 
 from app.deps import get_caller_client
+from app.errores import manejar_violacion_unicidad
 from app.permisos import requiere_permiso
 from app.schemas.areas import AreaCreate, AreaEstado, AreaOut, AreaRename
 
 router = APIRouter(prefix="/api/areas", tags=["areas"])
 
-UNIQUE_VIOLATION = "23505"
 MENSAJE_AREA_DUPLICADA = "Ya existe un área con ese nombre."
 MENSAJE_AREA_NO_ENCONTRADA = "Área no encontrada."
 
@@ -60,9 +60,7 @@ def alta_area(
             .data[0]
         )
     except APIError as error:
-        if error.code == UNIQUE_VIOLATION:
-            raise HTTPException(status.HTTP_409_CONFLICT, MENSAJE_AREA_DUPLICADA) from error
-        raise
+        manejar_violacion_unicidad(error, MENSAJE_AREA_DUPLICADA)
 
 
 @router.get("/{area_id}", response_model=AreaOut)
@@ -107,9 +105,7 @@ def renombrar_area(
             .data
         )
     except APIError as error:
-        if error.code == UNIQUE_VIOLATION:
-            raise HTTPException(status.HTTP_409_CONFLICT, MENSAJE_AREA_DUPLICADA) from error
-        raise
+        manejar_violacion_unicidad(error, MENSAJE_AREA_DUPLICADA)
     if not fila:
         raise HTTPException(status.HTTP_404_NOT_FOUND, MENSAJE_AREA_NO_ENCONTRADA)
     return fila[0]

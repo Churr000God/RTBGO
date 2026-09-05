@@ -16,6 +16,7 @@ from postgrest.exceptions import APIError
 from supabase import Client
 
 from app.deps import get_caller_client
+from app.errores import manejar_violacion_unicidad
 from app.permisos import requiere_permiso
 from app.schemas.asignaciones import (
     AsignacionCambiarPuesto,
@@ -33,8 +34,6 @@ MENSAJE_PERSONA_INVALIDA = "La persona no existe o no está activa."
 MENSAJE_PUESTO_INVALIDO = "El puesto no existe o está inactivo."
 MENSAJE_PLAZAS_LLENAS = "El puesto no tiene plazas libres."
 MENSAJE_ASIGNACION_VIGENTE_DUPLICADA = "Esta persona ya tiene una asignación vigente a ese puesto."
-
-UNIQUE_VIOLATION = "23505"
 
 SELECT_CON_DETALLE = (
     "*, persona:persona_id(primer_nombre, apellido_paterno), "
@@ -159,11 +158,9 @@ def alta_asignacion(
             .data[0]
         )
     except APIError as error:
-        if error.code == UNIQUE_VIOLATION:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_ENTITY, MENSAJE_ASIGNACION_VIGENTE_DUPLICADA
-            ) from error
-        raise
+        manejar_violacion_unicidad(
+            error, MENSAJE_ASIGNACION_VIGENTE_DUPLICADA, status.HTTP_422_UNPROCESSABLE_ENTITY
+        )
 
 
 @router.patch("/{asignacion_id}/terminar", response_model=AsignacionOut)
