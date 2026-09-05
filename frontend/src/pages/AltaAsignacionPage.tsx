@@ -45,6 +45,7 @@ export function AltaAsignacionPage() {
   const [estadoPuestos, setEstadoPuestos] = useState<EstadoCatalogo>("cargando");
   const [puestoSeleccionado, setPuestoSeleccionado] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
   // Deep-link desde "Nueva asignación" en la ficha de persona (?persona_id=...) — precarga la
   // selección así no hay que volver a buscar a la misma persona de la que se vino.
   const [personaId, setPersonaId] = useState(
@@ -91,6 +92,7 @@ export function AltaAsignacionPage() {
   async function handleSubmit(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     setError(null);
+    setEnviando(true);
     const f = new FormData(evento.currentTarget);
     const respuesta = await apiFetch("/api/asignaciones", {
       method: "POST",
@@ -102,6 +104,7 @@ export function AltaAsignacionPage() {
     });
     if (!respuesta.ok) {
       setError(await mensajeDeError(respuesta, "No se pudo registrar la asignación."));
+      setEnviando(false);
       return;
     }
     window.location.href = "/estructura/asignaciones";
@@ -205,7 +208,13 @@ export function AltaAsignacionPage() {
         {error && <p role="alert">{error}</p>}
         <div className="botonera">
           <a href="/estructura/asignaciones">Cancelar</a>
-          <Button type="submit" icono={ArrowRight} disabled={formularioDeshabilitado}>
+          <Button
+            type="submit"
+            icono={ArrowRight}
+            disabled={formularioDeshabilitado}
+            cargando={enviando}
+            textoCargando="Registrando…"
+          >
             Registrar
           </Button>
         </div>

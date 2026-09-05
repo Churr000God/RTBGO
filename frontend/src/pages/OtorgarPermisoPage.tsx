@@ -35,6 +35,7 @@ export function OtorgarPermisoPage() {
   const [permisos, setPermisos] = useState<Permiso[]>([]);
   const [estadoPermisos, setEstadoPermisos] = useState<EstadoCatalogo>("cargando");
   const [error, setError] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
   // Deep-link desde "Otorgar permiso" en la ficha de puesto (?puesto_id=...) — precarga la
   // selección así no hay que volver a buscar al mismo puesto del que se vino.
   const [puestoId, setPuestoId] = useState(
@@ -68,6 +69,7 @@ export function OtorgarPermisoPage() {
   async function handleSubmit(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     setError(null);
+    setEnviando(true);
     const f = new FormData(evento.currentTarget);
     const respuesta = await apiFetch("/api/permisos/otorgar", {
       method: "POST",
@@ -80,6 +82,7 @@ export function OtorgarPermisoPage() {
       // El 422 de auto-otorgamiento/herencia (SCJ-PRO-05 G5/G5b) es una regla real que puede
       // dispararse siempre — se muestra el detail que manda el backend, no un genérico inventado.
       setError(await mensajeDeError(respuesta, "No se pudo otorgar el permiso."));
+      setEnviando(false);
       return;
     }
     window.location.href = "/estructura/permisos";
@@ -170,7 +173,13 @@ export function OtorgarPermisoPage() {
         {error && <p role="alert">{error}</p>}
         <div className="botonera">
           <a href="/estructura/permisos">Cancelar</a>
-          <Button type="submit" icono={ArrowRight} disabled={formularioDeshabilitado}>
+          <Button
+            type="submit"
+            icono={ArrowRight}
+            disabled={formularioDeshabilitado}
+            cargando={enviando}
+            textoCargando="Otorgando…"
+          >
             Otorgar
           </Button>
         </div>

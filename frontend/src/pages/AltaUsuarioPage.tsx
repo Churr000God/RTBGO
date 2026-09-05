@@ -3,6 +3,7 @@ import { AlertCircle, Loader2, Mail, Send, User } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
+import { Button } from "../components/Button";
 
 type PersonaOpcion = { id: string; primer_nombre: string; apellido_paterno: string };
 
@@ -23,6 +24,7 @@ export function AltaUsuarioPage() {
   const [estadoPersonas, setEstadoPersonas] = useState<EstadoPersonas>("cargando");
   const [error, setError] = useState<string | null>(null);
   const [enviado, setEnviado] = useState(false);
+  const [enviando, setEnviando] = useState(false);
   // Deep-link desde "Crear acceso a Kairos" en la ficha de persona (?persona_id=...) — precarga
   // la selección así no hay que volver a buscar a la misma persona de la que se vino.
   const [personaId, setPersonaId] = useState(
@@ -50,6 +52,7 @@ export function AltaUsuarioPage() {
   async function handleSubmit(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     setError(null);
+    setEnviando(true);
     const f = new FormData(evento.currentTarget);
     const respuesta = await apiFetch("/api/usuarios", {
       method: "POST",
@@ -61,6 +64,7 @@ export function AltaUsuarioPage() {
     });
     if (!respuesta.ok) {
       setError(await mensajeDeError(respuesta, "No se pudo enviar la invitación."));
+      setEnviando(false);
       return;
     }
     setEnviado(true);
@@ -145,10 +149,9 @@ export function AltaUsuarioPage() {
             {error && <p role="alert">{error}</p>}
             <div className="botonera">
               <a href="/personas">Cancelar</a>
-              <button type="submit" className="boton-con-icono">
+              <Button type="submit" icono={Send} cargando={enviando} textoCargando="Enviando…">
                 Enviar invitación
-                <Send size={16} aria-hidden="true" />
-              </button>
+              </Button>
             </div>
           </form>
         )}

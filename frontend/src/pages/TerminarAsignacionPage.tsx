@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
+import { Button } from "../components/Button";
 import { Input } from "../components/Input";
 
 type Asignacion = {
@@ -27,6 +28,7 @@ export function TerminarAsignacionPage() {
   const { id } = useParams<{ id: string }>();
   const [asignacion, setAsignacion] = useState<Asignacion | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
 
   useEffect(() => {
     apiFetch(`/api/asignaciones/${id}`)
@@ -38,6 +40,7 @@ export function TerminarAsignacionPage() {
   async function handleSubmit(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     setError(null);
+    setEnviando(true);
     const f = new FormData(evento.currentTarget);
     const respuesta = await apiFetch(`/api/asignaciones/${id}/terminar`, {
       method: "PATCH",
@@ -47,6 +50,7 @@ export function TerminarAsignacionPage() {
     });
     if (!respuesta.ok) {
       setError(await mensajeDeError(respuesta, "No se pudo terminar la asignación."));
+      setEnviando(false);
       return;
     }
     window.location.href = "/estructura/asignaciones";
@@ -101,7 +105,9 @@ export function TerminarAsignacionPage() {
         {error && <p role="alert">{error}</p>}
         <div className="botonera">
           <a href="/estructura/asignaciones">Cancelar</a>
-          <button type="submit">Confirmar término</button>
+          <Button type="submit" cargando={enviando} textoCargando="Terminando…">
+            Confirmar término
+          </Button>
         </div>
       </form>
     </AppShell>

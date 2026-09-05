@@ -88,6 +88,8 @@ export function FichaPuestoPage() {
   const [estadoAsignaciones, setEstadoAsignaciones] = useState<EstadoCatalogo>("cargando");
   const [busqueda, setBusqueda] = useState("");
   const [busquedaPermisos, setBusquedaPermisos] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [cambiandoEstado, setCambiandoEstado] = useState(false);
 
   function cargar() {
     setEstadoCarga("cargando");
@@ -180,6 +182,7 @@ export function FichaPuestoPage() {
   async function handleGuardar(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     setError(null);
+    setGuardando(true);
     const f = new FormData(evento.currentTarget);
     const respuesta = await apiFetch(`/api/puestos/${id}`, {
       method: "PATCH",
@@ -191,13 +194,16 @@ export function FichaPuestoPage() {
     });
     if (!respuesta.ok) {
       setError(await mensajeDeError(respuesta, "No se pudo guardar el cambio."));
+      setGuardando(false);
       return;
     }
     setPuesto(await respuesta.json());
+    setGuardando(false);
   }
 
   async function handleEstado(nuevoActivo: boolean) {
     setError(null);
+    setCambiandoEstado(true);
     const respuesta = await apiFetch(`/api/puestos/${id}/estado`, {
       method: "PATCH",
       body: JSON.stringify({ activo: nuevoActivo }),
@@ -207,9 +213,11 @@ export function FichaPuestoPage() {
       // dispararse siempre (subordinados activos, o departamento/superior inactivo al
       // reactivar) — se muestra el detail que manda el backend, no un genérico inventado.
       setError(await mensajeDeError(respuesta, "No se pudo cambiar el estado del puesto."));
+      setCambiandoEstado(false);
       return;
     }
     setPuesto(await respuesta.json());
+    setCambiandoEstado(false);
   }
 
   if (estadoCarga === "cargando") {
@@ -268,11 +276,22 @@ export function FichaPuestoPage() {
           </div>
           <div className="botonera">
             {puesto.activo ? (
-              <Button type="button" onClick={() => handleEstado(false)}>
+              <Button
+                type="button"
+                onClick={() => handleEstado(false)}
+                cargando={cambiandoEstado}
+                textoCargando="Desactivando…"
+              >
                 Desactivar puesto
               </Button>
             ) : (
-              <Button type="button" onClick={() => handleEstado(true)} variante="primario">
+              <Button
+                type="button"
+                onClick={() => handleEstado(true)}
+                variante="primario"
+                cargando={cambiandoEstado}
+                textoCargando="Reactivando…"
+              >
                 Reactivar puesto
               </Button>
             )}
@@ -464,7 +483,9 @@ export function FichaPuestoPage() {
               defaultValue={puesto.plazas_totales}
             />
             <div className="botonera">
-              <button type="submit">Guardar</button>
+              <Button type="submit" cargando={guardando} textoCargando="Guardando…">
+                Guardar
+              </Button>
             </div>
           </Card>
 

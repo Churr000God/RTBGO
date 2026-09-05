@@ -4,6 +4,7 @@ import { AlertTriangle } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
+import { Button } from "../components/Button";
 
 type PuestoPermiso = {
   id: string;
@@ -29,6 +30,7 @@ export function RevocarPermisoPage() {
   const [otorgamiento, setOtorgamiento] = useState<PuestoPermiso | null>(null);
   const [estadoCarga, setEstadoCarga] = useState<EstadoCarga>("cargando");
   const [error, setError] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
   // Deep-link desde "Revocar" en la ficha de un puesto (?puesto_id=...) — si vino de ahí, tanto
   // cancelar como una revocación exitosa vuelven a esa ficha en vez de mandar a la pantalla
   // general de Permisos, que era la única salida antes y obligaba a renavegar todo de nuevo.
@@ -53,6 +55,7 @@ export function RevocarPermisoPage() {
 
   async function handleConfirmar() {
     setError(null);
+    setEnviando(true);
     const respuesta = await apiFetch("/api/permisos/revocar", {
       method: "POST",
       body: JSON.stringify({ puesto_permiso_id: id }),
@@ -61,6 +64,7 @@ export function RevocarPermisoPage() {
       // El 422 de "última fila activa de puesto_permiso_edicion" (SCJ-PRO-05 R2/R3) es una
       // regla real que puede dispararse siempre — se muestra el detail del backend.
       setError(await mensajeDeError(respuesta, "No se pudo revocar el permiso."));
+      setEnviando(false);
       return;
     }
     window.location.href = destino;
@@ -107,9 +111,15 @@ export function RevocarPermisoPage() {
         {error && <p role="alert">{error}</p>}
         <div className="botonera">
           <a href={destino}>Cancelar</a>
-          <button type="button" onClick={handleConfirmar} disabled={!otorgamiento}>
+          <Button
+            type="button"
+            onClick={handleConfirmar}
+            disabled={!otorgamiento}
+            cargando={enviando}
+            textoCargando="Revocando…"
+          >
             Confirmar revocación
-          </button>
+          </Button>
         </div>
       </div>
     </AppShell>

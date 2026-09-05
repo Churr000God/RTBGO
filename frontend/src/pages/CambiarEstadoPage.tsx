@@ -4,6 +4,7 @@ import { RotateCcw, ShieldAlert, UserX } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
+import { Button } from "../components/Button";
 
 type Persona = {
   id: string;
@@ -32,6 +33,7 @@ export function CambiarEstadoPage() {
   const { id } = useParams<{ id: string }>();
   const [error, setError] = useState<string | null>(null);
   const [persona, setPersona] = useState<Persona | null>(null);
+  const [enviando, setEnviando] = useState(false);
 
   useEffect(() => {
     apiFetch(`/api/personas/${id}`)
@@ -43,6 +45,7 @@ export function CambiarEstadoPage() {
   async function handleSubmit(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     setError(null);
+    setEnviando(true);
     const f = new FormData(evento.currentTarget);
     const respuesta = await apiFetch(`/api/personas/${id}/movimientos`, {
       method: "POST",
@@ -53,6 +56,7 @@ export function CambiarEstadoPage() {
     });
     if (!respuesta.ok) {
       setError(await mensajeDeError(respuesta, "No se pudo registrar el movimiento."));
+      setEnviando(false);
       return;
     }
     window.location.href = `/personas/${id}`;
@@ -140,7 +144,9 @@ export function CambiarEstadoPage() {
         {error && <p role="alert">{error}</p>}
         <div className="botonera">
           <a href={id ? `/personas/${id}` : "/personas"}>Cancelar</a>
-          <button type="submit">Confirmar</button>
+          <Button type="submit" cargando={enviando} textoCargando="Confirmando…">
+            Confirmar
+          </Button>
         </div>
       </form>
     </AppShell>

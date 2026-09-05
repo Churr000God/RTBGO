@@ -72,4 +72,36 @@ describe("Button", () => {
     );
     expect(screen.getByRole("button", { name: "Registrar" })).toBeDisabled();
   });
+
+  it("cargando deshabilita el botón de verdad (no sólo visualmente) y muestra el spinner", () => {
+    render(
+      <Button type="submit" icono={ArrowRight} cargando>
+        Registrar
+      </Button>
+    );
+    const boton = screen.getByRole("button", { name: "Registrar" });
+    expect(boton).toBeDisabled();
+    expect(boton.querySelector("svg")).toHaveClass("icono-girando");
+  });
+
+  it("cargando con textoCargando reemplaza el texto del botón (no el ícono, que siempre es el spinner)", () => {
+    render(
+      <Button type="submit" cargando textoCargando="Guardando…">
+        Guardar
+      </Button>
+    );
+    const boton = screen.getByRole("button", { name: "Guardando…" });
+    expect(boton.querySelector("svg.icono-girando")).toBeInTheDocument();
+  });
+
+  it("sin cargando, no dispara el estado disabled ni muestra el spinner", () => {
+    render(
+      <Button type="submit" icono={ArrowRight}>
+        Registrar
+      </Button>
+    );
+    const boton = screen.getByRole("button", { name: "Registrar" });
+    expect(boton).not.toBeDisabled();
+    expect(boton.querySelector("svg")).not.toHaveClass("icono-girando");
+  });
 });

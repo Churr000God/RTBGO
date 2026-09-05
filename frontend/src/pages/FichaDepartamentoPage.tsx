@@ -86,6 +86,8 @@ export function FichaDepartamentoPage() {
   const [estadoAsignaciones, setEstadoAsignaciones] = useState<EstadoCatalogo>("cargando");
   const [asignaciones, setAsignaciones] = useState<Asignacion[]>([]);
   const [busqueda, setBusqueda] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [cambiandoEstado, setCambiandoEstado] = useState(false);
 
   function cargar() {
     setEstadoCarga("cargando");
@@ -185,6 +187,7 @@ export function FichaDepartamentoPage() {
   async function handleRenombrar(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     setError(null);
+    setGuardando(true);
     const f = new FormData(evento.currentTarget);
     const respuesta = await apiFetch(`/api/departamentos/${id}`, {
       method: "PATCH",
@@ -196,13 +199,16 @@ export function FichaDepartamentoPage() {
       } else {
         setError(await mensajeDeError(respuesta, "No se pudo guardar el cambio."));
       }
+      setGuardando(false);
       return;
     }
     setDepartamento(await respuesta.json());
+    setGuardando(false);
   }
 
   async function handleEstado(nuevoActivo: boolean) {
     setError(null);
+    setCambiandoEstado(true);
     const respuesta = await apiFetch(`/api/departamentos/${id}/estado`, {
       method: "PATCH",
       body: JSON.stringify({ activo: nuevoActivo }),
@@ -215,9 +221,11 @@ export function FichaDepartamentoPage() {
       } else {
         setError(await mensajeDeError(respuesta, "No se pudo cambiar el estado del departamento."));
       }
+      setCambiandoEstado(false);
       return;
     }
     setDepartamento(await respuesta.json());
+    setCambiandoEstado(false);
   }
 
   if (estadoCarga === "cargando") {
@@ -277,11 +285,22 @@ export function FichaDepartamentoPage() {
           </div>
           <div className="botonera">
             {departamento.activo ? (
-              <Button type="button" onClick={() => handleEstado(false)}>
+              <Button
+                type="button"
+                onClick={() => handleEstado(false)}
+                cargando={cambiandoEstado}
+                textoCargando="Desactivando…"
+              >
                 Desactivar departamento
               </Button>
             ) : (
-              <Button type="button" onClick={() => handleEstado(true)} variante="primario">
+              <Button
+                type="button"
+                onClick={() => handleEstado(true)}
+                variante="primario"
+                cargando={cambiandoEstado}
+                textoCargando="Reactivando…"
+              >
                 Reactivar departamento
               </Button>
             )}
@@ -408,7 +427,9 @@ export function FichaDepartamentoPage() {
               defaultValue={departamento.nombre_departamento}
             />
             <div className="botonera">
-              <button type="submit">Guardar</button>
+              <Button type="submit" cargando={guardando} textoCargando="Guardando…">
+                Guardar
+              </Button>
             </div>
           </Card>
 

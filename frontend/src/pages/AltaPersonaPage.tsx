@@ -3,6 +3,7 @@ import { ArrowRight, Briefcase, Folder, User } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
+import { Button } from "../components/Button";
 
 function aMayusculas(evento: ChangeEvent<HTMLInputElement>) {
   evento.currentTarget.value = evento.currentTarget.value.toUpperCase();
@@ -20,10 +21,12 @@ async function mensajeDeError(respuesta: Response, generico: string): Promise<st
 
 export function AltaPersonaPage() {
   const [error, setError] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
 
   async function handleSubmit(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     setError(null);
+    setEnviando(true);
     const f = new FormData(evento.currentTarget);
     const respuesta = await apiFetch("/api/personas", {
       method: "POST",
@@ -43,6 +46,7 @@ export function AltaPersonaPage() {
     });
     if (!respuesta.ok) {
       setError(await mensajeDeError(respuesta, "No se pudo registrar el alta."));
+      setEnviando(false);
       return;
     }
     const persona = await respuesta.json();
@@ -197,10 +201,9 @@ export function AltaPersonaPage() {
         {error && <p role="alert">{error}</p>}
         <div className="botonera">
           <a href="/personas">Cancelar</a>
-          <button type="submit" className="boton-con-icono">
+          <Button type="submit" icono={ArrowRight} cargando={enviando} textoCargando="Registrando…">
             Registrar alta
-            <ArrowRight size={16} aria-hidden="true" />
-          </button>
+          </Button>
         </div>
       </form>
     </AppShell>

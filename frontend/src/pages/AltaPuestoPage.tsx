@@ -43,6 +43,7 @@ export function AltaPuestoPage() {
   const [puestos, setPuestos] = useState<Puesto[]>([]);
   const [estadoPuestos, setEstadoPuestos] = useState<EstadoCatalogo>("cargando");
   const [error, setError] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
 
   useEffect(() => {
     apiFetch("/api/departamentos")
@@ -79,6 +80,7 @@ export function AltaPuestoPage() {
   async function handleSubmit(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     setError(null);
+    setEnviando(true);
     const f = new FormData(evento.currentTarget);
     const respuesta = await apiFetch("/api/puestos", {
       method: "POST",
@@ -92,6 +94,7 @@ export function AltaPuestoPage() {
     });
     if (!respuesta.ok) {
       setError(await mensajeDeError(respuesta, "No se pudo registrar el alta."));
+      setEnviando(false);
       return;
     }
     const puesto = await respuesta.json();
@@ -205,7 +208,13 @@ export function AltaPuestoPage() {
         {error && <p role="alert">{error}</p>}
         <div className="botonera">
           <a href="/estructura/puestos">Cancelar</a>
-          <Button type="submit" icono={ArrowRight} disabled={formularioDeshabilitado}>
+          <Button
+            type="submit"
+            icono={ArrowRight}
+            disabled={formularioDeshabilitado}
+            cargando={enviando}
+            textoCargando="Registrando…"
+          >
             Registrar
           </Button>
         </div>

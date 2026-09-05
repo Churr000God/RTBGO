@@ -28,6 +28,7 @@ export function AltaDepartamentoPage() {
   const [areas, setAreas] = useState<Area[]>([]);
   const [estadoAreas, setEstadoAreas] = useState<EstadoAreas>("cargando");
   const [error, setError] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
 
   useEffect(() => {
     apiFetch("/api/areas")
@@ -47,6 +48,7 @@ export function AltaDepartamentoPage() {
   async function handleSubmit(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     setError(null);
+    setEnviando(true);
     const f = new FormData(evento.currentTarget);
     const respuesta = await apiFetch("/api/departamentos", {
       method: "POST",
@@ -63,6 +65,7 @@ export function AltaDepartamentoPage() {
       } else {
         setError(await mensajeDeError(respuesta, "No se pudo registrar el alta."));
       }
+      setEnviando(false);
       return;
     }
     const departamento = await respuesta.json();
@@ -130,7 +133,13 @@ export function AltaDepartamentoPage() {
         {error && <p role="alert">{error}</p>}
         <div className="botonera">
           <a href="/estructura/departamentos">Cancelar</a>
-          <Button type="submit" icono={ArrowRight} disabled={sinAreasDisponibles || noSePudoCargarAreas}>
+          <Button
+            type="submit"
+            icono={ArrowRight}
+            disabled={sinAreasDisponibles || noSePudoCargarAreas}
+            cargando={enviando}
+            textoCargando="Registrando…"
+          >
             Registrar
           </Button>
         </div>

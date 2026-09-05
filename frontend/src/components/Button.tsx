@@ -1,5 +1,5 @@
 import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactNode } from "react";
-import type { LucideIcon } from "lucide-react";
+import { Loader2, type LucideIcon } from "lucide-react";
 
 type PropsComunes = {
   variante?: "primario" | "plano";
@@ -13,6 +13,12 @@ type PropsBoton = PropsComunes &
   Omit<ButtonHTMLAttributes<HTMLButtonElement>, "type"> & {
     href?: undefined;
     type?: "button" | "submit" | "reset";
+    // Estado "en curso" de una acción que dispara un fetch (guardar/otorgar/desactivar/...) —
+    // deshabilita el botón de verdad (no sólo visualmente, evita el doble submit real) y
+    // reemplaza el ícono por el spinner que ya se usa en toda la app (Loader2 + .icono-girando)
+    // en vez de dejar el botón sin ningún feedback mientras espera la respuesta.
+    cargando?: boolean;
+    textoCargando?: ReactNode;
   };
 
 type PropsEnlace = PropsComunes &
@@ -57,10 +63,23 @@ export function Button(props: Props) {
     );
   }
 
-  const { type, ...restoBoton } = resto as Omit<PropsBoton, keyof PropsComunes | "className">;
+  const { type, cargando, textoCargando, disabled, ...restoBoton } = resto as Omit<
+    PropsBoton,
+    keyof PropsComunes | "className"
+  >;
+  const spinner = <Loader2 size={tamanoIcono} className="icono-girando" aria-hidden="true" />;
+  const contenidoBoton = cargando ? (
+    <>
+      {posicionIcono === "izquierda" && spinner}
+      {textoCargando ?? children}
+      {posicionIcono === "derecha" && spinner}
+    </>
+  ) : (
+    contenido
+  );
   return (
-    <button type={type ?? "button"} className={clases} {...restoBoton}>
-      {contenido}
+    <button type={type ?? "button"} className={clases} disabled={cargando || disabled} {...restoBoton}>
+      {contenidoBoton}
     </button>
   );
 }

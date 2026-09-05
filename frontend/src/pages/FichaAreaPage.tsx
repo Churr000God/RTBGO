@@ -51,6 +51,8 @@ export function FichaAreaPage() {
   const [error, setError] = useState<string | null>(null);
   const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
   const [estadoDepartamentos, setEstadoDepartamentos] = useState<EstadoDepartamentos>("cargando");
+  const [guardando, setGuardando] = useState(false);
+  const [cambiandoEstado, setCambiandoEstado] = useState(false);
 
   function cargar() {
     setEstadoCarga("cargando");
@@ -94,6 +96,7 @@ export function FichaAreaPage() {
   async function handleRenombrar(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     setError(null);
+    setGuardando(true);
     const f = new FormData(evento.currentTarget);
     const respuesta = await apiFetch(`/api/areas/${id}`, {
       method: "PATCH",
@@ -105,22 +108,27 @@ export function FichaAreaPage() {
       } else {
         setError(await mensajeDeError(respuesta, "No se pudo guardar el cambio."));
       }
+      setGuardando(false);
       return;
     }
     setArea(await respuesta.json());
+    setGuardando(false);
   }
 
   async function handleEstado(nuevoActivo: boolean) {
     setError(null);
+    setCambiandoEstado(true);
     const respuesta = await apiFetch(`/api/areas/${id}/estado`, {
       method: "PATCH",
       body: JSON.stringify({ activo: nuevoActivo }),
     });
     if (!respuesta.ok) {
       setError(await mensajeDeError(respuesta, "No se pudo cambiar el estado del área."));
+      setCambiandoEstado(false);
       return;
     }
     setArea(await respuesta.json());
+    setCambiandoEstado(false);
   }
 
   const departamentosActivos = departamentos.filter((d) => d.activo);
@@ -176,11 +184,22 @@ export function FichaAreaPage() {
           </div>
           <div className="botonera">
             {area.activo ? (
-              <Button type="button" onClick={() => handleEstado(false)}>
+              <Button
+                type="button"
+                onClick={() => handleEstado(false)}
+                cargando={cambiandoEstado}
+                textoCargando="Desactivando…"
+              >
                 Desactivar área
               </Button>
             ) : (
-              <Button type="button" onClick={() => handleEstado(true)} variante="primario">
+              <Button
+                type="button"
+                onClick={() => handleEstado(true)}
+                variante="primario"
+                cargando={cambiandoEstado}
+                textoCargando="Reactivando…"
+              >
                 Reactivar área
               </Button>
             )}
@@ -193,7 +212,9 @@ export function FichaAreaPage() {
           <h3>Nombre del área</h3>
           <Input id="nombre_area" name="nombre_area" label="Nombre" required maxLength={100} defaultValue={area.nombre_area} />
           <div className="botonera">
-            <button type="submit">Guardar</button>
+            <Button type="submit" cargando={guardando} textoCargando="Guardando…">
+              Guardar
+            </Button>
           </div>
         </Card>
 

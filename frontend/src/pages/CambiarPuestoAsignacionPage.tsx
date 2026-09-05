@@ -4,6 +4,7 @@ import { AlertTriangle } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
+import { Button } from "../components/Button";
 import { Input } from "../components/Input";
 
 type Asignacion = {
@@ -42,6 +43,7 @@ export function CambiarPuestoAsignacionPage() {
   const [puestos, setPuestos] = useState<Puesto[]>([]);
   const [asignaciones, setAsignaciones] = useState<AsignacionResumen[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
 
   useEffect(() => {
     apiFetch(`/api/asignaciones/${id}`)
@@ -68,6 +70,7 @@ export function CambiarPuestoAsignacionPage() {
   async function handleSubmit(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     setError(null);
+    setEnviando(true);
     const f = new FormData(evento.currentTarget);
     const respuesta = await apiFetch(`/api/asignaciones/${id}/cambiar-puesto`, {
       method: "POST",
@@ -78,6 +81,7 @@ export function CambiarPuestoAsignacionPage() {
     });
     if (!respuesta.ok) {
       setError(await mensajeDeError(respuesta, "No se pudo cambiar de puesto."));
+      setEnviando(false);
       return;
     }
     window.location.href = "/estructura/asignaciones";
@@ -144,7 +148,9 @@ export function CambiarPuestoAsignacionPage() {
         {error && <p role="alert">{error}</p>}
         <div className="botonera">
           <a href="/estructura/asignaciones">Cancelar</a>
-          <button type="submit">Confirmar cambio</button>
+          <Button type="submit" cargando={enviando} textoCargando="Cambiando…">
+            Confirmar cambio
+          </Button>
         </div>
       </form>
     </AppShell>

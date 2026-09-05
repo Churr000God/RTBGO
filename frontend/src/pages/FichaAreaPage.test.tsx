@@ -140,6 +140,42 @@ describe("FichaAreaPage", () => {
     expect(screen.getByRole("button", { name: /reactivar área/i })).toBeInTheDocument();
   });
 
+  it("mientras el PATCH de estado está en curso, el botón se deshabilita y avisa — un segundo click no dispara un segundo PATCH", async () => {
+    let resolverPatch!: (respuesta: Response) => void;
+    let llamadasPatch = 0;
+    vi.mocked(apiFetch).mockImplementation((path: string, opciones?: RequestInit) => {
+      if (path === "/api/sesion") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ acceso_permitido: true, motivo_bloqueo: null }))
+        );
+      }
+      if (path === `/api/areas/${AREA.id}/estado` && opciones?.method === "PATCH") {
+        llamadasPatch += 1;
+        return new Promise<Response>((resolver) => {
+          resolverPatch = resolver;
+        });
+      }
+      if (path === "/api/departamentos") {
+        return Promise.resolve(new Response(JSON.stringify([])));
+      }
+      return Promise.resolve(new Response(JSON.stringify(AREA)));
+    });
+
+    renderPagina();
+    await waitFor(() => expect(screen.getAllByText("Comercial").length).toBeGreaterThan(0));
+
+    const boton = screen.getByRole("button", { name: /desactivar área/i });
+    await userEvent.click(boton);
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /desactivando/i })).toBeDisabled());
+    // el botón deshabilitado de verdad (no sólo visual) evita el segundo submit real
+    await userEvent.click(screen.getByRole("button", { name: /desactivando/i }));
+    expect(llamadasPatch).toBe(1);
+
+    resolverPatch(new Response(JSON.stringify({ ...AREA, activo: false })));
+    await waitFor(() => expect(screen.getByText("Inactivo")).toBeInTheDocument());
+  });
+
   it("reactiva un área inactiva vía PATCH /api/areas/:id/estado", async () => {
     vi.mocked(apiFetch).mockImplementation((path: string, opciones?: RequestInit) => {
       if (path === "/api/sesion") {

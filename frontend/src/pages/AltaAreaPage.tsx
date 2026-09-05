@@ -18,10 +18,12 @@ async function mensajeDeError(respuesta: Response, generico: string): Promise<st
 
 export function AltaAreaPage() {
   const [error, setError] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
 
   async function handleSubmit(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     setError(null);
+    setEnviando(true);
     const f = new FormData(evento.currentTarget);
     const respuesta = await apiFetch("/api/areas", {
       method: "POST",
@@ -35,6 +37,7 @@ export function AltaAreaPage() {
       } else {
         setError(await mensajeDeError(respuesta, "No se pudo registrar el alta."));
       }
+      setEnviando(false);
       return;
     }
     const area = await respuesta.json();
@@ -70,7 +73,7 @@ export function AltaAreaPage() {
         {error && <p role="alert">{error}</p>}
         <div className="botonera">
           <a href="/estructura/areas">Cancelar</a>
-          <Button type="submit" icono={ArrowRight}>
+          <Button type="submit" icono={ArrowRight} cargando={enviando} textoCargando="Registrando…">
             Registrar
           </Button>
         </div>
