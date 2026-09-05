@@ -1432,6 +1432,25 @@ a.boton-con-icono {
   color: var(--navy-medio);
 }
 
+/* Modificador de .leyenda-estados para cuando vive en una sección de ancho completo en vez de
+   un <aside> angosto (PermisosPage, catálogo de permisos) — pasa de columna única a grilla
+   responsiva; se combina con .lista-desplazable para el límite de altura con scroll propio.
+   Cada ítem es su propia tarjeta bordeada (mismo tratamiento que .opcion-seleccionable) en vez
+   de texto suelto: la descripción de dos líneas de los permisos no heredables desalineaba la
+   grilla y daba sensación de amontonado sin un borde que absorbiera esa diferencia de alto. */
+.leyenda-estados--grilla {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: 1rem 1.25rem;
+}
+
+.leyenda-estados--grilla li {
+  align-items: flex-start;
+  border: 1px solid rgba(0, 43, 91, 0.12);
+  border-radius: 10px;
+  padding: 0.75rem 0.9rem;
+}
+
 /* ─── §ficha (mockup 10) ─── */
 
 .cabecera-ficha .identidad {

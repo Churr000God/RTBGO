@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, ArrowRight, Info, Loader2, Plus, ShieldCheck } from "lucide-react";
+import { AlertCircle, ArrowRight, Info, Loader2, Plus, Search, ShieldCheck } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { Badge } from "../components/Badge";
+import { Input } from "../components/Input";
 
 type TipoMovimientoPermiso = "otorgado" | "revocado";
 
@@ -64,6 +65,10 @@ export function PermisosPage() {
   const [estadoCarga, setEstadoCarga] = useState<EstadoCarga>("cargando");
   const [busqueda, setBusqueda] = useState("");
   const [filtroTipo, setFiltroTipo] = useState("");
+  const [filtroDesde, setFiltroDesde] = useState("");
+  const [filtroHasta, setFiltroHasta] = useState("");
+  const [orden, setOrden] = useState<"desc" | "asc">("desc");
+  const [busquedaCatalogo, setBusquedaCatalogo] = useState("");
 
   function cargar() {
     setEstadoCarga("cargando");
@@ -101,15 +106,30 @@ export function PermisosPage() {
 
   const filtrados = useMemo(() => {
     const consulta = normalizar(busqueda.trim());
+    const desde = filtroDesde ? new Date(`${filtroDesde}T00:00:00`) : null;
+    const hasta = filtroHasta ? new Date(`${filtroHasta}T00:00:00`) : null;
+    const direccion = orden === "desc" ? -1 : 1;
     return [...movimientos]
-      .sort((a, b) => new Date(b.fecha_efectiva).getTime() - new Date(a.fecha_efectiva).getTime())
+      .sort(
+        (a, b) =>
+          direccion * (new Date(a.fecha_efectiva).getTime() - new Date(b.fecha_efectiva).getTime()),
+      )
       .filter((m) => {
         const coincideBusqueda =
           !consulta || normalizar(m.nombre_puesto).includes(consulta) || normalizar(m.codigo).includes(consulta);
         const coincideTipo = !filtroTipo || m.tipo_movimiento === filtroTipo;
-        return coincideBusqueda && coincideTipo;
+        const fechaEfectiva = new Date(m.fecha_efectiva);
+        const coincideDesde = !desde || fechaEfectiva >= desde;
+        const coincideHasta = !hasta || fechaEfectiva <= hasta;
+        return coincideBusqueda && coincideTipo && coincideDesde && coincideHasta;
       });
-  }, [movimientos, busqueda, filtroTipo]);
+  }, [movimientos, busqueda, filtroTipo, filtroDesde, filtroHasta, orden]);
+
+  const catalogoFiltrado = useMemo(() => {
+    const consulta = normalizar(busquedaCatalogo.trim());
+    if (!consulta) return catalogo;
+    return catalogo.filter((permiso) => normalizar(permiso.codigo).includes(consulta));
+  }, [catalogo, busquedaCatalogo]);
 
   const agrupadosPorAnio = useMemo(() => {
     const grupos = new Map<string, MovimientoPermiso[]>();
@@ -173,15 +193,39 @@ export function PermisosPage() {
               aria-label="Buscar por puesto o código de permiso"
             />
           </div>
-          <select
-            value={filtroTipo}
-            onChange={(evento) => setFiltroTipo(evento.target.value)}
-            aria-label="Filtrar por tipo de movimiento"
-          >
-            <option value="">Tipo: Todos</option>
-            <option value="otorgado">Otorgado</option>
-            <option value="revocado">Revocado</option>
-          </select>
+          <div className="grupo-filtros-secundarios">
+            <select
+              value={filtroTipo}
+              onChange={(evento) => setFiltroTipo(evento.target.value)}
+              aria-label="Filtrar por tipo de movimiento"
+            >
+              <option value="">Tipo: Todos</option>
+              <option value="otorgado">Otorgado</option>
+              <option value="revocado">Revocado</option>
+            </select>
+            <Input
+              id="filtro-fecha-efectiva-desde"
+              label="Desde"
+              type="date"
+              value={filtroDesde}
+              onChange={(evento) => setFiltroDesde(evento.target.value)}
+            />
+            <Input
+              id="filtro-fecha-efectiva-hasta"
+              label="Hasta"
+              type="date"
+              value={filtroHasta}
+              onChange={(evento) => setFiltroHasta(evento.target.value)}
+            />
+            <select
+              value={orden}
+              onChange={(evento) => setOrden(evento.target.value as "desc" | "asc")}
+              aria-label="Ordenar por fecha"
+            >
+              <option value="desc">Más recientes primero</option>
+              <option value="asc">Más antiguas primero</option>
+            </select>
+          </div>
         </div>
 
         {estadoCarga === "cargando" && (
@@ -202,6 +246,44 @@ export function PermisosPage() {
               Reintentar
             </button>
           </div>
+        )}
+
+        {estadoCarga === "listo" && (
+          <Card>
+            <h3>Catálogo de permisos</h3>
+            <div className="campo-con-icono">
+              <Search size={16} className="icono-campo" aria-hidden="true" />
+              <input
+                type="search"
+                placeholder="Buscar por código de permiso"
+                value={busquedaCatalogo}
+                onChange={(evento) => setBusquedaCatalogo(evento.target.value)}
+                aria-label="Buscar por código de permiso"
+              />
+            </div>
+            {catalogoFiltrado.length === 0 ? (
+              <p>No hay permisos que coincidan con la búsqueda.</p>
+            ) : (
+              <ul className="leyenda-estados leyenda-estados--grilla lista-desplazable">
+                {catalogoFiltrado.map((permiso) => (
+                  <li key={permiso.codigo}>
+                    <span
+                      className={`punto ${permiso.heredable ? "punto--exito" : "punto--peligro"}`}
+                      aria-hidden="true"
+                    />
+                    <span>
+                      <strong>{permiso.codigo}</strong>
+                      <span className="descripcion">
+                        {permiso.heredable
+                          ? "Heredable — sube por reporta_a_id"
+                          : "No heredable — sólo el puesto que lo tiene"}
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
         )}
 
         {estadoCarga === "listo" && filtrados.length === 0 && (
@@ -255,28 +337,6 @@ export function PermisosPage() {
                     <span>Otorgamientos</span>
                   </div>
                 </div>
-              </Card>
-
-              <Card>
-                <h3>Catálogo de permisos</h3>
-                <ul className="leyenda-estados">
-                  {catalogo.map((permiso) => (
-                    <li key={permiso.codigo}>
-                      <span
-                        className={`punto ${permiso.heredable ? "punto--exito" : "punto--peligro"}`}
-                        aria-hidden="true"
-                      />
-                      <span>
-                        <strong>{permiso.codigo}</strong>
-                        <span className="descripcion">
-                          {permiso.heredable
-                            ? "Heredable — sube por reporta_a_id"
-                            : "No heredable — sólo el puesto que lo tiene"}
-                        </span>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
               </Card>
             </aside>
           </div>

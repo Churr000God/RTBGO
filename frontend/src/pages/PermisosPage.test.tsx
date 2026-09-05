@@ -126,6 +126,37 @@ describe("PermisosPage", () => {
     expect(elementoConTexto("Puesto Ficticio Dos")).toBeInTheDocument();
   });
 
+  it("filtra por rango de fecha efectiva (desde/hasta)", async () => {
+    mockApiFetch();
+
+    render(<PermisosPage />);
+    await waitFor(() => expect(elementoConTexto("Puesto Ficticio Uno")).toBeInTheDocument());
+
+    await userEvent.type(screen.getByLabelText(/^desde$/i), "2025-01-01");
+    expect(elementoConTextoQuery("Puesto Ficticio Dos")).not.toBeInTheDocument();
+    expect(elementoConTexto("Puesto Ficticio Uno")).toBeInTheDocument();
+
+    await userEvent.clear(screen.getByLabelText(/^desde$/i));
+    await userEvent.type(screen.getByLabelText(/^hasta$/i), "2024-12-31");
+    expect(elementoConTextoQuery("Puesto Ficticio Uno")).not.toBeInTheDocument();
+    expect(elementoConTexto("Puesto Ficticio Dos")).toBeInTheDocument();
+  });
+
+  it("ordena el historial por fecha efectiva (más recientes / más antiguas primero)", async () => {
+    mockApiFetch();
+
+    render(<PermisosPage />);
+    await waitFor(() => expect(elementoConTexto("Puesto Ficticio Uno")).toBeInTheDocument());
+
+    const titulosDescendente = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+    expect(titulosDescendente).toEqual(["2025", "2024"]);
+
+    await userEvent.selectOptions(screen.getByLabelText(/ordenar por fecha/i), "asc");
+
+    const titulosAscendente = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+    expect(titulosAscendente).toEqual(["2024", "2025"]);
+  });
+
   it("filtra por tipo de movimiento", async () => {
     mockApiFetch();
 
@@ -138,7 +169,7 @@ describe("PermisosPage", () => {
     expect(elementoConTexto("Puesto Ficticio Dos")).toBeInTheDocument();
   });
 
-  it("muestra el catálogo de permisos en la barra lateral, con heredable/no heredable", async () => {
+  it("muestra el catálogo de permisos en su propia sección de ancho completo, con heredable/no heredable", async () => {
     mockApiFetch();
 
     render(<PermisosPage />);
@@ -147,6 +178,39 @@ describe("PermisosPage", () => {
     expect(screen.getByText("permiso_ficticio_heredable")).toBeInTheDocument();
     expect(screen.getByText(/heredable — sube por reporta_a_id/i)).toBeInTheDocument();
     expect(screen.getByText(/no heredable — sólo el puesto que lo tiene/i)).toBeInTheDocument();
+  });
+
+  it("el catálogo no depende del historial filtrado: sigue visible con el historial vacío", async () => {
+    mockApiFetch({ otorgados: new Response(JSON.stringify([])) });
+
+    render(<PermisosPage />);
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          /no hay movimientos de permisos registrados o tu cuenta no tiene acceso al historial/i
+        )
+      ).toBeInTheDocument()
+    );
+    expect(screen.getByText("permiso_ficticio_uno")).toBeInTheDocument();
+    expect(screen.getByText("permiso_ficticio_heredable")).toBeInTheDocument();
+  });
+
+  it("el buscador del catálogo filtra por código, en cliente, sin afectar el historial", async () => {
+    mockApiFetch();
+
+    render(<PermisosPage />);
+    await waitFor(() => expect(screen.getByText("permiso_ficticio_uno")).toBeInTheDocument());
+
+    await userEvent.type(
+      screen.getByLabelText(/buscar por código de permiso/i),
+      "heredable"
+    );
+
+    expect(screen.queryByText("permiso_ficticio_uno")).not.toBeInTheDocument();
+    expect(screen.getByText("permiso_ficticio_heredable")).toBeInTheDocument();
+    // El historial no se ve afectado por el buscador del catálogo.
+    expect(elementoConTexto("Puesto Ficticio Uno")).toBeInTheDocument();
   });
 
   it("no tiene acciones inline en cada evento (decisión ya tomada)", async () => {
