@@ -45,8 +45,16 @@ backend y un frontend que lo exponen. Ver `README.md` y `docs/00-contexto/SCJ-CT
   `--no-dev` (sin pytest) y el frontend prod es nginx sirviendo el bundle (sin npm/node); el script
   corta con un mensaje explícito en vez de fallar con un error de `docker exec`. Las pruebas
   siempre corren con `dev pruebas`.
-- **Tests:** backend `uv run pytest` (117 casos), frontend `npm test` (198 casos). Ambos corren
-  igual dentro de los contenedores (`./scripts/desplegar.sh <entorno> pruebas`).
+- **Tests:** backend `uv run pytest` (117 casos), frontend `npm test` (221 casos). Ambos corren
+  igual dentro de los contenedores (`./scripts/desplegar.sh <entorno> pruebas`). Cobertura
+  instrumentada desde el 4 de septiembre de 2026: `uv run pytest --cov=app --cov-report=term-missing`
+  (backend, 97%) y `npm run test:coverage` / `npm test -- --coverage` (frontend, 92.4% líneas / 82.5%
+  ramas) — medición habilitada, sin umbral mínimo forzado todavía. `backend/.coverage` y
+  `frontend/coverage/` son artefactos generados, no se versionan.
+- **CI:** `.github/workflows/ci.yml` (agregado 4 de septiembre de 2026) corre backend (`uv run
+  pytest`) y frontend (`vitest run`) en cada push/PR — sin secrets de Supabase (todos los tests
+  mockean el cliente de Supabase, ninguno pega contra el proyecto real). No hace deploy, sólo
+  valida.
 - **Módulo Personas y Usuarios (`SCJ-PRO-01`/`SCJ-PRO-02`):** entregado el 3 de septiembre de 2026,
   de punta a punta (backend + frontend + DDL de `personas`). Puesto/área/departamento/permiso/
   asignación quedaron **fuera de alcance a propósito** — no asumir tablas ni endpoints de eso.
@@ -86,6 +94,20 @@ backend y un frontend que lo exponen. Ver `README.md` y `docs/00-contexto/SCJ-CT
   con los 16 permisos y 2FA configurado. Ver
   `bitacora/2026-09-04_modulo_{area,departamento,puesto,asignacion,puesto_permiso}.md` para el
   detalle de cada corte.
+- **Pase de mejora cross-stack con equipo de 6 especialistas (4 de septiembre de 2026):** con el
+  gate de permisos ya conectado, el usuario pidió una pasada de optimización orquestada —
+  `orchestrator` coordinó por `SendMessage` a 6 sesiones persistentes (`frontend`/`backend`/`db`/
+  `testing`/`security`/`devops`, roster fijo de `team-orchestrator`) para que cada una explorara y
+  mejorara su dominio con sus propias skills, sin commitear nada individualmente (commits
+  batcheados al final por dominio, revisados por `orchestrator`). Resultado: capa de componentes
+  UI reutilizables en frontend (`Button`/`Card`/`Badge`/`Input`, `frontend/src/components/`,
+  primera vez que el proyecto tiene componentes compartidos más allá de `CasilleroCodigo`/
+  `TemporizadorTotp`) usada para migrar las 17 páginas de Estructura Organizacional (construidas
+  sin mockup) más el rediseño de `Configurar2FAPage` (era la única pantalla de auth sin nivelar al
+  resto); helper `backend/app/errores.py` deduplicando el patrón `APIError` 23505 → `409` de 4
+  routers; 21 índices FK nuevos (`db/ddl/30_indices_fk.sql`); cobertura instrumentada (ver más
+  arriba); CI agregado (ver más arriba). Ver `bitacora/2026-09-04_pase_mejora_cross_stack_equipo.md`
+  para el detalle completo, incluido el hallazgo de seguridad crítico documentado abajo.
 
 ## Arquitectura y módulos
 
@@ -130,7 +152,7 @@ Cada una vive en su propio documento de decisión — no se duplican aquí, sól
   `http://localhost:5173` fijo a mano — esa configuración no vive en este repositorio. Al pasar a
   producción (`docker compose … prod`, frontend en `:8080`) hay que actualizarla ahí también, o
   los links de invitación/recuperación de contraseña no aterrizan en la app.
-- El DDL corre hasta `db/ddl/28_*.sql` (módulo Estructura Organizacional completo). `personas.permiso`
+- El DDL corre hasta `db/ddl/31_*.sql`. `personas.permiso`
   es la única tabla del proyecto con clave natural (`codigo varchar PRIMARY KEY`) en vez de `uuid`
   — decisión deliberada, fiel a la redacción literal de `SCJ-PRO-05`, no un descuido a corregir.
 - Las tablas de bitácora inmutables (`bitacora_movimiento_persona`,
@@ -146,6 +168,24 @@ Cada una vive en su propio documento de decisión — no se duplican aquí, sól
   inmutable necesita su propio `REVOKE UPDATE, DELETE` explícito desde el arranque, no asumir que
   "nunca se concedieron" sólo porque el `GRANT` del archivo no los menciona (hallazgo real de
   seguridad en el corte de `puesto_permiso`, corregido en `28_*.sql`).
+- **RLS no es automáticamente autorización — puede ser sólo autenticación disfrazada.** Hasta
+  `30_*.sql`, las policies de `area`/`departamento`/`puesto`/`asignacion`/`permiso`/
+  `puesto_permiso`/`persona`/`usuario` sólo exigían `fn_caller_activo()` (persona activa, no
+  suspendida) para INSERT/UPDATE/DELETE — nunca el permiso específico que sí valida
+  `backend/app/permisos.py::requiere_permiso(...)`. Como los 7 routers de Estructura
+  Organizacional/Personas usan `get_caller_client` (anon key + JWT del usuario, sujeto a RLS) para
+  **toda** lectura y escritura — nunca `service_role` — y el esquema está expuesto en Data API con
+  `GRANT ALL` a `anon`/`authenticated`, cualquier persona activa podía pegarle directo a PostgREST
+  (bypaseando FastAPI por completo) e insertar en `bitacora_movimiento_puesto_permiso`; el trigger
+  `fn_puesto_permiso_sincroniza` sincronizaba eso en un otorgamiento real, sin pasar por ninguna de
+  las validaciones de auto-otorgamiento de `routers/permisos.py`. Escalaba a admin total del
+  módulo de permisos partiendo de cualquier cuenta. Corregido en
+  `31_personas_rls_permiso_especifico.sql`: `personas.fn_caller_tiene_permiso(codigo)` replica en
+  SQL (con herencia jerárquica) la misma lógica de `tiene_permiso()` de Python, y las policies de
+  escritura ahora la exigen además de `fn_caller_activo()`. **Lección para módulos nuevos:** si un
+  router usa `get_caller_client` en vez de `service_role`, la policy RLS de esas tablas es la
+  autorización real, no un respaldo — hay que validar el permiso específico ahí, no sólo "¿está
+  activo?".
 
 ## Historial de decisiones
 
