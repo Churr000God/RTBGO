@@ -175,6 +175,15 @@ th {
   overflow-y: auto;
 }
 
+/* Un buscador (.campo-con-icono) suelto justo antes de una lista o de un mensaje de estado
+   (vacío/sin resultados), sin envolverlos en un form o .barra-filtros (que ya traen su propio
+   gap) — quedaban pegados sin ningún espacio contra el campo. Sólo afecta esa adyacencia
+   puntual, no toca .barra-filtros ni ningún otro uso de .campo-con-icono. */
+.campo-con-icono + .lista-historial-resumido,
+.campo-con-icono + p {
+  margin-top: 1rem;
+}
+
 /* Capa decorativa de las pantallas de autenticación — iconos en campos, badges,
    medidor de fuerza, tarjeta de error — replicada de diseno_paginas/personas/. */
 
