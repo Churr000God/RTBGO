@@ -1226,6 +1226,15 @@ a.boton-con-icono {
   gap: 0.85rem;
 }
 
+/* Modificador para cuando el grupo vive en una columna angosta (ej. la tarjeta "Resumen" del
+   costado en PermisosPage) en vez de una barra de filtros ancha — una fila por control, cada
+   uno estirado al ancho disponible, en vez de intentar acomodarlos en la misma línea. */
+.grupo-filtros-secundarios--apilado {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.75rem;
+}
+
 .persona-celda {
   display: flex;
   align-items: center;

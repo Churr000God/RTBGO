@@ -142,6 +142,19 @@ describe("PermisosPage", () => {
     expect(elementoConTexto("Puesto Ficticio Dos")).toBeInTheDocument();
   });
 
+  it("los filtros de fecha y orden viven dentro de la tarjeta Resumen del costado", async () => {
+    mockApiFetch();
+
+    render(<PermisosPage />);
+    await waitFor(() => expect(elementoConTexto("Puesto Ficticio Uno")).toBeInTheDocument());
+
+    const tarjetaResumen = screen.getByText("Resumen").closest("aside");
+    expect(tarjetaResumen).not.toBeNull();
+    expect(tarjetaResumen).toContainElement(screen.getByLabelText(/^desde$/i));
+    expect(tarjetaResumen).toContainElement(screen.getByLabelText(/^hasta$/i));
+    expect(tarjetaResumen).toContainElement(screen.getByLabelText(/ordenar por fecha/i));
+  });
+
   it("ordena el historial por fecha efectiva (más recientes / más antiguas primero)", async () => {
     mockApiFetch();
 
@@ -245,6 +258,23 @@ describe("PermisosPage", () => {
       "href",
       "/estructura/puestos"
     );
+  });
+
+  it("los filtros de fecha/orden de la tarjeta Resumen siguen visibles con el historial vacío", async () => {
+    mockApiFetch({ otorgados: new Response(JSON.stringify([])) });
+
+    render(<PermisosPage />);
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          /no hay movimientos de permisos registrados o tu cuenta no tiene acceso al historial/i
+        )
+      ).toBeInTheDocument()
+    );
+    expect(screen.getByLabelText(/^desde$/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^hasta$/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/ordenar por fecha/i)).toBeInTheDocument();
   });
 
   it("muestra el estado vacío cuando no hay movimientos", async () => {

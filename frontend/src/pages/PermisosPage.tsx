@@ -182,36 +182,6 @@ export function PermisosPage() {
           </div>
         </div>
 
-        <p className="etiqueta-metrica" style={{ marginBottom: "0.5rem" }}>
-          Ordenar y filtrar el historial por fecha
-        </p>
-        <div className="barra-filtros">
-          <div className="grupo-filtros-secundarios">
-            <Input
-              id="filtro-fecha-efectiva-desde"
-              label="Desde"
-              type="date"
-              value={filtroDesde}
-              onChange={(evento) => setFiltroDesde(evento.target.value)}
-            />
-            <Input
-              id="filtro-fecha-efectiva-hasta"
-              label="Hasta"
-              type="date"
-              value={filtroHasta}
-              onChange={(evento) => setFiltroHasta(evento.target.value)}
-            />
-            <select
-              value={orden}
-              onChange={(evento) => setOrden(evento.target.value as "desc" | "asc")}
-              aria-label="Ordenar por fecha"
-            >
-              <option value="desc">Más recientes primero</option>
-              <option value="asc">Más antiguas primero</option>
-            </select>
-          </div>
-        </div>
-
         <div className="barra-filtros">
           <div className="campo-con-icono">
             <ShieldCheck size={16} className="icono-campo" aria-hidden="true" />
@@ -292,42 +262,42 @@ export function PermisosPage() {
           </Card>
         )}
 
-        {estadoCarga === "listo" && filtrados.length === 0 && (
-          <div className="estado-vacio">
-            <ShieldCheck size={28} aria-hidden="true" />
-            <p>No hay movimientos de permisos registrados o tu cuenta no tiene acceso al historial.</p>
-          </div>
-        )}
-
-        {estadoCarga === "listo" && filtrados.length > 0 && (
+        {estadoCarga === "listo" && (
           <div className="layout-bitacora">
             <div className="linea-tiempo bloque-desplazable">
-              {[...agrupadosPorAnio.entries()].map(([anio, items]) => (
-                <div key={anio} className="grupo-anio">
-                  <h2 className="titulo-anio">{anio}</h2>
-                  {items.map((movimiento) => (
-                    <article key={movimiento.id} className="tarjeta-movimiento">
-                      <div className="fila-movimiento">
-                        <time dateTime={movimiento.fecha_efectiva}>
-                          {formatearFechaHora(movimiento.fecha_efectiva)}
-                        </time>
-                        <Badge variante={VARIANTE_TIPO[movimiento.tipo_movimiento]}>
-                          {ETIQUETA_TIPO[movimiento.tipo_movimiento]}
-                        </Badge>
-                      </div>
-                      <p style={{ fontWeight: 600, margin: 0, display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                        {movimiento.nombre_puesto}
-                        <ArrowRight size={14} aria-hidden="true" />
-                        {movimiento.codigo}
-                      </p>
-                      {movimiento.motivo && <p>{movimiento.motivo}</p>}
-                      <p className="autor-movimiento">
-                        <strong>{movimiento.registrado_por_nombre ?? "Sistema"}</strong>
-                      </p>
-                    </article>
-                  ))}
+              {filtrados.length === 0 ? (
+                <div className="estado-vacio">
+                  <ShieldCheck size={28} aria-hidden="true" />
+                  <p>No hay movimientos de permisos registrados o tu cuenta no tiene acceso al historial.</p>
                 </div>
-              ))}
+              ) : (
+                [...agrupadosPorAnio.entries()].map(([anio, items]) => (
+                  <div key={anio} className="grupo-anio">
+                    <h2 className="titulo-anio">{anio}</h2>
+                    {items.map((movimiento) => (
+                      <article key={movimiento.id} className="tarjeta-movimiento">
+                        <div className="fila-movimiento">
+                          <time dateTime={movimiento.fecha_efectiva}>
+                            {formatearFechaHora(movimiento.fecha_efectiva)}
+                          </time>
+                          <Badge variante={VARIANTE_TIPO[movimiento.tipo_movimiento]}>
+                            {ETIQUETA_TIPO[movimiento.tipo_movimiento]}
+                          </Badge>
+                        </div>
+                        <p style={{ fontWeight: 600, margin: 0, display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                          {movimiento.nombre_puesto}
+                          <ArrowRight size={14} aria-hidden="true" />
+                          {movimiento.codigo}
+                        </p>
+                        {movimiento.motivo && <p>{movimiento.motivo}</p>}
+                        <p className="autor-movimiento">
+                          <strong>{movimiento.registrado_por_nombre ?? "Sistema"}</strong>
+                        </p>
+                      </article>
+                    ))}
+                  </div>
+                ))
+              )}
             </div>
 
             <aside>
@@ -342,6 +312,33 @@ export function PermisosPage() {
                     <strong>{metricas.otorgamientos}</strong>
                     <span>Otorgamientos</span>
                   </div>
+                </div>
+                <p className="etiqueta-metrica" style={{ marginTop: "1.25rem", marginBottom: "0.5rem" }}>
+                  Ordenar y filtrar por fecha
+                </p>
+                <div className="grupo-filtros-secundarios grupo-filtros-secundarios--apilado">
+                  <Input
+                    id="filtro-fecha-efectiva-desde"
+                    label="Desde"
+                    type="date"
+                    value={filtroDesde}
+                    onChange={(evento) => setFiltroDesde(evento.target.value)}
+                  />
+                  <Input
+                    id="filtro-fecha-efectiva-hasta"
+                    label="Hasta"
+                    type="date"
+                    value={filtroHasta}
+                    onChange={(evento) => setFiltroHasta(evento.target.value)}
+                  />
+                  <select
+                    value={orden}
+                    onChange={(evento) => setOrden(evento.target.value as "desc" | "asc")}
+                    aria-label="Ordenar por fecha"
+                  >
+                    <option value="desc">Más recientes primero</option>
+                    <option value="asc">Más antiguas primero</option>
+                  </select>
                 </div>
               </Card>
             </aside>
