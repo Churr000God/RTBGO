@@ -45,7 +45,7 @@ backend y un frontend que lo exponen. Ver `README.md` y `docs/00-contexto/SCJ-CT
   `--no-dev` (sin pytest) y el frontend prod es nginx sirviendo el bundle (sin npm/node); el script
   corta con un mensaje explícito en vez de fallar con un error de `docker exec`. Las pruebas
   siempre corren con `dev pruebas`.
-- **Tests:** backend `uv run pytest` (101 casos), frontend `npm test` (191 casos). Ambos corren
+- **Tests:** backend `uv run pytest` (117 casos), frontend `npm test` (198 casos). Ambos corren
   igual dentro de los contenedores (`./scripts/desplegar.sh <entorno> pruebas`).
 - **Módulo Personas y Usuarios (`SCJ-PRO-01`/`SCJ-PRO-02`):** entregado el 3 de septiembre de 2026,
   de punta a punta (backend + frontend + DDL de `personas`). Puesto/área/departamento/permiso/
@@ -68,12 +68,22 @@ backend y un frontend que lo exponen. Ver `README.md` y `docs/00-contexto/SCJ-CT
   `PRIMARY KEY`), otorgar/revocar con validación real de auto-otorgamiento y herencia jerárquica,
   y un mecanismo de "usuario base de bootstrap" en `./scripts/desplegar.sh` (crea un usuario con
   todos los permisos al desplegar desde cero, credenciales por prompt interactivo, nunca en
-  `.env` — ver memoria de proyecto `usuario-base-bootstrap`). **El gate de permisos real NO está
-  conectado todavía** — los 5 routers (`areas`, `departamentos`, `puestos`, `asignaciones`,
-  `permisos`) siguen gateados sólo por "usuario autenticado y activo"; conectarlo de verdad
-  (incluida la relación entre `ver_modulo_1`/`ver_modulo_2` y el sidebar) es un corte aparte, no
-  asumir que ya está hecho. Primer `CREATE OR REPLACE FUNCTION` y primer RPC del proyecto
-  (`fn_asignacion_cambiar_puesto`) aparecieron en el corte de `asignacion`. Ver
+  `.env` — ver memoria de proyecto `usuario-base-bootstrap`). **El gate de permisos real YA ESTÁ
+  conectado** (commit `a52b534`, mismo día): `backend/app/permisos.py` resuelve los puestos
+  vigentes del caller y la herencia jerárquica (el jefe hereda lo del subordinado), y
+  `requiere_permiso(...)` (primer `403` del proyecto) gatea los 7 routers relevantes —
+  `areas`/`departamentos`/`puestos`/`asignaciones`/`permisos` (lectura exige lectura-o-edición,
+  escritura exige edición) y `personas`/`usuarios`/`movimientos` (sólo sus `POST`, con
+  `alta_personas_usuarios`/`cambio_estado_persona` — sus `GET` siguen con el gate débil a
+  propósito, el catálogo de 16 permisos no tiene código de lectura para ese módulo).
+  `GET /api/sesion` expone `puede_ver_modulo_1`/`puede_ver_modulo_2` para que el sidebar oculte
+  grupos completos sin permiso (fail-open si la sesión no carga). Primer `CREATE OR REPLACE
+  FUNCTION` y primer RPC del proyecto (`fn_asignacion_cambiar_puesto`) aparecieron en el corte de
+  `asignacion`. La base se **wipeó y reconstruyó por completo** el mismo día (`DROP SCHEMA
+  personas/tiempo CASCADE` + reaplicación de todo el DDL versionado, `auth.users` vaciado vía
+  Admin API) para eliminar 4 cuentas de desarrollo que la inmutabilidad de la bitácora hacía
+  imposible borrar quirúrgicamente — el único usuario que queda es el usuario base de bootstrap,
+  con los 16 permisos y 2FA configurado. Ver
   `bitacora/2026-09-04_modulo_{area,departamento,puesto,asignacion,puesto_permiso}.md` para el
   detalle de cada corte.
 
@@ -123,6 +133,13 @@ Cada una vive en su propio documento de decisión — no se duplican aquí, sól
 - El DDL corre hasta `db/ddl/28_*.sql` (módulo Estructura Organizacional completo). `personas.permiso`
   es la única tabla del proyecto con clave natural (`codigo varchar PRIMARY KEY`) en vez de `uuid`
   — decisión deliberada, fiel a la redacción literal de `SCJ-PRO-05`, no un descuido a corregir.
+- Las tablas de bitácora inmutables (`bitacora_movimiento_persona`,
+  `bitacora_movimiento_puesto_permiso`) bloquean `UPDATE`/`DELETE` **incluso para `postgres`** — a
+  propósito, es la garantía de auditoría. Consecuencia real: si una cuenta de desarrollo/QA generó
+  aunque sea una fila ahí (como autor o como persona afectada), no se puede borrar esa cuenta
+  quirúrgicamente ni con acceso de superusuario. La única salida limpia es `DROP SCHEMA ... CASCADE`
+  + reaplicar el DDL versionado desde cero (que sí regenera todo el dato real, porque está
+  capturado en archivos `.sql`) — no intentar desactivar el trigger ni forzar el `DELETE`.
 - `ALTER DEFAULT PRIVILEGES` de `08_personas_permisos.sql` le da `GRANT ALL` a cualquier tabla nueva
   creada por el mismo rol — eso incluye `UPDATE`/`DELETE`, que un `GRANT` explícito más chico
   (`SELECT, INSERT`) **no revoca** (`GRANT` es aditivo). Toda tabla de bitácora nueva que deba ser
