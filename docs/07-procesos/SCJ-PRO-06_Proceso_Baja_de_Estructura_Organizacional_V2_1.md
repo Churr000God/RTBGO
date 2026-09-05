@@ -1,13 +1,23 @@
 # Proceso — Baja/desactivación de estructura organizacional (área / departamento / puesto)
 
 **Sistema de Control de Jornada**
-Folio SCJ-PRO-06 · Versión 2.0 · 4 de septiembre de 2026
+Folio SCJ-PRO-06 · Versión 2.1 · 5 de septiembre de 2026
 
 Sexto documento de la serie `SCJ-PRO`, subsistema **Personas y Usuarios** — módulo
 Asignaciones/áreas/puestos/permisos. Cierra el módulo: cubre desactivar (`activo = false`) y
 reactivar (`activo = true`) área, departamento y puesto, precisando la regla ya anunciada en
 `SCJ-PRO-03 §V` ("no se desactiva si tiene información asociada activa río abajo").
 
+> **Cambió en V2.1 (no contradice V2.0, se agrega sin quitar nada — bump menor):** el puesto
+> marcado `personas.puesto.es_administrador_generico = true` (el fixture de bootstrap de
+> `26_puesto_permiso_bootstrap_admin_generico.sql`) no puede desactivarse, sin excepción — ver
+> DPA en §III/§IV y la regla nueva de §V. Hoy ya queda bloqueado de rebote por DP1/DP3 (siempre
+> tiene asignación vigente y `puesto_permiso` activo), pero eso es un efecto colateral, no una
+> garantía — la protección nueva es explícita y no depende de que DP1/DP3 seguro se cumplan.
+> Ver también `SCJ-PRO-04 §V` (misma protección, para no poder cortarle la asignación) y
+> `SCJ-PRO-05 §V` (misma protección, para no poder revocarle un permiso) — las tres cierran el
+> mismo puesto por sus tres vectores distintos.
+>
 > **Cambió en V2.0:** el §VI decía "nada de este proceso está construido". Los endpoints
 > `PATCH /api/{areas,departamentos,puestos}/{id}/estado` y el frontend ya existían desde el corte
 > de `area`, pero con las validaciones DA1/DD1/RD1/DP1/DP3 marcadas `TODO` porque las tablas que
@@ -57,7 +67,9 @@ flowchart TD
         DD1 -->|sí| DD2["Rechaza"]
         DD1 -->|no| DD3["departamento.activo = false"]
 
-        DP0["Desactivar puesto"] --> DP1{"¿tiene asignacion\nvigente (vigente_hasta\nIS NULL)?"}
+        DP0["Desactivar puesto"] --> DPA{"¿es_administrador_generico?"}
+        DPA -->|sí| DPA2["Rechaza: puesto administrador,\nnunca se desactiva"]
+        DPA -->|no| DP1{"¿tiene asignacion\nvigente (vigente_hasta\nIS NULL)?"}
         DP1 -->|sí| DP2["Rechaza"]
         DP1 -->|no| DP3{"¿tiene puesto_permiso\ncon activo = true?"}
         DP3 -->|sí| DP2
@@ -87,6 +99,7 @@ flowchart TD
 |---|---|---|---|
 | DA1 | Sistema | Rechaza desactivar `area` si algún `departamento` hijo sigue `activo = true` | `personas.departamento` |
 | DD1 | Sistema | Rechaza desactivar `departamento` si algún `puesto` hijo sigue `Puesto_activo = true` | `personas.puesto` |
+| DPA | Sistema | Rechaza desactivar `puesto` si `es_administrador_generico = true`, sin excepción — primer chequeo, antes que cualquier otro (V2.1) | `personas.puesto` |
 | DP1 | Sistema | Rechaza desactivar `puesto` si tiene una `asignacion` vigente (persona ocupándolo) | `personas.asignacion` |
 | DP3 | Sistema | Rechaza si tiene algún `puesto_permiso.activo = true` (permisos otorgados) | `personas.puesto_permiso` |
 | DP4 | Sistema | Rechaza si algún puesto activo le reporta (`reporta_a_id` apunta a éste) | `personas.puesto` |
@@ -116,6 +129,16 @@ flowchart TD
   desactivar es la única forma de "retirar" algo del catálogo, preservando el historial completo.
 - **`permiso` queda fuera de este proceso a propósito** — su ciclo de vida es de migración/deploy,
   no de operación diaria (`SCJ-PRO-03 §I`).
+- **El puesto administrador nunca se desactiva, sin excepción (V2.1).** El puesto marcado
+  `es_administrador_generico = true` (a lo sumo uno, `SCJ-PRO-05 §V`) se rechaza en `DPA`, antes
+  de llegar siquiera a evaluar `DP1`/`DP3`/`DP4`. Es un chequeo explícito, no un efecto colateral
+  de las otras reglas — aunque hoy el puesto administrador siempre tiene asignación vigente y
+  `puesto_permiso` activo (así que `DP1`/`DP3` ya lo bloquearían de rebote), esa coincidencia no es
+  una garantía si algún día ese puesto queda temporalmente sin asignación o sin permisos activos.
+  Implementado en las dos capas de siempre: `backend/app/routers/puestos.py::
+  cambiar_estado_puesto()` (chequeo explícito, antes de DP1/DP3) y RLS
+  (`db/ddl/32_puesto_administrador_generico_proteccion.sql` — la policy de `personas.puesto`
+  rechaza la transición a `activo = false` para ese puesto, deja pasar `activo = true`).
 
 ---
 
@@ -134,7 +157,10 @@ Construido de punta a punta:
   (`departamento.area_id`, `puesto.departamento_id`, `asignacion.puesto_id`) en
   `30_indices_fk.sql`.
 - **RLS:** las escrituras de `.../estado` exigen `area_edicion`/`departamento_edicion`/
-  `puesto_edicion` real (`31_personas_rls_permiso_especifico.sql`), no sólo estar activo.
+  `puesto_edicion` real (`31_personas_rls_permiso_especifico.sql`), no sólo estar activo. Desde el
+  5 de septiembre de 2026, además: desactivar el puesto administrador
+  (`es_administrador_generico`) nunca procede
+  (`32_puesto_administrador_generico_proteccion.sql` — ver §V, DPA).
 
 Tests: 5 casos nuevos de rechazo (uno por regla) más los ya existentes de camino feliz, 100% de
 cobertura de líneas en los 3 routers.
@@ -151,4 +177,4 @@ otro proceso del módulo.
 
 ---
 
-*Proceso · Folio SCJ-PRO-06 · V2.0*
+*Proceso · Folio SCJ-PRO-06 · V2.1*

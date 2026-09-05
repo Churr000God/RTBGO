@@ -1,7 +1,7 @@
 # Proceso — Asignación de persona a puesto
 
 **Sistema de Control de Jornada**
-Folio SCJ-PRO-04 · Versión 1.0 · 4 de septiembre de 2026
+Folio SCJ-PRO-04 · Versión 1.1 · 5 de septiembre de 2026
 
 Cuarto documento de la serie `SCJ-PRO`, subsistema **Personas y Usuarios** — módulo
 Asignaciones/áreas/puestos/permisos. Cubre cómo una persona queda ligada a un puesto, cómo se
@@ -9,6 +9,13 @@ mueve entre puestos, y qué pasa con esa liga cuando la persona cambia de estado
 
 Es la pieza que conecta los dos lados del módulo: `puesto_permiso` da permisos a un **puesto**, y
 `asignacion` es lo único que hace que esos permisos lleguen a una **persona**.
+
+> **Cambió en V1.1 (no contradice V1.0, se agrega sin quitar nada — bump menor):** nueva regla en
+> §V, "la asignación al puesto administrador nunca se termina" — ver `T2` en §III/§IV. El §VII de
+> este documento sigue describiendo el estado de diseño previo a la implementación real del 4 de
+> septiembre de 2026 (nunca se actualizó después, a diferencia de `SCJ-PRO-05`/`06`); esta nota de
+> V1.1 no corrige esa desactualización general, sólo documenta la regla nueva — señalado aparte
+> para quien decida cerrar esa brecha más adelante.
 
 ---
 
@@ -54,7 +61,9 @@ flowchart TD
 
     subgraph CAMBIO["Cambiar de puesto (transaccional)"]
         C0["Usuario elige la asignación a cerrar\n+ el puesto nuevo + fecha"]
-        C0 --> C1["Valida el puesto nuevo\n(mismas 3 validaciones de arriba)"]
+        C0 --> CA{"¿puesto ORIGEN es\nes_administrador_generico?"}
+        CA -->|sí| CA2["Rechaza: no se puede sacar\na nadie del puesto administrador"]
+        CA -->|no| C1["Valida el puesto nuevo\n(mismas 3 validaciones de arriba)"]
         C1 --> C2{"¿todas pasan?"}
         C2 -->|no| C3["Rechaza — no se cierra nada"]
         C2 -->|sí| C4["TRANSACCIÓN:\ncierra la vieja (vigente_hasta = fecha)\n+ abre la nueva (vigente_desde = fecha)"]
@@ -62,7 +71,9 @@ flowchart TD
 
     subgraph TERMINA["Terminar asignación"]
         T0["Usuario elige la asignación vigente"]
-        T0 --> T1["vigente_hasta = fecha\nLa plaza queda libre"]
+        T0 --> T2{"¿puesto.es_administrador_generico?"}
+        T2 -->|sí| T3["Rechaza: puesto administrador,\nnunca se le corta la asignación"]
+        T2 -->|no| T1["vigente_hasta = fecha\nLa plaza queda libre"]
     end
 
     subgraph ESTADO["Efecto del cambio de estado (SCJ-PRO-02)"]
@@ -86,7 +97,9 @@ flowchart TD
 | N5 | Sistema | Cuenta asignaciones vigentes del puesto; rechaza si ya alcanzó `plazas_totales` | `personas.asignacion`, `personas.puesto` |
 | N7 | Sistema | Crea la fila con `vigente_hasta = NULL` | `personas.asignacion` |
 | N8 | Sistema | Desde ese momento la persona tiene los permisos de ese puesto (unión con los de sus otros puestos vigentes) | `puesto_permiso` |
+| CA | Sistema | Rechaza cambiar de puesto si el puesto ORIGEN es `es_administrador_generico` (el destino no importa) — V1.1 | `personas.puesto` |
 | C0-C4 | Usuario con `asignacion_edicion` | Cambio de puesto: se valida el destino **antes** de cerrar el origen; ambas escrituras van en una transacción | `personas.asignacion` |
+| T2 | Sistema | Rechaza terminar la asignación si el puesto es `es_administrador_generico` — V1.1 | `personas.puesto` |
 | T0-T1 | Usuario con `asignacion_edicion` | Termina una asignación vigente sin abrir otra | `personas.asignacion` |
 | E4 | Sistema (trigger) | Al insertarse un movimiento `baja_definitiva`, cierra todas las asignaciones vigentes de esa persona con `vigente_hasta = fecha_efectiva` | `personas.asignacion` |
 
@@ -117,6 +130,16 @@ flowchart TD
   origen; si algo falla no se cierra nada. Nunca queda a medias.
 - **`asignacion` no lleva bitácora aparte.** `vigente_desde`/`vigente_hasta` ya son el histórico
   completo — ya establecido en `SCJ-PRO-02 §I`.
+- **La asignación al puesto administrador nunca se termina ni se cambia, sin excepción (V1.1).**
+  Ni `terminar_asignacion` (`T2`) ni `cambiar_puesto_asignacion` sobre el puesto ORIGEN (`CA`)
+  pueden dejar sin asignación vigente al puesto marcado `es_administrador_generico = true`
+  (`SCJ-PRO-05 §V`, `SCJ-PRO-06 §V` — misma protección, tres vectores). El destino de un
+  `cambiar-puesto` no importa: meter a alguien MÁS en el puesto administrador no es un riesgo,
+  sacar al único ocupante sí. Implementado en las dos capas de siempre: `backend/app/routers/
+  asignaciones.py` (`_validar_puesto_no_es_administrador_generico`, en ambos endpoints) y RLS
+  (`db/ddl/32_puesto_administrador_generico_proteccion.sql` — la policy de `personas.asignacion`
+  rechaza cualquier `UPDATE` que deje `vigente_hasta` no nulo para ese puesto; alcanza también a
+  `fn_asignacion_cambiar_puesto`, que es `SECURITY INVOKER` y hace el mismo `UPDATE` por dentro).
 
 ---
 
@@ -148,4 +171,4 @@ puede compilarse su plan de implementación.
 
 ---
 
-*Proceso · Folio SCJ-PRO-04 · V1.0*
+*Proceso · Folio SCJ-PRO-04 · V1.1*
