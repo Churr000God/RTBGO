@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, ArrowRight, Loader2, Plus, ShieldCheck } from "lucide-react";
+import { AlertCircle, ArrowRight, Info, Loader2, Plus, ShieldCheck } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
@@ -137,6 +137,12 @@ export function PermisosPage() {
             Otorgar permiso
           </Button>
         </div>
+
+        <p className="tarjeta-info">
+          <Info size={16} aria-hidden="true" />
+          Para revocar un permiso, abrí la ficha del puesto correspondiente en{" "}
+          <a href="/estructura/puestos">Estructura organizacional → Puestos</a>.
+        </p>
 
         <div className="banda-metricas">
           <div className="metrica">

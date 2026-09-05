@@ -159,6 +159,19 @@ describe("PermisosPage", () => {
     expect(screen.queryByRole("button", { name: /revocar/i })).not.toBeInTheDocument();
   });
 
+  it("muestra una nota fija indicando dónde revocar un permiso (ficha del puesto)", async () => {
+    mockApiFetch();
+
+    render(<PermisosPage />);
+
+    await waitFor(() => expect(elementoConTexto("Puesto Ficticio Uno")).toBeInTheDocument());
+    expect(screen.getByText(/para revocar un permiso, abrí la ficha del puesto/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /estructura organizacional.*puestos/i })).toHaveAttribute(
+      "href",
+      "/estructura/puestos"
+    );
+  });
+
   it("muestra el estado vacío cuando no hay movimientos", async () => {
     mockApiFetch({ otorgados: new Response(JSON.stringify([])) });
 
