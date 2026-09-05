@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
@@ -36,6 +36,7 @@ function mockApiFetch(overrides: {
   departamento?: Record<string, unknown> | null;
   superior?: Record<string, unknown> | null;
   permisosVigentes?: Response;
+  asignaciones?: Response;
   patch?: (path: string, init: RequestInit) => Response | undefined;
 } = {}) {
   const puesto = overrides.puesto ?? PUESTO;
@@ -59,6 +60,9 @@ function mockApiFetch(overrides: {
     }
     if (path === "/api/permisos/vigentes") {
       return Promise.resolve(overrides.permisosVigentes ?? new Response(JSON.stringify([])));
+    }
+    if (path === "/api/asignaciones") {
+      return Promise.resolve(overrides.asignaciones ?? new Response(JSON.stringify([])));
     }
     if (path === `/api/puestos/${(puesto as typeof PUESTO).reporta_a_id}`) {
       return Promise.resolve(
@@ -286,5 +290,98 @@ describe("FichaPuestoPage", () => {
         screen.getByText(/no se pudieron cargar los permisos de este puesto/i)
       ).toBeInTheDocument()
     );
+  });
+
+  describe("personas asignadas a este puesto (opción B: dos columnas)", () => {
+    const ASIGNACION_SOFIA = {
+      persona_id: "persona-sofia",
+      persona_nombre: "Sofía Ramírez",
+      puesto_id: PUESTO.id,
+      vigente_desde: "2025-02-03",
+      vigente_hasta: null,
+    };
+    const ASIGNACION_DIEGO = {
+      persona_id: "persona-diego",
+      persona_nombre: "Diego Morales",
+      puesto_id: PUESTO.id,
+      vigente_desde: "2024-06-18",
+      vigente_hasta: null,
+    };
+    const ASIGNACION_OTRO_PUESTO = {
+      persona_id: "persona-otro-puesto",
+      persona_nombre: "No Debería Aparecer",
+      puesto_id: "otro-puesto-ficticio",
+      vigente_desde: "2024-01-01",
+      vigente_hasta: null,
+    };
+    const ASIGNACION_TERMINADA = {
+      persona_id: "persona-vieja",
+      persona_nombre: "Persona Ya No Vigente",
+      puesto_id: PUESTO.id,
+      vigente_desde: "2020-01-01",
+      vigente_hasta: "2023-01-01",
+    };
+
+    it("lista en tabla las personas vigentes de este puesto, con link a su expediente, y filtra por búsqueda", async () => {
+      mockApiFetch({
+        asignaciones: new Response(
+          JSON.stringify([ASIGNACION_SOFIA, ASIGNACION_DIEGO, ASIGNACION_OTRO_PUESTO, ASIGNACION_TERMINADA])
+        ),
+      });
+      renderPagina();
+
+      await waitFor(() => expect(screen.getByText("Sofía Ramírez")).toBeInTheDocument());
+      expect(screen.getByText("Diego Morales")).toBeInTheDocument();
+      expect(screen.queryByText("No Debería Aparecer")).not.toBeInTheDocument();
+      expect(screen.queryByText("Persona Ya No Vigente")).not.toBeInTheDocument();
+
+      expect(screen.getByRole("link", { name: /sofía ramírez/i })).toHaveAttribute(
+        "href",
+        "/personas/persona-sofia"
+      );
+
+      const resumen = screen.getByText("Resumen").closest(".tarjeta-resumen") as HTMLElement;
+      expect(within(resumen).getByText("2/5")).toBeInTheDocument();
+
+      await userEvent.type(screen.getByLabelText(/buscar por nombre/i), "sofía");
+      expect(screen.getByText("Sofía Ramírez")).toBeInTheDocument();
+      expect(screen.queryByText("Diego Morales")).not.toBeInTheDocument();
+    });
+
+    it("muestra un estado vacío si el puesto no tiene personas asignadas", async () => {
+      mockApiFetch();
+      renderPagina();
+
+      await waitFor(() =>
+        expect(
+          screen.getByText("Este puesto no tiene personas asignadas actualmente.")
+        ).toBeInTheDocument()
+      );
+    });
+
+    it("si GET /api/asignaciones da 403, avisa sin romper el resto de la ficha (permisos y datos del puesto siguen)", async () => {
+      mockApiFetch({ asignaciones: new Response(null, { status: 403 }) });
+      renderPagina();
+
+      await waitFor(() =>
+        expect(
+          screen.getByText("No tienes permiso para ver las personas asignadas a este puesto.")
+        ).toBeInTheDocument()
+      );
+      expect(screen.getByRole("button", { name: /desactivar puesto/i })).toBeInTheDocument();
+      const resumen = screen.getByText("Resumen").closest(".tarjeta-resumen") as HTMLElement;
+      expect(within(resumen).getByText("—/5")).toBeInTheDocument();
+    });
+
+    it("si GET /api/asignaciones falla con otro error, muestra un aviso genérico", async () => {
+      mockApiFetch({ asignaciones: new Response(null, { status: 500 }) });
+      renderPagina();
+
+      await waitFor(() =>
+        expect(
+          screen.getByText("No se pudieron cargar las personas asignadas a este puesto.")
+        ).toBeInTheDocument()
+      );
+    });
   });
 });

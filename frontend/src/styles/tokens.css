@@ -167,10 +167,14 @@ th {
   overflow-x: auto;
 }
 
-/* Lista dentro de una tarjeta que no debe crecer sin límite (ej. personas de un departamento
-   grande) — scroll interno vertical en vez de estirar toda la página. El buscador/título de
-   la tarjeta quedan afuera de esta clase para seguir siempre visibles arriba del scroll. */
-.lista-desplazable {
+/* Lista o tabla dentro de una tarjeta que no debe crecer sin límite (ej. personas de un
+   departamento o de un puesto con muchas plazas) — scroll interno vertical en vez de estirar
+   toda la página. El buscador/título de la tarjeta quedan afuera de esta clase para seguir
+   siempre visibles arriba del scroll. Dos nombres para la misma regla: -lista- para un `<ul>`,
+   -bloque- para el envoltorio de una `<table>` (que además suele llevar .tabla-desplazable
+   para el scroll horizontal — son ejes distintos, no se pisan). */
+.lista-desplazable,
+.bloque-desplazable {
   max-height: 24rem;
   overflow-y: auto;
 }
@@ -180,6 +184,7 @@ th {
    gap) — quedaban pegados sin ningún espacio contra el campo. Sólo afecta esa adyacencia
    puntual, no toca .barra-filtros ni ningún otro uso de .campo-con-icono. */
 .campo-con-icono + .lista-historial-resumido,
+.campo-con-icono + .bloque-desplazable,
 .campo-con-icono + p {
   margin-top: 1rem;
 }
