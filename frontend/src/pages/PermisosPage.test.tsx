@@ -165,7 +165,7 @@ describe("PermisosPage", () => {
     render(<PermisosPage />);
 
     await waitFor(() => expect(elementoConTexto("Puesto Ficticio Uno")).toBeInTheDocument());
-    expect(screen.getByText(/para revocar un permiso, abrí la ficha del puesto/i)).toBeInTheDocument();
+    expect(screen.getByText(/para revocar un permiso, abre la ficha del puesto/i)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /estructura organizacional.*puestos/i })).toHaveAttribute(
       "href",
       "/estructura/puestos"

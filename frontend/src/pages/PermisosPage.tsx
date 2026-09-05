@@ -140,7 +140,7 @@ export function PermisosPage() {
 
         <p className="tarjeta-info">
           <Info size={16} aria-hidden="true" />
-          Para revocar un permiso, abrí la ficha del puesto correspondiente en{" "}
+          Para revocar un permiso, abre la ficha del puesto correspondiente en{" "}
           <a href="/estructura/puestos">Estructura organizacional → Puestos</a>.
         </p>
 
