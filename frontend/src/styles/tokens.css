@@ -167,6 +167,14 @@ th {
   overflow-x: auto;
 }
 
+/* Lista dentro de una tarjeta que no debe crecer sin límite (ej. personas de un departamento
+   grande) — scroll interno vertical en vez de estirar toda la página. El buscador/título de
+   la tarjeta quedan afuera de esta clase para seguir siempre visibles arriba del scroll. */
+.lista-desplazable {
+  max-height: 24rem;
+  overflow-y: auto;
+}
+
 /* Capa decorativa de las pantallas de autenticación — iconos en campos, badges,
    medidor de fuerza, tarjeta de error — replicada de diseno_paginas/personas/. */
 

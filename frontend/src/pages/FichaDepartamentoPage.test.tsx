@@ -266,7 +266,7 @@ describe("FichaDepartamentoPage", () => {
 
       await waitFor(() => expect(screen.getByText("Mariana Torres")).toBeInTheDocument());
       expect(screen.getByText("Luis Fernández")).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: "Mariana Torres" })).toHaveAttribute(
+      expect(screen.getByRole("link", { name: /mariana torres/i })).toHaveAttribute(
         "href",
         "/personas/persona-mariana"
       );
@@ -311,6 +311,23 @@ describe("FichaDepartamentoPage", () => {
       // el conteo de puestos activos, independiente, sigue mostrándose
       expect(screen.getByText("2")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /desactivar departamento/i })).toBeInTheDocument();
+    });
+
+    it("cada fila usa avatar-iniciales + persona-celda (jerarquía visual real, no texto plano)", async () => {
+      mockApiFetch(DEPARTAMENTO, AREA, PUESTOS, [ASIGNACION_MARIANA]);
+      renderPagina();
+
+      const enlace = await screen.findByRole("link", { name: /mariana torres/i });
+      expect(enlace).toHaveClass("persona-celda");
+      expect(enlace.querySelector(".avatar-iniciales")).toHaveTextContent("MT");
+    });
+
+    it("la lista de personas tiene la clase de scroll interno (no crece sin límite)", async () => {
+      mockApiFetch(DEPARTAMENTO, AREA, PUESTOS, [ASIGNACION_MARIANA]);
+      renderPagina();
+
+      await waitFor(() => expect(screen.getByText("Mariana Torres")).toBeInTheDocument());
+      expect(screen.getByText("Mariana Torres").closest("ul")).toHaveClass("lista-desplazable");
     });
 
     it("muestra un estado vacío si el departamento no tiene personas asignadas", async () => {

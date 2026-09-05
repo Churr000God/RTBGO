@@ -53,6 +53,11 @@ function normalizar(texto: string): string {
     .toLowerCase();
 }
 
+function inicialesDe(nombre: string): string {
+  const partes = nombre.trim().split(/\s+/);
+  return `${partes[0]?.[0] ?? ""}${partes[partes.length - 1]?.[0] ?? ""}`.toUpperCase();
+}
+
 function formatearFecha(fecha?: string | null): string {
   if (!fecha) return "—";
   const valor = new Date(fecha);
@@ -319,10 +324,13 @@ export function FichaDepartamentoPage() {
                   <p>Ninguna persona coincide con la búsqueda.</p>
                 )}
                 {personasFiltradas.length > 0 && (
-                  <ul className="lista-historial-resumido">
+                  <ul className="lista-historial-resumido lista-desplazable">
                     {personasFiltradas.map((persona) => (
                       <li key={persona.persona_id}>
-                        <a href={`/personas/${persona.persona_id}`}>{persona.persona_nombre}</a>
+                        <a className="persona-celda" href={`/personas/${persona.persona_id}`}>
+                          <span className="avatar-iniciales">{inicialesDe(persona.persona_nombre)}</span>
+                          {persona.persona_nombre}
+                        </a>
                         <span className="autor-historial">{persona.puestos.join(", ")}</span>
                       </li>
                     ))}
