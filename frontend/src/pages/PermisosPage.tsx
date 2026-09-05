@@ -182,27 +182,11 @@ export function PermisosPage() {
           </div>
         </div>
 
+        <p className="etiqueta-metrica" style={{ marginBottom: "0.5rem" }}>
+          Ordenar y filtrar el historial por fecha
+        </p>
         <div className="barra-filtros">
-          <div className="campo-con-icono">
-            <ShieldCheck size={16} className="icono-campo" aria-hidden="true" />
-            <input
-              type="search"
-              placeholder="Buscar por puesto o código de permiso"
-              value={busqueda}
-              onChange={(evento) => setBusqueda(evento.target.value)}
-              aria-label="Buscar por puesto o código de permiso"
-            />
-          </div>
           <div className="grupo-filtros-secundarios">
-            <select
-              value={filtroTipo}
-              onChange={(evento) => setFiltroTipo(evento.target.value)}
-              aria-label="Filtrar por tipo de movimiento"
-            >
-              <option value="">Tipo: Todos</option>
-              <option value="otorgado">Otorgado</option>
-              <option value="revocado">Revocado</option>
-            </select>
             <Input
               id="filtro-fecha-efectiva-desde"
               label="Desde"
@@ -226,6 +210,28 @@ export function PermisosPage() {
               <option value="asc">Más antiguas primero</option>
             </select>
           </div>
+        </div>
+
+        <div className="barra-filtros">
+          <div className="campo-con-icono">
+            <ShieldCheck size={16} className="icono-campo" aria-hidden="true" />
+            <input
+              type="search"
+              placeholder="Buscar por puesto o código de permiso"
+              value={busqueda}
+              onChange={(evento) => setBusqueda(evento.target.value)}
+              aria-label="Buscar por puesto o código de permiso"
+            />
+          </div>
+          <select
+            value={filtroTipo}
+            onChange={(evento) => setFiltroTipo(evento.target.value)}
+            aria-label="Filtrar por tipo de movimiento"
+          >
+            <option value="">Tipo: Todos</option>
+            <option value="otorgado">Otorgado</option>
+            <option value="revocado">Revocado</option>
+          </select>
         </div>
 
         {estadoCarga === "cargando" && (
