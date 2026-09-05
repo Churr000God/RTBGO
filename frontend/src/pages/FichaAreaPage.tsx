@@ -17,7 +17,15 @@ type Area = {
   actualizado_en: string;
 };
 
+type Departamento = {
+  id: string;
+  area_id: string;
+  nombre_departamento: string;
+  activo: boolean;
+};
+
 type EstadoCarga = "cargando" | "listo" | "error";
+type EstadoDepartamentos = "cargando" | "listo" | "error" | "sin_permiso";
 
 function formatearFecha(fecha?: string | null): string {
   if (!fecha) return "—";
@@ -41,6 +49,8 @@ export function FichaAreaPage() {
   const [area, setArea] = useState<Area | null>(null);
   const [estadoCarga, setEstadoCarga] = useState<EstadoCarga>("cargando");
   const [error, setError] = useState<string | null>(null);
+  const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
+  const [estadoDepartamentos, setEstadoDepartamentos] = useState<EstadoDepartamentos>("cargando");
 
   function cargar() {
     setEstadoCarga("cargando");
@@ -49,9 +59,29 @@ export function FichaAreaPage() {
         if (!respuesta.ok) throw new Error(`status ${respuesta.status}`);
         return respuesta.json();
       })
-      .then((datos: Area) => {
-        setArea(datos);
+      .then((datosArea: Area) => {
+        setArea(datosArea);
         setEstadoCarga("listo");
+
+        // Sin endpoint filtrado por área — se pide el catálogo completo y se filtra acá,
+        // mismo criterio que FichaPuestoPage con /api/permisos/vigentes. El gate de
+        // /api/departamentos es distinto (departamento_lectura/edicion) al de esta página
+        // (area_lectura/edicion): quien ve el área puede no tener permiso sobre departamentos,
+        // así que un 403 acá degrada sólo esta tarjeta, no la página completa.
+        setEstadoDepartamentos("cargando");
+        apiFetch("/api/departamentos")
+          .then((r) => {
+            if (r.status === 403) throw new Error("sin_permiso");
+            if (!r.ok) throw new Error(`status ${r.status}`);
+            return r.json();
+          })
+          .then((datosDepartamentos: Departamento[]) => {
+            setDepartamentos(datosDepartamentos.filter((d) => d.area_id === datosArea.id));
+            setEstadoDepartamentos("listo");
+          })
+          .catch((errorDepartamentos: Error) =>
+            setEstadoDepartamentos(errorDepartamentos.message === "sin_permiso" ? "sin_permiso" : "error")
+          );
       })
       .catch(() => setEstadoCarga("error"));
   }
@@ -92,6 +122,9 @@ export function FichaAreaPage() {
     }
     setArea(await respuesta.json());
   }
+
+  const departamentosActivos = departamentos.filter((d) => d.activo);
+  const departamentosInactivos = departamentos.filter((d) => !d.activo);
 
   if (estadoCarga === "cargando") {
     return (
@@ -162,6 +195,57 @@ export function FichaAreaPage() {
           <div className="botonera">
             <button type="submit">Guardar</button>
           </div>
+        </Card>
+
+        <Card>
+          <h3>Departamentos de esta área</h3>
+          {estadoDepartamentos === "cargando" && (
+            <p className="boton-con-icono">
+              <Loader2 size={14} className="icono-girando" aria-hidden="true" />
+              Cargando departamentos…
+            </p>
+          )}
+          {estadoDepartamentos === "sin_permiso" && (
+            <p>No tienes permiso para ver los departamentos de esta área.</p>
+          )}
+          {estadoDepartamentos === "error" && <p>No se pudieron cargar los departamentos de esta área.</p>}
+          {estadoDepartamentos === "listo" && departamentos.length === 0 && (
+            <p>Esta área no tiene departamentos registrados.</p>
+          )}
+          {estadoDepartamentos === "listo" && departamentos.length > 0 && (
+            <>
+              {departamentosActivos.length > 0 && (
+                <>
+                  <p className="eyebrow-seccion">Activos</p>
+                  <ul className="lista-historial-resumido">
+                    {departamentosActivos.map((departamento) => (
+                      <li key={departamento.id}>
+                        <a href={`/estructura/departamentos/${departamento.id}`}>
+                          {departamento.nombre_departamento}
+                        </a>
+                        <Badge estado="activo">Activo</Badge>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+              {departamentosInactivos.length > 0 && (
+                <>
+                  <p className="eyebrow-seccion">Inactivos</p>
+                  <ul className="lista-historial-resumido">
+                    {departamentosInactivos.map((departamento) => (
+                      <li key={departamento.id}>
+                        <a href={`/estructura/departamentos/${departamento.id}`}>
+                          {departamento.nombre_departamento}
+                        </a>
+                        <Badge estado="baja_definitiva">Inactivo</Badge>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </>
+          )}
         </Card>
 
         <Card>

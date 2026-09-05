@@ -24,12 +24,15 @@ const AREA = {
   actualizado_en: "2026-08-31T00:00:00+00:00",
 };
 
-function mockApiFetch(area = AREA) {
+function mockApiFetch(area = AREA, departamentos: unknown = []) {
   vi.mocked(apiFetch).mockImplementation((path: string) => {
     if (path === "/api/sesion") {
       return Promise.resolve(
         new Response(JSON.stringify({ acceso_permitido: true, motivo_bloqueo: null }))
       );
+    }
+    if (path === "/api/departamentos") {
+      return Promise.resolve(new Response(JSON.stringify(departamentos)));
     }
     return Promise.resolve(new Response(JSON.stringify(area)));
   });
@@ -68,6 +71,9 @@ describe("FichaAreaPage", () => {
           new Response(JSON.stringify({ ...AREA, nombre_area: "Comercial y Marketing" }))
         );
       }
+      if (path === "/api/departamentos") {
+        return Promise.resolve(new Response(JSON.stringify([])));
+      }
       return Promise.resolve(new Response(JSON.stringify(AREA)));
     });
 
@@ -95,6 +101,9 @@ describe("FichaAreaPage", () => {
       if (path === `/api/areas/${AREA.id}` && opciones?.method === "PATCH") {
         return Promise.resolve(new Response(null, { status: 409 }));
       }
+      if (path === "/api/departamentos") {
+        return Promise.resolve(new Response(JSON.stringify([])));
+      }
       return Promise.resolve(new Response(JSON.stringify(AREA)));
     });
 
@@ -117,6 +126,9 @@ describe("FichaAreaPage", () => {
       if (path === `/api/areas/${AREA.id}/estado` && opciones?.method === "PATCH") {
         return Promise.resolve(new Response(JSON.stringify({ ...AREA, activo: false })));
       }
+      if (path === "/api/departamentos") {
+        return Promise.resolve(new Response(JSON.stringify([])));
+      }
       return Promise.resolve(new Response(JSON.stringify(AREA)));
     });
 
@@ -137,6 +149,9 @@ describe("FichaAreaPage", () => {
       }
       if (path === `/api/areas/${AREA.id}/estado` && opciones?.method === "PATCH") {
         return Promise.resolve(new Response(JSON.stringify({ ...AREA, activo: true })));
+      }
+      if (path === "/api/departamentos") {
+        return Promise.resolve(new Response(JSON.stringify([])));
       }
       return Promise.resolve(new Response(JSON.stringify({ ...AREA, activo: false })));
     });
@@ -164,5 +179,96 @@ describe("FichaAreaPage", () => {
       expect(screen.getByText(/no se pudo cargar esta área/i)).toBeInTheDocument()
     );
     expect(screen.getByRole("button", { name: /reintentar/i })).toBeInTheDocument();
+  });
+
+  describe("departamentos de esta área", () => {
+    const DEPARTAMENTO_ACTIVO = {
+      id: "dep-activo-1",
+      area_id: AREA.id,
+      nombre_departamento: "Ventas",
+      activo: true,
+    };
+    const DEPARTAMENTO_INACTIVO = {
+      id: "dep-inactivo-1",
+      area_id: AREA.id,
+      nombre_departamento: "Marketing (histórico)",
+      activo: false,
+    };
+    const DEPARTAMENTO_DE_OTRA_AREA = {
+      id: "dep-otra-area",
+      area_id: "otra-area-cualquiera",
+      nombre_departamento: "No debería aparecer",
+      activo: true,
+    };
+
+    it("lista los departamentos activos e inactivos de esta área, filtrando los de otras áreas", async () => {
+      mockApiFetch(AREA, [DEPARTAMENTO_ACTIVO, DEPARTAMENTO_INACTIVO, DEPARTAMENTO_DE_OTRA_AREA]);
+      renderPagina();
+
+      await waitFor(() => expect(screen.getByText("Ventas")).toBeInTheDocument());
+      expect(screen.getByText("Marketing (histórico)")).toBeInTheDocument();
+      expect(screen.queryByText("No debería aparecer")).not.toBeInTheDocument();
+
+      const enlaceActivo = screen.getByRole("link", { name: "Ventas" });
+      expect(enlaceActivo).toHaveAttribute("href", `/estructura/departamentos/${DEPARTAMENTO_ACTIVO.id}`);
+      const enlaceInactivo = screen.getByRole("link", { name: "Marketing (histórico)" });
+      expect(enlaceInactivo).toHaveAttribute(
+        "href",
+        `/estructura/departamentos/${DEPARTAMENTO_INACTIVO.id}`
+      );
+
+      expect(screen.getByText("Activos")).toBeInTheDocument();
+      expect(screen.getByText("Inactivos")).toBeInTheDocument();
+    });
+
+    it("muestra un estado vacío si el área no tiene departamentos", async () => {
+      mockApiFetch(AREA, []);
+      renderPagina();
+
+      await waitFor(() => expect(screen.getAllByText("Comercial").length).toBeGreaterThan(0));
+      expect(screen.getByText("Esta área no tiene departamentos registrados.")).toBeInTheDocument();
+    });
+
+    it("si GET /api/departamentos responde 403, muestra el aviso de sin permiso sin romper el resto de la página", async () => {
+      vi.mocked(apiFetch).mockImplementation((path: string) => {
+        if (path === "/api/sesion") {
+          return Promise.resolve(
+            new Response(JSON.stringify({ acceso_permitido: true, motivo_bloqueo: null }))
+          );
+        }
+        if (path === "/api/departamentos") {
+          return Promise.resolve(new Response(null, { status: 403 }));
+        }
+        return Promise.resolve(new Response(JSON.stringify(AREA)));
+      });
+      renderPagina();
+
+      await waitFor(() => expect(screen.getAllByText("Comercial").length).toBeGreaterThan(0));
+      expect(
+        screen.getByText("No tienes permiso para ver los departamentos de esta área.")
+      ).toBeInTheDocument();
+      // el resto de la ficha (nombre, botón desactivar) sigue disponible: el 403 no rompe la página
+      expect(screen.getByRole("button", { name: /desactivar área/i })).toBeInTheDocument();
+    });
+
+    it("si GET /api/departamentos falla con otro error, muestra un aviso genérico en la tarjeta", async () => {
+      vi.mocked(apiFetch).mockImplementation((path: string) => {
+        if (path === "/api/sesion") {
+          return Promise.resolve(
+            new Response(JSON.stringify({ acceso_permitido: true, motivo_bloqueo: null }))
+          );
+        }
+        if (path === "/api/departamentos") {
+          return Promise.resolve(new Response(null, { status: 500 }));
+        }
+        return Promise.resolve(new Response(JSON.stringify(AREA)));
+      });
+      renderPagina();
+
+      await waitFor(() => expect(screen.getAllByText("Comercial").length).toBeGreaterThan(0));
+      expect(
+        screen.getByText("No se pudieron cargar los departamentos de esta área.")
+      ).toBeInTheDocument();
+    });
   });
 });
