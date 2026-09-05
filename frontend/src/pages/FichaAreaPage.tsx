@@ -4,6 +4,10 @@ import { AlertCircle, Loader2 } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
+import { Button } from "../components/Button";
+import { Card } from "../components/Card";
+import { Badge } from "../components/Badge";
+import { Input } from "../components/Input";
 
 type Area = {
   id: string;
@@ -132,42 +136,35 @@ export function FichaAreaPage() {
           <div className="identidad">
             <div className="fila-nombre-badge">
               <strong>{area.nombre_area}</strong>
-              <span className={`insignia-estado ${area.activo ? "activo" : "baja_definitiva"}`}>
+              <Badge estado={area.activo ? "activo" : "baja_definitiva"}>
                 {area.activo ? "Activo" : "Inactivo"}
-              </span>
+              </Badge>
             </div>
           </div>
           <div className="botonera">
             {area.activo ? (
-              <button type="button" onClick={() => handleEstado(false)} className="boton-con-icono">
+              <Button type="button" onClick={() => handleEstado(false)}>
                 Desactivar área
-              </button>
+              </Button>
             ) : (
-              <button
-                type="button"
-                onClick={() => handleEstado(true)}
-                className="boton-con-icono boton-primario"
-              >
+              <Button type="button" onClick={() => handleEstado(true)} variante="primario">
                 Reactivar área
-              </button>
+              </Button>
             )}
           </div>
         </div>
 
         {error && <p role="alert">{error}</p>}
 
-        <form onSubmit={handleRenombrar} className="tarjeta-resumen">
+        <Card as="form" onSubmit={handleRenombrar}>
           <h3>Nombre del área</h3>
-          <div className="campo">
-            <label htmlFor="nombre_area">Nombre</label>
-            <input id="nombre_area" name="nombre_area" required maxLength={100} defaultValue={area.nombre_area} />
-          </div>
+          <Input id="nombre_area" name="nombre_area" label="Nombre" required maxLength={100} defaultValue={area.nombre_area} />
           <div className="botonera">
             <button type="submit">Guardar</button>
           </div>
-        </form>
+        </Card>
 
-        <div className="tarjeta-resumen">
+        <Card>
           <h3>Fechas</h3>
           <div className="rejilla-datos">
             <div className="dato">
@@ -179,7 +176,7 @@ export function FichaAreaPage() {
               <strong>{formatearFecha(area.actualizado_en)}</strong>
             </div>
           </div>
-        </div>
+        </Card>
       </div>
     </AppShell>
   );

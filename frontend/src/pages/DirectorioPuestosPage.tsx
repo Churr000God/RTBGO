@@ -3,6 +3,8 @@ import { AlertCircle, Building2, Loader2, Plus, Search } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
+import { Button } from "../components/Button";
+import { Badge } from "../components/Badge";
 
 type Puesto = {
   id: string;
@@ -108,10 +110,9 @@ export function DirectorioPuestosPage() {
             <h1>Puestos</h1>
             <p className="subtitulo-pagina">Catálogo de puestos por departamento.</p>
           </div>
-          <a href="/estructura/puestos/nueva" className="boton-con-icono boton-primario">
-            <Plus size={16} aria-hidden="true" />
+          <Button href="/estructura/puestos/nueva" variante="primario" icono={Plus} posicionIcono="izquierda">
             Nuevo puesto
-          </a>
+          </Button>
         </div>
 
         <div className="banda-metricas">
@@ -211,11 +212,9 @@ export function DirectorioPuestosPage() {
                       <td>{puesto.reporta_a_id ? nombresPuesto[puesto.reporta_a_id] ?? "—" : "—"}</td>
                       <td>{puesto.plazas_totales}</td>
                       <td>
-                        <span
-                          className={`insignia ${puesto.activo ? "insignia--exito" : "insignia--peligro"}`}
-                        >
+                        <Badge variante={puesto.activo ? "exito" : "peligro"}>
                           {puesto.activo ? "Activo" : "Inactivo"}
-                        </span>
+                        </Badge>
                       </td>
                     </tr>
                   ))}

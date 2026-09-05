@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
+import { Input } from "../components/Input";
 
 type Asignacion = {
   id: string;
@@ -94,8 +95,7 @@ export function TerminarAsignacionPage() {
 
         <fieldset className="fieldset-formulario">
           <legend className="encabezado-fieldset">Fecha de término</legend>
-          <label htmlFor="vigente_hasta">Vigente hasta</label>
-          <input id="vigente_hasta" name="vigente_hasta" type="date" required />
+          <Input id="vigente_hasta" name="vigente_hasta" label="Vigente hasta" type="date" required />
         </fieldset>
 
         {error && <p role="alert">{error}</p>}

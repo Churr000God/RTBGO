@@ -140,8 +140,8 @@ export function AppShell({ children }: Props) {
 
   if (estadoAcceso === "verificando") {
     return (
-      <div style={{ display: "grid", placeItems: "center", minHeight: "100vh" }}>
-        <p style={{ color: "var(--navy-medio)" }}>Verificando acceso…</p>
+      <div className="app-shell-cargando">
+        <p>Verificando acceso…</p>
       </div>
     );
   }
@@ -164,29 +164,10 @@ export function AppShell({ children }: Props) {
   const gruposVisibles = gruposConGate.filter((grupo) => grupo.items.length === 0 || grupo.disponible);
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh" }}>
-      <aside
-        style={{
-          flex: "0 0 260px",
-          background: "var(--navy)",
-          color: "white",
-          padding: "1.5rem 1rem",
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
-        <strong
-          style={{
-            fontFamily: "var(--font-titulo)",
-            fontSize: "1.35rem",
-            display: "block",
-            marginBottom: "2rem",
-            padding: "0 0.5rem",
-          }}
-        >
-          Kairos
-        </strong>
-        <nav style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+    <div className="app-shell">
+      <aside className="app-shell-aside">
+        <strong className="app-shell-wordmark">Kairos</strong>
+        <nav className="app-shell-nav">
           {gruposVisibles.map((grupo) => {
             const Icono = grupo.icono;
 
@@ -249,19 +230,15 @@ export function AppShell({ children }: Props) {
             );
           })}
         </nav>
-        <div style={{ borderTop: "1px solid rgba(255,255,255,0.15)", paddingTop: "1rem" }}>
-          {correoUsuario && (
-            <p style={{ margin: "0 0 0.75rem", fontSize: "0.8rem", color: "rgba(255,255,255,0.6)" }}>
-              {correoUsuario}
-            </p>
-          )}
+        <div className="app-shell-footer">
+          {correoUsuario && <p className="app-shell-correo">{correoUsuario}</p>}
           <button type="button" onClick={cerrarSesion} className="boton-cerrar-sesion">
             <LogOut size={16} aria-hidden="true" />
             Cerrar sesión
           </button>
         </div>
       </aside>
-      <main style={{ flex: 1, background: "var(--superficie)" }}>{children}</main>
+      <main className="app-shell-main">{children}</main>
     </div>
   );
 }

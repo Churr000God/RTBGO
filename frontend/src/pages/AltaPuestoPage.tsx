@@ -3,6 +3,8 @@ import { ArrowRight, Building2 } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
+import { Button } from "../components/Button";
+import { Input } from "../components/Input";
 
 type Departamento = {
   id: string;
@@ -120,6 +122,9 @@ export function AltaPuestoPage() {
               name="departamento_id"
               required
               disabled={sinDepartamentos || estadoDepartamentos === "error"}
+              aria-describedby={
+                sinDepartamentos || estadoDepartamentos === "error" ? "departamento_id-ayuda" : undefined
+              }
             >
               <option value="">Selecciona un departamento</option>
               {departamentosActivos.map((departamento) => (
@@ -129,12 +134,14 @@ export function AltaPuestoPage() {
               ))}
             </select>
             {sinDepartamentos && (
-              <small className="ayuda-campo">
+              <small className="ayuda-campo" id="departamento_id-ayuda">
                 No hay departamentos activos. Da de alta o reactiva uno antes de crear un puesto.
               </small>
             )}
             {estadoDepartamentos === "error" && (
-              <small className="ayuda-campo">No se pudo cargar el catálogo de departamentos.</small>
+              <small className="ayuda-campo" id="departamento_id-ayuda">
+                No se pudo cargar el catálogo de departamentos.
+              </small>
             )}
           </div>
 
@@ -145,6 +152,9 @@ export function AltaPuestoPage() {
               name="reporta_a_id"
               required
               disabled={sinPuestosSuperiores || estadoPuestos === "error"}
+              aria-describedby={
+                sinPuestosSuperiores || estadoPuestos === "error" ? "reporta_a_id-ayuda" : undefined
+              }
             >
               <option value="">Selecciona un puesto superior</option>
               {puestosActivos.map((puesto) => (
@@ -154,17 +164,18 @@ export function AltaPuestoPage() {
               ))}
             </select>
             {sinPuestosSuperiores && (
-              <small className="ayuda-campo">No hay puestos activos a los que reportar.</small>
+              <small className="ayuda-campo" id="reporta_a_id-ayuda">
+                No hay puestos activos a los que reportar.
+              </small>
             )}
             {estadoPuestos === "error" && (
-              <small className="ayuda-campo">No se pudo cargar el catálogo de puestos.</small>
+              <small className="ayuda-campo" id="reporta_a_id-ayuda">
+                No se pudo cargar el catálogo de puestos.
+              </small>
             )}
           </div>
 
-          <div className="campo">
-            <label htmlFor="nombre_puesto">Nombre del puesto</label>
-            <input id="nombre_puesto" name="nombre_puesto" required maxLength={100} />
-          </div>
+          <Input id="nombre_puesto" name="nombre_puesto" label="Nombre del puesto" required maxLength={100} />
 
           <div className="campo">
             <label htmlFor="nivel">Nivel</label>
@@ -180,26 +191,23 @@ export function AltaPuestoPage() {
             </select>
           </div>
 
-          <div className="campo">
-            <label htmlFor="plazas_totales">Plazas totales</label>
-            <input
-              id="plazas_totales"
-              name="plazas_totales"
-              type="number"
-              min={1}
-              defaultValue={1}
-              required
-            />
-          </div>
+          <Input
+            id="plazas_totales"
+            name="plazas_totales"
+            label="Plazas totales"
+            type="number"
+            min={1}
+            defaultValue={1}
+            required
+          />
         </fieldset>
 
         {error && <p role="alert">{error}</p>}
         <div className="botonera">
           <a href="/estructura/puestos">Cancelar</a>
-          <button type="submit" className="boton-con-icono" disabled={formularioDeshabilitado}>
+          <Button type="submit" icono={ArrowRight} disabled={formularioDeshabilitado}>
             Registrar
-            <ArrowRight size={16} aria-hidden="true" />
-          </button>
+          </Button>
         </div>
       </form>
     </AppShell>

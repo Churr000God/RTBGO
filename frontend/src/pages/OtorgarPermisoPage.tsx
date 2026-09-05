@@ -3,6 +3,7 @@ import { ArrowRight, ShieldCheck } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
+import { Button } from "../components/Button";
 
 type Puesto = {
   id: string;
@@ -115,6 +116,7 @@ export function OtorgarPermisoPage() {
               disabled={sinPuestos || estadoPuestos === "error"}
               value={puestoId}
               onChange={(evento) => setPuestoId(evento.target.value)}
+              aria-describedby={sinPuestos || estadoPuestos === "error" ? "puesto_id-ayuda" : undefined}
             >
               <option value="">Selecciona un puesto activo</option>
               {puestos.map((puesto) => (
@@ -123,15 +125,27 @@ export function OtorgarPermisoPage() {
                 </option>
               ))}
             </select>
-            {sinPuestos && <small className="ayuda-campo">No hay puestos activos disponibles.</small>}
+            {sinPuestos && (
+              <small className="ayuda-campo" id="puesto_id-ayuda">
+                No hay puestos activos disponibles.
+              </small>
+            )}
             {estadoPuestos === "error" && (
-              <small className="ayuda-campo">No se pudo cargar el catálogo de puestos.</small>
+              <small className="ayuda-campo" id="puesto_id-ayuda">
+                No se pudo cargar el catálogo de puestos.
+              </small>
             )}
           </div>
 
           <div className="campo">
             <label htmlFor="codigo">Permiso</label>
-            <select id="codigo" name="codigo" required disabled={sinPermisos || estadoPermisos === "error"}>
+            <select
+              id="codigo"
+              name="codigo"
+              required
+              disabled={sinPermisos || estadoPermisos === "error"}
+              aria-describedby={sinPermisos || estadoPermisos === "error" ? "codigo-ayuda" : undefined}
+            >
               <option value="">Selecciona un permiso</option>
               {permisos.map((permiso) => (
                 <option key={permiso.codigo} value={permiso.codigo}>
@@ -140,9 +154,15 @@ export function OtorgarPermisoPage() {
                 </option>
               ))}
             </select>
-            {sinPermisos && <small className="ayuda-campo">No hay permisos activos en el catálogo.</small>}
+            {sinPermisos && (
+              <small className="ayuda-campo" id="codigo-ayuda">
+                No hay permisos activos en el catálogo.
+              </small>
+            )}
             {estadoPermisos === "error" && (
-              <small className="ayuda-campo">No se pudo cargar el catálogo de permisos.</small>
+              <small className="ayuda-campo" id="codigo-ayuda">
+                No se pudo cargar el catálogo de permisos.
+              </small>
             )}
           </div>
         </fieldset>
@@ -150,10 +170,9 @@ export function OtorgarPermisoPage() {
         {error && <p role="alert">{error}</p>}
         <div className="botonera">
           <a href="/estructura/permisos">Cancelar</a>
-          <button type="submit" className="boton-con-icono" disabled={formularioDeshabilitado}>
+          <Button type="submit" icono={ArrowRight} disabled={formularioDeshabilitado}>
             Otorgar
-            <ArrowRight size={16} aria-hidden="true" />
-          </button>
+          </Button>
         </div>
       </form>
     </AppShell>

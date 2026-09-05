@@ -4,6 +4,7 @@ import { AlertTriangle } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
+import { Input } from "../components/Input";
 
 type Asignacion = {
   id: string;
@@ -117,7 +118,7 @@ export function CambiarPuestoAsignacionPage() {
           <legend className="encabezado-fieldset">Datos del cambio</legend>
           <div className="campo">
             <label htmlFor="puesto_nuevo_id">Puesto nuevo</label>
-            <select id="puesto_nuevo_id" name="puesto_nuevo_id" required>
+            <select id="puesto_nuevo_id" name="puesto_nuevo_id" required aria-describedby="puesto_nuevo_id-ayuda">
               <option value="">Selecciona un puesto activo</option>
               {puestosDestino.map((puesto) => (
                 <option key={puesto.id} value={puesto.id}>
@@ -126,15 +127,18 @@ export function CambiarPuestoAsignacionPage() {
                 </option>
               ))}
             </select>
-            <small className="ayuda-campo">Debe estar activo y tener al menos una plaza libre.</small>
-          </div>
-          <div className="campo">
-            <label htmlFor="fecha">Fecha del cambio</label>
-            <input id="fecha" name="fecha" type="date" required />
-            <small className="ayuda-campo">
-              Se usa como fecha de término del puesto actual y de inicio del nuevo.
+            <small className="ayuda-campo" id="puesto_nuevo_id-ayuda">
+              Debe estar activo y tener al menos una plaza libre.
             </small>
           </div>
+          <Input
+            id="fecha"
+            name="fecha"
+            label="Fecha del cambio"
+            type="date"
+            required
+            ayuda="Se usa como fecha de término del puesto actual y de inicio del nuevo."
+          />
         </fieldset>
 
         {error && <p role="alert">{error}</p>}

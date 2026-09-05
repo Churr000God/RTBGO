@@ -98,8 +98,11 @@ export function AltaPersonaPage() {
                 className="campo-identificador"
                 style={{ textTransform: "uppercase" }}
                 onChange={aMayusculas}
+                aria-describedby="curp-ayuda"
               />
-              <small className="ayuda-campo">18 caracteres</small>
+              <small className="ayuda-campo" id="curp-ayuda">
+                18 caracteres
+              </small>
             </div>
             <div className="campo">
               <label htmlFor="rfc">RFC</label>
@@ -111,13 +114,25 @@ export function AltaPersonaPage() {
                 className="campo-identificador"
                 style={{ textTransform: "uppercase" }}
                 onChange={aMayusculas}
+                aria-describedby="rfc-ayuda"
               />
-              <small className="ayuda-campo">13 caracteres con homoclave</small>
+              <small className="ayuda-campo" id="rfc-ayuda">
+                13 caracteres con homoclave
+              </small>
             </div>
             <div className="campo">
               <label htmlFor="nss">NSS</label>
-              <input id="nss" name="nss" required maxLength={11} className="campo-identificador" />
-              <small className="ayuda-campo">11 dígitos</small>
+              <input
+                id="nss"
+                name="nss"
+                required
+                maxLength={11}
+                className="campo-identificador"
+                aria-describedby="nss-ayuda"
+              />
+              <small className="ayuda-campo" id="nss-ayuda">
+                11 dígitos
+              </small>
             </div>
           </div>
         </fieldset>
@@ -171,8 +186,11 @@ export function AltaPersonaPage() {
               placeholder="RTB-__-__"
               required
               className="campo-identificador"
+              aria-describedby="documento_ref-ayuda"
             />
-            <small className="ayuda-campo">Formato RTB-__-__ · folio del expediente físico</small>
+            <small className="ayuda-campo" id="documento_ref-ayuda">
+              Formato RTB-__-__ · folio del expediente físico
+            </small>
           </div>
         </fieldset>
 

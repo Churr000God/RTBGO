@@ -4,6 +4,10 @@ import { AlertCircle, Loader2 } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
+import { Button } from "../components/Button";
+import { Card } from "../components/Card";
+import { Badge } from "../components/Badge";
+import { Input } from "../components/Input";
 
 type Departamento = {
   id: string;
@@ -150,56 +154,50 @@ export function FichaDepartamentoPage() {
           <div className="identidad">
             <div className="fila-nombre-badge">
               <strong>{departamento.nombre_departamento}</strong>
-              <span className={`insignia-estado ${departamento.activo ? "activo" : "baja_definitiva"}`}>
+              <Badge estado={departamento.activo ? "activo" : "baja_definitiva"}>
                 {departamento.activo ? "Activo" : "Inactivo"}
-              </span>
+              </Badge>
             </div>
           </div>
           <div className="botonera">
             {departamento.activo ? (
-              <button type="button" onClick={() => handleEstado(false)} className="boton-con-icono">
+              <Button type="button" onClick={() => handleEstado(false)}>
                 Desactivar departamento
-              </button>
+              </Button>
             ) : (
-              <button
-                type="button"
-                onClick={() => handleEstado(true)}
-                className="boton-con-icono boton-primario"
-              >
+              <Button type="button" onClick={() => handleEstado(true)} variante="primario">
                 Reactivar departamento
-              </button>
+              </Button>
             )}
           </div>
         </div>
 
         {error && <p role="alert">{error}</p>}
 
-        <div className="tarjeta-resumen">
+        <Card>
           <h3>Área</h3>
           <div className="dato">
             <span>Área a la que pertenece</span>
             <strong>{nombreArea ?? "—"}</strong>
           </div>
-        </div>
+        </Card>
 
-        <form onSubmit={handleRenombrar} className="tarjeta-resumen">
+        <Card as="form" onSubmit={handleRenombrar}>
           <h3>Nombre del departamento</h3>
-          <div className="campo">
-            <label htmlFor="nombre_departamento">Nombre</label>
-            <input
-              id="nombre_departamento"
-              name="nombre_departamento"
-              required
-              maxLength={100}
-              defaultValue={departamento.nombre_departamento}
-            />
-          </div>
+          <Input
+            id="nombre_departamento"
+            name="nombre_departamento"
+            label="Nombre"
+            required
+            maxLength={100}
+            defaultValue={departamento.nombre_departamento}
+          />
           <div className="botonera">
             <button type="submit">Guardar</button>
           </div>
-        </form>
+        </Card>
 
-        <div className="tarjeta-resumen">
+        <Card>
           <h3>Fechas</h3>
           <div className="rejilla-datos">
             <div className="dato">
@@ -211,7 +209,7 @@ export function FichaDepartamentoPage() {
               <strong>{formatearFecha(departamento.actualizado_en)}</strong>
             </div>
           </div>
-        </div>
+        </Card>
       </div>
     </AppShell>
   );

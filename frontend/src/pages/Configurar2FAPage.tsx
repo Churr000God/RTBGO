@@ -4,12 +4,29 @@ import { AlertCircle, ArrowRight, Loader2, ShieldCheck } from "lucide-react";
 import { AuthLayout } from "../layouts/AuthLayout";
 import { supabase } from "../lib/supabaseClient";
 import { registrarErrorAuth } from "../lib/erroresAuth";
+import { Button } from "../components/Button";
 import { VerificarTotpPage } from "./VerificarTotpPage";
 
 const INSIGNIA_PASO = { icono: ShieldCheck, texto: "Paso 2 de 3 · Seguridad" };
 
+const PASOS = [
+  {
+    titulo: "Descarga una app autenticadora",
+    detalle: "Google Authenticator, Microsoft Authenticator o Authy.",
+  },
+  {
+    titulo: "Escanea el código QR",
+    detalle: "Abre la app, elige «Agregar cuenta» y apunta la cámara.",
+  },
+  {
+    titulo: "Ingresa el código de 6 dígitos",
+    detalle: "La app genera un código nuevo cada 30 segundos.",
+  },
+];
+
 export function Configurar2FAPage() {
   const [qr, setQr] = useState<string | null>(null);
+  const [claveManual, setClaveManual] = useState<string | null>(null);
   const [factorId, setFactorId] = useState<string | null>(null);
   const [listoParaVerificar, setListoParaVerificar] = useState(false);
   const [yaConfigurado, setYaConfigurado] = useState(false);
@@ -44,6 +61,7 @@ export function Configurar2FAPage() {
           return;
         }
         setQr(enrolado.totp.qr_code);
+        setClaveManual(enrolado.totp.secret);
         setFactorId(enrolado.id);
       });
     });
@@ -71,10 +89,9 @@ export function Configurar2FAPage() {
           <ShieldCheck size={16} aria-hidden="true" />
           Tu cuenta ya tiene la verificación en dos pasos activa.
         </p>
-        <a href="/personas" className="boton-con-icono">
+        <Button href="/personas" icono={ArrowRight} tamanoIcono={14}>
           Ir a Personas
-          <ArrowRight size={14} aria-hidden="true" />
-        </a>
+        </Button>
       </AuthLayout>
     );
   }
@@ -96,11 +113,33 @@ export function Configurar2FAPage() {
       )}
       {!error && (qr ? (
         <>
+          <div className="icono-tarjeta">
+            <ShieldCheck size={22} aria-hidden="true" />
+          </div>
+          <h2>Escanea el código con tu app</h2>
+          <ol className="pasos-totp">
+            {PASOS.map((paso, indice) => (
+              <li key={paso.titulo}>
+                <span className="numero-paso" aria-hidden="true">
+                  {indice + 1}
+                </span>
+                <span>
+                  <strong>{paso.titulo}</strong>
+                  <span className="detalle">{paso.detalle}</span>
+                </span>
+              </li>
+            ))}
+          </ol>
           <img src={qr} alt="Código QR para configurar 2FA" />
-          <button type="button" className="boton-con-icono" onClick={() => setListoParaVerificar(true)}>
+          {claveManual && (
+            <p className="subtitulo-pagina">
+              ¿No puedes escanear? Usa esta clave manual:{" "}
+              <span className="pildora-monoespaciada">{claveManual}</span>
+            </p>
+          )}
+          <Button onClick={() => setListoParaVerificar(true)} icono={ArrowRight}>
             Ya la agregué, continuar
-            <ArrowRight size={16} aria-hidden="true" />
-          </button>
+          </Button>
         </>
       ) : (
         <p className="boton-con-icono">

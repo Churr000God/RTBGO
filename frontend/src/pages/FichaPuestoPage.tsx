@@ -4,6 +4,10 @@ import { AlertCircle, Loader2, Plus } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
+import { Button } from "../components/Button";
+import { Card } from "../components/Card";
+import { Badge } from "../components/Badge";
+import { Input } from "../components/Input";
 
 type PuestoPermiso = {
   id: string;
@@ -191,31 +195,27 @@ export function FichaPuestoPage() {
           <div className="identidad">
             <div className="fila-nombre-badge">
               <strong>{puesto.nombre_puesto}</strong>
-              <span className={`insignia-estado ${puesto.activo ? "activo" : "baja_definitiva"}`}>
+              <Badge estado={puesto.activo ? "activo" : "baja_definitiva"}>
                 {puesto.activo ? "Activo" : "Inactivo"}
-              </span>
+              </Badge>
             </div>
           </div>
           <div className="botonera">
             {puesto.activo ? (
-              <button type="button" onClick={() => handleEstado(false)} className="boton-con-icono">
+              <Button type="button" onClick={() => handleEstado(false)}>
                 Desactivar puesto
-              </button>
+              </Button>
             ) : (
-              <button
-                type="button"
-                onClick={() => handleEstado(true)}
-                className="boton-con-icono boton-primario"
-              >
+              <Button type="button" onClick={() => handleEstado(true)} variante="primario">
                 Reactivar puesto
-              </button>
+              </Button>
             )}
           </div>
         </div>
 
         {error && <p role="alert">{error}</p>}
 
-        <div className="tarjeta-resumen">
+        <Card>
           <h3>Ubicación en la estructura</h3>
           <div className="rejilla-datos">
             <div className="dato">
@@ -227,20 +227,18 @@ export function FichaPuestoPage() {
               <strong>{puesto.reporta_a_id ? nombreSuperior ?? "—" : "— (puesto tope)"}</strong>
             </div>
           </div>
-        </div>
+        </Card>
 
-        <form onSubmit={handleGuardar} className="tarjeta-resumen">
+        <Card as="form" onSubmit={handleGuardar}>
           <h3>Datos del puesto</h3>
-          <div className="campo">
-            <label htmlFor="nombre_puesto">Nombre</label>
-            <input
-              id="nombre_puesto"
-              name="nombre_puesto"
-              required
-              maxLength={100}
-              defaultValue={puesto.nombre_puesto}
-            />
-          </div>
+          <Input
+            id="nombre_puesto"
+            name="nombre_puesto"
+            label="Nombre"
+            required
+            maxLength={100}
+            defaultValue={puesto.nombre_puesto}
+          />
           <div className="campo">
             <label htmlFor="nivel">Nivel</label>
             <select id="nivel" name="nivel" required defaultValue={puesto.nivel}>
@@ -251,32 +249,32 @@ export function FichaPuestoPage() {
               ))}
             </select>
           </div>
-          <div className="campo">
-            <label htmlFor="plazas_totales">Plazas totales</label>
-            <input
-              id="plazas_totales"
-              name="plazas_totales"
-              type="number"
-              min={1}
-              required
-              defaultValue={puesto.plazas_totales}
-            />
-          </div>
+          <Input
+            id="plazas_totales"
+            name="plazas_totales"
+            label="Plazas totales"
+            type="number"
+            min={1}
+            required
+            defaultValue={puesto.plazas_totales}
+          />
           <div className="botonera">
             <button type="submit">Guardar</button>
           </div>
-        </form>
+        </Card>
 
-        <div className="tarjeta-resumen">
+        <Card>
           <div className="fila-cabecera-tarjeta">
             <h3>Permisos de este puesto</h3>
-            <a
+            <Button
               href={`/estructura/permisos/otorgar?puesto_id=${puesto.id}`}
-              className="boton-con-icono enlace-etiqueta"
+              className="enlace-etiqueta"
+              icono={Plus}
+              posicionIcono="izquierda"
+              tamanoIcono={14}
             >
-              <Plus size={14} aria-hidden="true" />
               Otorgar permiso
-            </a>
+            </Button>
           </div>
           {estadoPermisos === "cargando" && (
             <p className="boton-con-icono">
@@ -298,9 +296,9 @@ export function FichaPuestoPage() {
               ))}
             </ul>
           )}
-        </div>
+        </Card>
 
-        <div className="tarjeta-resumen">
+        <Card>
           <h3>Fechas</h3>
           <div className="rejilla-datos">
             <div className="dato">
@@ -312,7 +310,7 @@ export function FichaPuestoPage() {
               <strong>{formatearFecha(puesto.actualizado_en)}</strong>
             </div>
           </div>
-        </div>
+        </Card>
       </div>
     </AppShell>
   );

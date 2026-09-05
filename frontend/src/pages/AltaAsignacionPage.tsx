@@ -3,6 +3,8 @@ import { ArrowRight, Users } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
+import { Button } from "../components/Button";
+import { Input } from "../components/Input";
 
 type Persona = {
   id: string;
@@ -136,6 +138,9 @@ export function AltaAsignacionPage() {
               disabled={sinPersonas || estadoPersonas === "error"}
               value={personaId}
               onChange={(evento) => setPersonaId(evento.target.value)}
+              aria-describedby={
+                sinPersonas || estadoPersonas === "error" ? "persona_id-ayuda" : undefined
+              }
             >
               <option value="">Selecciona una persona activa</option>
               {personas.map((persona) => (
@@ -144,9 +149,15 @@ export function AltaAsignacionPage() {
                 </option>
               ))}
             </select>
-            {sinPersonas && <small className="ayuda-campo">No hay personas activas para asignar.</small>}
+            {sinPersonas && (
+              <small className="ayuda-campo" id="persona_id-ayuda">
+                No hay personas activas para asignar.
+              </small>
+            )}
             {estadoPersonas === "error" && (
-              <small className="ayuda-campo">No se pudo cargar el padrón de personas.</small>
+              <small className="ayuda-campo" id="persona_id-ayuda">
+                No se pudo cargar el padrón de personas.
+              </small>
             )}
           </div>
 
@@ -159,6 +170,9 @@ export function AltaAsignacionPage() {
               disabled={sinPuestos || estadoPuestos === "error"}
               value={puestoSeleccionado}
               onChange={(evento) => setPuestoSeleccionado(evento.target.value)}
+              aria-describedby={
+                sinPuestos || estadoPuestos === "error" || puestoActivo ? "puesto_id-ayuda" : undefined
+              }
             >
               <option value="">Selecciona un puesto activo</option>
               {puestos.map((puesto) => (
@@ -167,31 +181,33 @@ export function AltaAsignacionPage() {
                 </option>
               ))}
             </select>
-            {sinPuestos && <small className="ayuda-campo">No hay puestos activos disponibles.</small>}
+            {sinPuestos && (
+              <small className="ayuda-campo" id="puesto_id-ayuda">
+                No hay puestos activos disponibles.
+              </small>
+            )}
             {estadoPuestos === "error" && (
-              <small className="ayuda-campo">No se pudo cargar el catálogo de puestos.</small>
+              <small className="ayuda-campo" id="puesto_id-ayuda">
+                No se pudo cargar el catálogo de puestos.
+              </small>
             )}
             {puestoActivo && (
-              <small className="ayuda-campo">
+              <small className="ayuda-campo" id="puesto_id-ayuda">
                 {puestoActivo.plazas_totales - plazasLibres(puestoActivo)}/{puestoActivo.plazas_totales} ocupadas
                 {plazasLibres(puestoActivo) <= 0 && " — sin plazas libres"}
               </small>
             )}
           </div>
 
-          <div className="campo">
-            <label htmlFor="vigente_desde">Vigente desde</label>
-            <input id="vigente_desde" name="vigente_desde" type="date" required />
-          </div>
+          <Input id="vigente_desde" name="vigente_desde" label="Vigente desde" type="date" required />
         </fieldset>
 
         {error && <p role="alert">{error}</p>}
         <div className="botonera">
           <a href="/estructura/asignaciones">Cancelar</a>
-          <button type="submit" className="boton-con-icono" disabled={formularioDeshabilitado}>
+          <Button type="submit" icono={ArrowRight} disabled={formularioDeshabilitado}>
             Registrar
-            <ArrowRight size={16} aria-hidden="true" />
-          </button>
+          </Button>
         </div>
       </form>
     </AppShell>

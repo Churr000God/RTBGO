@@ -3,6 +3,8 @@ import { ArrowRight, Building2 } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
+import { Button } from "../components/Button";
+import { Input } from "../components/Input";
 
 async function mensajeDeError(respuesta: Response, generico: string): Promise<string> {
   try {
@@ -55,20 +57,22 @@ export function AltaAreaPage() {
             </span>
             Datos del área
           </legend>
-          <div className="campo">
-            <label htmlFor="nombre_area">Nombre del área</label>
-            <input id="nombre_area" name="nombre_area" required maxLength={100} />
-            <small className="ayuda-campo">Debe ser único, ej. Comercial, Operaciones.</small>
-          </div>
+          <Input
+            id="nombre_area"
+            name="nombre_area"
+            label="Nombre del área"
+            required
+            maxLength={100}
+            ayuda="Debe ser único, ej. Comercial, Operaciones."
+          />
         </fieldset>
 
         {error && <p role="alert">{error}</p>}
         <div className="botonera">
           <a href="/estructura/areas">Cancelar</a>
-          <button type="submit" className="boton-con-icono">
+          <Button type="submit" icono={ArrowRight}>
             Registrar
-            <ArrowRight size={16} aria-hidden="true" />
-          </button>
+          </Button>
         </div>
       </form>
     </AppShell>

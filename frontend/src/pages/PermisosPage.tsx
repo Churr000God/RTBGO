@@ -3,6 +3,9 @@ import { AlertCircle, ArrowRight, Loader2, Plus, ShieldCheck } from "lucide-reac
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
+import { Button } from "../components/Button";
+import { Card } from "../components/Card";
+import { Badge } from "../components/Badge";
 
 type TipoMovimientoPermiso = "otorgado" | "revocado";
 
@@ -31,9 +34,9 @@ const ETIQUETA_TIPO: Record<TipoMovimientoPermiso, string> = {
   revocado: "Revocado",
 };
 
-const CLASE_TIPO: Record<TipoMovimientoPermiso, string> = {
-  otorgado: "insignia--exito",
-  revocado: "insignia--neutra",
+const VARIANTE_TIPO: Record<TipoMovimientoPermiso, "exito" | "neutra"> = {
+  otorgado: "exito",
+  revocado: "neutra",
 };
 
 function normalizar(texto: string): string {
@@ -130,10 +133,9 @@ export function PermisosPage() {
             <h1>Permisos</h1>
             <p className="subtitulo-pagina">Historial de permisos otorgados o revocados a cada puesto.</p>
           </div>
-          <a href="/estructura/permisos/otorgar" className="boton-con-icono boton-primario">
-            <Plus size={16} aria-hidden="true" />
+          <Button href="/estructura/permisos/otorgar" variante="primario" icono={Plus} posicionIcono="izquierda">
             Otorgar permiso
-          </a>
+          </Button>
         </div>
 
         <div className="banda-metricas">
@@ -215,9 +217,9 @@ export function PermisosPage() {
                         <time dateTime={movimiento.fecha_efectiva}>
                           {formatearFechaHora(movimiento.fecha_efectiva)}
                         </time>
-                        <span className={`insignia ${CLASE_TIPO[movimiento.tipo_movimiento]}`}>
+                        <Badge variante={VARIANTE_TIPO[movimiento.tipo_movimiento]}>
                           {ETIQUETA_TIPO[movimiento.tipo_movimiento]}
-                        </span>
+                        </Badge>
                       </div>
                       <p style={{ fontWeight: 600, margin: 0, display: "flex", alignItems: "center", gap: "0.5rem" }}>
                         {movimiento.nombre_puesto}
@@ -235,7 +237,7 @@ export function PermisosPage() {
             </div>
 
             <aside>
-              <div className="tarjeta-resumen">
+              <Card>
                 <h3>Resumen</h3>
                 <div className="rejilla-resumen">
                   <div>
@@ -247,9 +249,9 @@ export function PermisosPage() {
                     <span>Otorgamientos</span>
                   </div>
                 </div>
-              </div>
+              </Card>
 
-              <div className="tarjeta-resumen">
+              <Card>
                 <h3>Catálogo de permisos</h3>
                 <ul className="leyenda-estados">
                   {catalogo.map((permiso) => (
@@ -269,7 +271,7 @@ export function PermisosPage() {
                     </li>
                   ))}
                 </ul>
-              </div>
+              </Card>
             </aside>
           </div>
         )}

@@ -456,6 +456,47 @@ a.boton-con-icono {
   animation: girar 1s linear infinite;
 }
 
+/* ─── §movimiento ─── */
+/* Entrada de tarjetas/listas: un solo momento de aparición al cargar la página, no un efecto
+   por hover ni escalonado por fila — ver principios de motion del proyecto. Sólo corre si la
+   persona no pidió menos movimiento; si prefiere reducido, aparecen directo sin animación. */
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes aparecer {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .tarjeta-movimiento,
+  .tarjeta-resumen {
+    animation: aparecer 240ms ease-out both;
+  }
+}
+
+/* El spinner de carga transmite un estado real ("sigue trabajando") — no es decorativo, así
+   que sigue girando aunque el resto del movimiento no esencial se apague. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .icono-girando {
+    animation-duration: 1s !important;
+    animation-iteration-count: infinite !important;
+  }
+}
+
 /* ─── §layout auth ─── */
 /* Breakpoints: 48rem (768px, tablet) · 64rem (1024px, entra el split de dos columnas) ·
    80rem (1280px, amplio). El split entra recién en 64rem por aritmética: a 768px el aside
@@ -684,6 +725,50 @@ a.boton-con-icono {
   padding: 0;
   cursor: pointer;
   flex-shrink: 0;
+}
+
+/* ─── §pasos totp (mockup 02-configurar-2fa) ─── */
+/* Mismo lenguaje visual que .icono-seccion/.icono-opcion (círculo var(--superficie) + texto
+   var(--teal)) — no una insignia nueva, sólo numerada en vez de un ícono. */
+
+.pasos-totp {
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.pasos-totp li {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.pasos-totp .numero-paso {
+  flex-shrink: 0;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  background: var(--superficie);
+  color: var(--teal);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.pasos-totp strong {
+  display: block;
+  color: var(--navy);
+  font-size: 0.92rem;
+}
+
+.pasos-totp .detalle {
+  display: block;
+  font-size: 0.82rem;
+  color: var(--navy-medio);
+  margin-top: 0.1rem;
 }
 
 .icono-tarjeta {
@@ -1422,6 +1507,64 @@ a.boton-con-icono {
   margin: 0;
   color: var(--navy-medio);
   max-width: 26rem;
+}
+
+/* ─── §app shell ─── */
+/* Migradas desde inline styles en AppShell.tsx — la propia migración que este comentario
+   dejaba pendiente en §sidebar agrupado de abajo. */
+
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.app-shell-cargando {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+}
+
+.app-shell-cargando p {
+  color: var(--navy-medio);
+}
+
+.app-shell-aside {
+  flex: 0 0 260px;
+  background: var(--navy);
+  color: white;
+  padding: 1.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-shell-wordmark {
+  font-family: var(--font-titulo);
+  font-size: 1.35rem;
+  display: block;
+  margin-bottom: 2rem;
+  padding: 0 0.5rem;
+}
+
+.app-shell-nav {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-shell-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  padding-top: 1rem;
+}
+
+.app-shell-correo {
+  margin: 0 0 0.75rem;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.app-shell-main {
+  flex: 1;
+  background: var(--superficie);
 }
 
 /* ─── §sidebar agrupado ─── */

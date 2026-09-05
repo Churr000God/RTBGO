@@ -3,6 +3,8 @@ import { AlertCircle, Building2, Loader2, Plus, Search } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
+import { Button } from "../components/Button";
+import { Badge } from "../components/Badge";
 
 type Departamento = {
   id: string;
@@ -90,10 +92,14 @@ export function DirectorioDepartamentosPage() {
             <h1>Departamentos</h1>
             <p className="subtitulo-pagina">Catálogo de departamentos por área.</p>
           </div>
-          <a href="/estructura/departamentos/nueva" className="boton-con-icono boton-primario">
-            <Plus size={16} aria-hidden="true" />
+          <Button
+            href="/estructura/departamentos/nueva"
+            variante="primario"
+            icono={Plus}
+            posicionIcono="izquierda"
+          >
             Nuevo departamento
-          </a>
+          </Button>
         </div>
 
         <div className="banda-metricas">
@@ -190,11 +196,9 @@ export function DirectorioDepartamentosPage() {
                       </td>
                       <td>{nombresArea[departamento.area_id] ?? "—"}</td>
                       <td>
-                        <span
-                          className={`insignia ${departamento.activo ? "insignia--exito" : "insignia--peligro"}`}
-                        >
+                        <Badge variante={departamento.activo ? "exito" : "peligro"}>
                           {departamento.activo ? "Activo" : "Inactivo"}
-                        </span>
+                        </Badge>
                       </td>
                     </tr>
                   ))}

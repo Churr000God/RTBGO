@@ -3,6 +3,9 @@ import { AlertCircle, ArrowRight, Loader2, Plus, Repeat, Search, Users } from "l
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
+import { Button } from "../components/Button";
+import { Badge } from "../components/Badge";
+import { Input } from "../components/Input";
 
 type Asignacion = {
   id: string;
@@ -120,10 +123,14 @@ export function AsignacionesPage() {
             <h1>Asignaciones</h1>
             <p className="subtitulo-pagina">Historial de personas asignadas a puestos.</p>
           </div>
-          <a href="/estructura/asignaciones/nueva" className="boton-con-icono boton-primario">
-            <Plus size={16} aria-hidden="true" />
+          <Button
+            href="/estructura/asignaciones/nueva"
+            variante="primario"
+            icono={Plus}
+            posicionIcono="izquierda"
+          >
             Nueva asignación
-          </a>
+          </Button>
         </div>
 
         <div className="banda-metricas">
@@ -165,24 +172,20 @@ export function AsignacionesPage() {
               <option value="vigente">Vigentes</option>
               <option value="terminada">Terminadas</option>
             </select>
-            <div className="campo">
-              <label htmlFor="filtro-vigente-desde">Vigente desde</label>
-              <input
-                id="filtro-vigente-desde"
-                type="date"
-                value={filtroDesde}
-                onChange={(evento) => setFiltroDesde(evento.target.value)}
-              />
-            </div>
-            <div className="campo">
-              <label htmlFor="filtro-vigente-hasta">Vigente hasta</label>
-              <input
-                id="filtro-vigente-hasta"
-                type="date"
-                value={filtroHasta}
-                onChange={(evento) => setFiltroHasta(evento.target.value)}
-              />
-            </div>
+            <Input
+              id="filtro-vigente-desde"
+              label="Vigente desde"
+              type="date"
+              value={filtroDesde}
+              onChange={(evento) => setFiltroDesde(evento.target.value)}
+            />
+            <Input
+              id="filtro-vigente-hasta"
+              label="Vigente hasta"
+              type="date"
+              value={filtroHasta}
+              onChange={(evento) => setFiltroHasta(evento.target.value)}
+            />
             <select
               value={orden}
               onChange={(evento) => setOrden(evento.target.value as "desc" | "asc")}
@@ -235,9 +238,9 @@ export function AsignacionesPage() {
                           {" — "}
                           {asignacion.vigente_hasta ? formatearFecha(asignacion.vigente_hasta) : "Vigente"}
                         </time>
-                        <span className={`insignia ${asignacion.vigente_hasta ? "insignia--neutra" : "insignia--exito"}`}>
+                        <Badge variante={asignacion.vigente_hasta ? "neutra" : "exito"}>
                           {asignacion.vigente_hasta ? "Terminada" : "Vigente"}
-                        </span>
+                        </Badge>
                       </div>
                       <p className="persona-celda" style={{ fontWeight: 600 }}>
                         <span className="avatar-iniciales">{inicialesDe(asignacion.persona_nombre)}</span>
@@ -251,13 +254,15 @@ export function AsignacionesPage() {
                       {!asignacion.vigente_hasta && (
                         <div className="botonera" style={{ justifyContent: "flex-start", marginTop: "0.6rem" }}>
                           <a href={`/estructura/asignaciones/${asignacion.id}/terminar`}>Terminar</a>
-                          <a
+                          <Button
                             href={`/estructura/asignaciones/${asignacion.id}/cambiar-puesto`}
-                            className="boton-con-icono boton-primario"
+                            variante="primario"
+                            icono={Repeat}
+                            posicionIcono="izquierda"
+                            tamanoIcono={14}
                           >
-                            <Repeat size={14} aria-hidden="true" />
                             Cambiar de puesto
-                          </a>
+                          </Button>
                         </div>
                       )}
                     </article>

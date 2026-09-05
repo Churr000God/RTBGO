@@ -3,6 +3,8 @@ import { AlertCircle, Building2, Loader2, Plus, Search } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
+import { Button } from "../components/Button";
+import { Badge } from "../components/Badge";
 
 type Area = {
   id: string;
@@ -76,10 +78,9 @@ export function DirectorioAreasPage() {
             <h1>Áreas</h1>
             <p className="subtitulo-pagina">Catálogo de áreas de la organización.</p>
           </div>
-          <a href="/estructura/areas/nueva" className="boton-con-icono boton-primario">
-            <Plus size={16} aria-hidden="true" />
+          <Button href="/estructura/areas/nueva" variante="primario" icono={Plus} posicionIcono="izquierda">
             Nueva área
-          </a>
+          </Button>
         </div>
 
         <div className="banda-metricas">
@@ -171,9 +172,9 @@ export function DirectorioAreasPage() {
                         </a>
                       </td>
                       <td>
-                        <span className={`insignia ${area.activo ? "insignia--exito" : "insignia--peligro"}`}>
+                        <Badge variante={area.activo ? "exito" : "peligro"}>
                           {area.activo ? "Activo" : "Inactivo"}
-                        </span>
+                        </Badge>
                       </td>
                     </tr>
                   ))}

@@ -132,8 +132,10 @@ export function CambiarEstadoPage() {
         </fieldset>
 
         <label htmlFor="motivo">Motivo</label>
-        <textarea id="motivo" name="motivo" required />
-        <small className="ayuda-campo">Queda asentado en el historial de la persona y no podrá editarse.</small>
+        <textarea id="motivo" name="motivo" required aria-describedby="motivo-ayuda" />
+        <small className="ayuda-campo" id="motivo-ayuda">
+          Queda asentado en el historial de la persona y no podrá editarse.
+        </small>
 
         {error && <p role="alert">{error}</p>}
         <div className="botonera">

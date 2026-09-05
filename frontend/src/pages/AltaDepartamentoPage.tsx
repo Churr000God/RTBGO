@@ -3,6 +3,8 @@ import { ArrowRight, Building2 } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
+import { Button } from "../components/Button";
+import { Input } from "../components/Input";
 
 type Area = {
   id: string;
@@ -88,7 +90,15 @@ export function AltaDepartamentoPage() {
           </legend>
           <div className="campo">
             <label htmlFor="area_id">Área</label>
-            <select id="area_id" name="area_id" required disabled={sinAreasDisponibles || noSePudoCargarAreas}>
+            <select
+              id="area_id"
+              name="area_id"
+              required
+              disabled={sinAreasDisponibles || noSePudoCargarAreas}
+              aria-describedby={
+                sinAreasDisponibles || noSePudoCargarAreas ? "area_id-ayuda" : undefined
+              }
+            >
               <option value="">Selecciona un área</option>
               {areasActivas.map((area) => (
                 <option key={area.id} value={area.id}>
@@ -97,32 +107,32 @@ export function AltaDepartamentoPage() {
               ))}
             </select>
             {sinAreasDisponibles && (
-              <small className="ayuda-campo">
+              <small className="ayuda-campo" id="area_id-ayuda">
                 No hay áreas activas. Da de alta o reactiva un área antes de crear un departamento.
               </small>
             )}
             {noSePudoCargarAreas && (
-              <small className="ayuda-campo">No se pudo cargar el catálogo de áreas.</small>
+              <small className="ayuda-campo" id="area_id-ayuda">
+                No se pudo cargar el catálogo de áreas.
+              </small>
             )}
           </div>
-          <div className="campo">
-            <label htmlFor="nombre_departamento">Nombre del departamento</label>
-            <input id="nombre_departamento" name="nombre_departamento" required maxLength={100} />
-            <small className="ayuda-campo">Debe ser único en todo el catálogo.</small>
-          </div>
+          <Input
+            id="nombre_departamento"
+            name="nombre_departamento"
+            label="Nombre del departamento"
+            required
+            maxLength={100}
+            ayuda="Debe ser único en todo el catálogo."
+          />
         </fieldset>
 
         {error && <p role="alert">{error}</p>}
         <div className="botonera">
           <a href="/estructura/departamentos">Cancelar</a>
-          <button
-            type="submit"
-            className="boton-con-icono"
-            disabled={sinAreasDisponibles || noSePudoCargarAreas}
-          >
+          <Button type="submit" icono={ArrowRight} disabled={sinAreasDisponibles || noSePudoCargarAreas}>
             Registrar
-            <ArrowRight size={16} aria-hidden="true" />
-          </button>
+          </Button>
         </div>
       </form>
     </AppShell>

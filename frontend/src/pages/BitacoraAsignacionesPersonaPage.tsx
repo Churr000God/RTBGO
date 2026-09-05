@@ -4,6 +4,8 @@ import { AlertCircle, Loader2, Repeat } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
+import { Button } from "../components/Button";
+import { Badge } from "../components/Badge";
 
 type Persona = {
   id: string;
@@ -31,10 +33,10 @@ const ETIQUETA_ESTADO: Record<string, string> = {
   baja_definitiva: "Baja",
 };
 
-const CLASE_ESTADO: Record<string, string> = {
-  activo: "insignia--exito",
-  suspension: "insignia--aviso",
-  baja_definitiva: "insignia--peligro",
+const VARIANTE_ESTADO: Record<string, "exito" | "aviso" | "peligro"> = {
+  activo: "exito",
+  suspension: "aviso",
+  baja_definitiva: "peligro",
 };
 
 function formatearFecha(fecha?: string | null): string {
@@ -137,9 +139,9 @@ export function BitacoraAsignacionesPersonaPage() {
                 <strong>{ordenadas.length}</strong>
               </div>
             </div>
-            <span className={`insignia ${CLASE_ESTADO[persona.estado] ?? "insignia--neutra"}`}>
+            <Badge variante={VARIANTE_ESTADO[persona.estado] ?? "neutra"}>
               {ETIQUETA_ESTADO[persona.estado] ?? persona.estado}
-            </span>
+            </Badge>
           </div>
         )}
 
@@ -161,9 +163,9 @@ export function BitacoraAsignacionesPersonaPage() {
                           {" — "}
                           {asignacion.vigente_hasta ? formatearFecha(asignacion.vigente_hasta) : "Vigente"}
                         </time>
-                        <span className={`insignia ${asignacion.vigente_hasta ? "insignia--neutra" : "insignia--exito"}`}>
+                        <Badge variante={asignacion.vigente_hasta ? "neutra" : "exito"}>
                           {asignacion.vigente_hasta ? "Terminada" : "Vigente"}
-                        </span>
+                        </Badge>
                       </div>
                       <p style={{ fontWeight: 600, margin: 0 }}>
                         {asignacion.nombre_puesto}
@@ -174,13 +176,15 @@ export function BitacoraAsignacionesPersonaPage() {
                       {!asignacion.vigente_hasta && (
                         <div className="botonera" style={{ justifyContent: "flex-start", marginTop: "0.6rem" }}>
                           <a href={`/estructura/asignaciones/${asignacion.id}/terminar`}>Terminar</a>
-                          <a
+                          <Button
                             href={`/estructura/asignaciones/${asignacion.id}/cambiar-puesto`}
-                            className="boton-con-icono boton-primario"
+                            variante="primario"
+                            icono={Repeat}
+                            posicionIcono="izquierda"
+                            tamanoIcono={14}
                           >
-                            <Repeat size={14} aria-hidden="true" />
                             Cambiar de puesto
-                          </a>
+                          </Button>
                         </div>
                       )}
                     </article>
