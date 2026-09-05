@@ -69,6 +69,7 @@ export function PermisosPage() {
   const [filtroHasta, setFiltroHasta] = useState("");
   const [orden, setOrden] = useState<"desc" | "asc">("desc");
   const [busquedaCatalogo, setBusquedaCatalogo] = useState("");
+  const [filtroHeredable, setFiltroHeredable] = useState("");
 
   function cargar() {
     setEstadoCarga("cargando");
@@ -127,9 +128,13 @@ export function PermisosPage() {
 
   const catalogoFiltrado = useMemo(() => {
     const consulta = normalizar(busquedaCatalogo.trim());
-    if (!consulta) return catalogo;
-    return catalogo.filter((permiso) => normalizar(permiso.codigo).includes(consulta));
-  }, [catalogo, busquedaCatalogo]);
+    return catalogo.filter((permiso) => {
+      const coincideBusqueda = !consulta || normalizar(permiso.codigo).includes(consulta);
+      const coincideHeredable =
+        !filtroHeredable || (filtroHeredable === "si" ? permiso.heredable : !permiso.heredable);
+      return coincideBusqueda && coincideHeredable;
+    });
+  }, [catalogo, busquedaCatalogo, filtroHeredable]);
 
   const agrupadosPorAnio = useMemo(() => {
     const grupos = new Map<string, MovimientoPermiso[]>();
@@ -182,28 +187,6 @@ export function PermisosPage() {
           </div>
         </div>
 
-        <div className="barra-filtros">
-          <div className="campo-con-icono">
-            <ShieldCheck size={16} className="icono-campo" aria-hidden="true" />
-            <input
-              type="search"
-              placeholder="Buscar por puesto o código de permiso"
-              value={busqueda}
-              onChange={(evento) => setBusqueda(evento.target.value)}
-              aria-label="Buscar por puesto o código de permiso"
-            />
-          </div>
-          <select
-            value={filtroTipo}
-            onChange={(evento) => setFiltroTipo(evento.target.value)}
-            aria-label="Filtrar por tipo de movimiento"
-          >
-            <option value="">Tipo: Todos</option>
-            <option value="otorgado">Otorgado</option>
-            <option value="revocado">Revocado</option>
-          </select>
-        </div>
-
         {estadoCarga === "cargando" && (
           <p className="boton-con-icono">
             <Loader2 size={16} className="icono-girando" aria-hidden="true" />
@@ -227,15 +210,26 @@ export function PermisosPage() {
         {estadoCarga === "listo" && (
           <Card>
             <h3>Catálogo de permisos</h3>
-            <div className="campo-con-icono">
-              <Search size={16} className="icono-campo" aria-hidden="true" />
-              <input
-                type="search"
-                placeholder="Buscar por código de permiso"
-                value={busquedaCatalogo}
-                onChange={(evento) => setBusquedaCatalogo(evento.target.value)}
-                aria-label="Buscar por código de permiso"
-              />
+            <div className="barra-filtros">
+              <div className="campo-con-icono">
+                <Search size={16} className="icono-campo" aria-hidden="true" />
+                <input
+                  type="search"
+                  placeholder="Buscar por código de permiso"
+                  value={busquedaCatalogo}
+                  onChange={(evento) => setBusquedaCatalogo(evento.target.value)}
+                  aria-label="Buscar por código de permiso"
+                />
+              </div>
+              <select
+                value={filtroHeredable}
+                onChange={(evento) => setFiltroHeredable(evento.target.value)}
+                aria-label="Filtrar por herencia"
+              >
+                <option value="">Tipo: Todos</option>
+                <option value="si">Heredable</option>
+                <option value="no">No heredable</option>
+              </select>
             </div>
             {catalogoFiltrado.length === 0 ? (
               <p>No hay permisos que coincidan con la búsqueda.</p>
@@ -260,6 +254,30 @@ export function PermisosPage() {
               </ul>
             )}
           </Card>
+        )}
+
+        {estadoCarga === "listo" && (
+          <div className="barra-filtros">
+            <div className="campo-con-icono">
+              <ShieldCheck size={16} className="icono-campo" aria-hidden="true" />
+              <input
+                type="search"
+                placeholder="Buscar por puesto o código de permiso"
+                value={busqueda}
+                onChange={(evento) => setBusqueda(evento.target.value)}
+                aria-label="Buscar por puesto o código de permiso"
+              />
+            </div>
+            <select
+              value={filtroTipo}
+              onChange={(evento) => setFiltroTipo(evento.target.value)}
+              aria-label="Filtrar por tipo de movimiento"
+            >
+              <option value="">Tipo: Todos</option>
+              <option value="otorgado">Otorgado</option>
+              <option value="revocado">Revocado</option>
+            </select>
+          </div>
         )}
 
         {estadoCarga === "listo" && (

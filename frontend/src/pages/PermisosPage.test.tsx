@@ -209,6 +209,33 @@ describe("PermisosPage", () => {
     expect(screen.getByText("permiso_ficticio_heredable")).toBeInTheDocument();
   });
 
+  it("el select de herencia filtra el catálogo entre heredable/no heredable", async () => {
+    mockApiFetch();
+
+    render(<PermisosPage />);
+    await waitFor(() => expect(screen.getByText("permiso_ficticio_uno")).toBeInTheDocument());
+
+    await userEvent.selectOptions(screen.getByLabelText(/filtrar por herencia/i), "si");
+    expect(screen.queryByText("permiso_ficticio_uno")).not.toBeInTheDocument();
+    expect(screen.getByText("permiso_ficticio_heredable")).toBeInTheDocument();
+
+    await userEvent.selectOptions(screen.getByLabelText(/filtrar por herencia/i), "no");
+    expect(screen.getByText("permiso_ficticio_uno")).toBeInTheDocument();
+    expect(screen.queryByText("permiso_ficticio_heredable")).not.toBeInTheDocument();
+  });
+
+  it("la sección del catálogo queda antes de la barra de filtros y la línea de tiempo del historial", async () => {
+    mockApiFetch();
+
+    render(<PermisosPage />);
+    await waitFor(() => expect(elementoConTexto("Puesto Ficticio Uno")).toBeInTheDocument());
+
+    const catalogo = screen.getByText("Catálogo de permisos");
+    const buscadorHistorial = screen.getByLabelText(/buscar por puesto o código de permiso/i);
+    // DOCUMENT_POSITION_FOLLOWING (4): el buscador del historial viene DESPUÉS del catálogo.
+    expect(catalogo.compareDocumentPosition(buscadorHistorial) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("el buscador del catálogo filtra por código, en cliente, sin afectar el historial", async () => {
     mockApiFetch();
 
