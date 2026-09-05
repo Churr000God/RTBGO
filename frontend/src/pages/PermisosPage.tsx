@@ -295,7 +295,7 @@ export function PermisosPage() {
 
         {estadoCarga === "listo" && filtrados.length > 0 && (
           <div className="layout-bitacora">
-            <div className="linea-tiempo">
+            <div className="linea-tiempo bloque-desplazable">
               {[...agrupadosPorAnio.entries()].map(([anio, items]) => (
                 <div key={anio} className="grupo-anio">
                   <h2 className="titulo-anio">{anio}</h2>

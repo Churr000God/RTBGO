@@ -213,6 +213,17 @@ describe("PermisosPage", () => {
     expect(elementoConTexto("Puesto Ficticio Uno")).toBeInTheDocument();
   });
 
+  it("la línea de tiempo tiene su propio scroll interno con altura máxima, no crece sin límite", async () => {
+    mockApiFetch();
+
+    render(<PermisosPage />);
+    await waitFor(() => expect(elementoConTexto("Puesto Ficticio Uno")).toBeInTheDocument());
+
+    expect(elementoConTexto("Puesto Ficticio Uno").closest(".linea-tiempo")).toHaveClass(
+      "bloque-desplazable"
+    );
+  });
+
   it("no tiene acciones inline en cada evento (decisión ya tomada)", async () => {
     mockApiFetch();
 
