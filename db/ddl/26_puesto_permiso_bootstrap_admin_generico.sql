@@ -13,6 +13,13 @@
 -- personas.usuario (el auth_user_id real) NO se crea acá — es la única pieza que no puede ser SQL
 -- puro, necesita un auth.users real que sólo Supabase Auth puede emitir. Eso vive en
 -- scripts/desplegar.sh (sesión devops), no en DDL.
+--
+-- Corrección 2026-09-05: este archivo corre antes que 16_puesto_migracion_inicial.sql en el orden
+-- de despliegue, pero antes ambos sembraban un puesto de TI cada uno (16_ creaba "Encargado de
+-- TI" como puesto propio del organigrama; éste crea "Gerente o Encargado de TI") — dos filas para
+-- el mismo rol, siempre duplicadas en un despliegue nuevo. Se unificaron en uno solo: el que crea
+-- ESTE archivo, "Gerente o Encargado de TI" bajo "Gerencia de Tecnologías de la Información". Ver
+-- la nota de cabecera de 16_puesto_migracion_inicial.sql para el detalle completo.
 -- Depende de: 14_personas_puesto.sql, 17_personas_asignacion.sql, 24_puesto_permiso_trigger.sql,
 --   25_permiso_migracion_inicial.sql
 
