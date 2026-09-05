@@ -3,6 +3,7 @@ import { AlertCircle, ArrowRight, Eye, EyeOff, Info, Lock, Mail } from "lucide-r
 
 import { supabase } from "../lib/supabaseClient";
 import { AuthLayout } from "../layouts/AuthLayout";
+import { Button } from "../components/Button";
 import { registrarErrorAuth } from "../lib/erroresAuth";
 import { consultarSesion } from "../lib/sesion";
 import { CONTACTOS } from "../lib/contactos";
@@ -15,6 +16,7 @@ export function LoginPage() {
   const [mostrarContrasena, setMostrarContrasena] = useState(false);
   const [intentosRestantes, setIntentosRestantes] = useState(INTENTOS_INICIALES);
   const [bloqueadoHasta, setBloqueadoHasta] = useState<number | null>(null);
+  const [enviando, setEnviando] = useState(false);
 
   async function handleSubmit(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
@@ -24,6 +26,7 @@ export function LoginPage() {
       return;
     }
 
+    setEnviando(true);
     const formulario = new FormData(evento.currentTarget);
     const { error: errorLogin } = await supabase.auth.signInWithPassword({
       email: String(formulario.get("correo")),
@@ -39,6 +42,7 @@ export function LoginPage() {
         setIntentosRestantes(restantes);
       }
       setError(true);
+      setEnviando(false);
       return;
     }
 
@@ -153,10 +157,15 @@ export function LoginPage() {
             Distingue mayúsculas y minúsculas.
           </p>
         )}
-        <button type="submit" className="boton-con-icono" disabled={bloqueado}>
+        <Button
+          type="submit"
+          icono={ArrowRight}
+          disabled={bloqueado}
+          cargando={enviando}
+          textoCargando="Verificando…"
+        >
           {error ? "Reintentar acceso" : "Iniciar sesión"}
-          <ArrowRight size={16} aria-hidden="true" />
-        </button>
+        </Button>
       </form>
       <p className="texto-ayuda">
         ¿Problemas para entrar? Escribe a{" "}

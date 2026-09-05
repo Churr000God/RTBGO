@@ -2,6 +2,7 @@ import { type FormEvent, useEffect, useState } from "react";
 import { AlertCircle, ArrowLeft, ArrowRight, ShieldCheck } from "lucide-react";
 
 import { AuthLayout } from "../layouts/AuthLayout";
+import { Button } from "../components/Button";
 import { supabase } from "../lib/supabaseClient";
 import { verificarTotp } from "../lib/mfa";
 import { registrarErrorAuth } from "../lib/erroresAuth";
@@ -114,10 +115,15 @@ export function VerificarTotpPage({
             <p>{error}</p>
           </div>
         )}
-        <button type="submit" className="boton-con-icono" disabled={codigo.length < 6 || enviando}>
+        <Button
+          type="submit"
+          icono={ArrowRight}
+          disabled={codigo.length < 6}
+          cargando={enviando}
+          textoCargando="Verificando…"
+        >
           Verificar
-          <ArrowRight size={16} aria-hidden="true" />
-        </button>
+        </Button>
       </form>
       {/* "Usar un código de respaldo" — pendiente: Supabase MFA no soporta backup codes hoy. */}
       <a href="/" className="boton-con-icono" style={{ fontSize: "0.85rem" }}>

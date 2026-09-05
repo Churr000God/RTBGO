@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { AuthLayout } from "../layouts/AuthLayout";
+import { Button } from "../components/Button";
 import { supabase } from "../lib/supabaseClient";
 import { obtenerFactorTotpVerificado, verificarTotp } from "../lib/mfa";
 import { esInsuficienteAal, mensajeDeErrorAuth, registrarErrorAuth } from "../lib/erroresAuth";
@@ -256,14 +257,15 @@ export function RestablecerContrasenaPage({ modo = "restablecer" }: Props) {
                 <p>{errorTotp}</p>
               </div>
             )}
-            <button
+            <Button
               type="submit"
-              className="boton-con-icono"
-              disabled={codigoTotp.length < 6 || enviandoTotp}
+              icono={ArrowRight}
+              disabled={codigoTotp.length < 6}
+              cargando={enviandoTotp}
+              textoCargando="Verificando…"
             >
               Confirmar código
-              <ArrowRight size={16} aria-hidden="true" />
-            </button>
+            </Button>
           </form>
         </>
       )}
@@ -352,10 +354,9 @@ export function RestablecerContrasenaPage({ modo = "restablecer" }: Props) {
                 )}
               </p>
             )}
-            <button type="submit" className="boton-con-icono" disabled={guardando}>
+            <Button type="submit" icono={Check} cargando={guardando} textoCargando="Guardando…">
               Guardar contraseña
-              <Check size={16} aria-hidden="true" />
-            </button>
+            </Button>
           </form>
           <p className="texto-ayuda">
             Al guardar se cerrarán todas tus sesiones activas y deberás iniciar sesión de nuevo.
