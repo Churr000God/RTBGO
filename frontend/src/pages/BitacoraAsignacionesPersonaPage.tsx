@@ -150,7 +150,6 @@ export function BitacoraAsignacionesPersonaPage() {
         )}
 
         {estadoCarga === "listo" && ordenadas.length > 0 && (
-          <div className="layout-bitacora">
             <div className="linea-tiempo">
               {[...agrupadasPorAnio.entries()].map(([anio, items]) => (
                 <div key={anio} className="grupo-anio">
@@ -192,7 +191,6 @@ export function BitacoraAsignacionesPersonaPage() {
                 </div>
               ))}
             </div>
-          </div>
         )}
       </div>
     </AppShell>

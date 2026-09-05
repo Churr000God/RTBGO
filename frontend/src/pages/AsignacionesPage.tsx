@@ -356,7 +356,6 @@ export function AsignacionesPage() {
         )}
 
         {estadoCarga === "listo" && filtradas.length > 0 && (
-          <div className="layout-bitacora">
             <div className="linea-tiempo">
               {[...agrupadasPorAnio.entries()].map(([anio, items]) => (
                 <div key={anio} className="grupo-anio">
@@ -401,7 +400,6 @@ export function AsignacionesPage() {
                 </div>
               ))}
             </div>
-          </div>
         )}
         </div>
         )}
