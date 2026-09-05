@@ -384,4 +384,43 @@ describe("FichaPuestoPage", () => {
       );
     });
   });
+
+  describe("búsqueda y scroll en Permisos de este puesto", () => {
+    const PERMISOS_VARIOS = [
+      { id: "pp-1", puesto_id: PUESTO.id, codigo: "equipo_ti_gestion", activo: true },
+      { id: "pp-2", puesto_id: PUESTO.id, codigo: "ticket_soporte_atencion", activo: true },
+    ];
+
+    it("filtra los permisos por nombre con el buscador", async () => {
+      mockApiFetch({ permisosVigentes: new Response(JSON.stringify(PERMISOS_VARIOS)) });
+      renderPagina();
+
+      await waitFor(() => expect(screen.getByText("equipo_ti_gestion")).toBeInTheDocument());
+      expect(screen.getByText("ticket_soporte_atencion")).toBeInTheDocument();
+
+      await userEvent.type(screen.getByLabelText(/buscar por nombre de permiso/i), "ticket");
+
+      expect(screen.getByText("ticket_soporte_atencion")).toBeInTheDocument();
+      expect(screen.queryByText("equipo_ti_gestion")).not.toBeInTheDocument();
+    });
+
+    it("muestra un aviso cuando ningún permiso coincide con la búsqueda", async () => {
+      mockApiFetch({ permisosVigentes: new Response(JSON.stringify(PERMISOS_VARIOS)) });
+      renderPagina();
+
+      await waitFor(() => expect(screen.getByText("equipo_ti_gestion")).toBeInTheDocument());
+      await userEvent.type(screen.getByLabelText(/buscar por nombre de permiso/i), "no existe");
+
+      expect(screen.getByText("Ningún permiso coincide con la búsqueda.")).toBeInTheDocument();
+      expect(screen.queryByText("equipo_ti_gestion")).not.toBeInTheDocument();
+    });
+
+    it("la lista de permisos tiene la clase de scroll interno (no crece sin límite)", async () => {
+      mockApiFetch({ permisosVigentes: new Response(JSON.stringify(PERMISOS_VARIOS)) });
+      renderPagina();
+
+      await waitFor(() => expect(screen.getByText("equipo_ti_gestion")).toBeInTheDocument());
+      expect(screen.getByText("equipo_ti_gestion").closest("ul")).toHaveClass("lista-desplazable");
+    });
+  });
 });

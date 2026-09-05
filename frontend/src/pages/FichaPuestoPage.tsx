@@ -87,6 +87,7 @@ export function FichaPuestoPage() {
   const [asignaciones, setAsignaciones] = useState<Asignacion[]>([]);
   const [estadoAsignaciones, setEstadoAsignaciones] = useState<EstadoCatalogo>("cargando");
   const [busqueda, setBusqueda] = useState("");
+  const [busquedaPermisos, setBusquedaPermisos] = useState("");
 
   function cargar() {
     setEstadoCarga("cargando");
@@ -169,6 +170,12 @@ export function FichaPuestoPage() {
     if (!consulta) return asignacionesOrdenadas;
     return asignacionesOrdenadas.filter((a) => normalizar(a.persona_nombre).includes(consulta));
   }, [asignacionesOrdenadas, busqueda]);
+
+  const permisosFiltrados = useMemo(() => {
+    const consulta = normalizar(busquedaPermisos.trim());
+    if (!consulta) return permisos;
+    return permisos.filter((p) => normalizar(p.codigo).includes(consulta));
+  }, [permisos, busquedaPermisos]);
 
   async function handleGuardar(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
@@ -382,14 +389,29 @@ export function FichaPuestoPage() {
                 <p>Este puesto no tiene permisos otorgados actualmente.</p>
               )}
               {estadoPermisos === "listo" && permisos.length > 0 && (
-                <ul className="lista-historial-resumido">
-                  {permisos.map((permiso) => (
-                    <li key={permiso.id}>
-                      <span style={{ fontWeight: 600 }}>{permiso.codigo}</span>
-                      <a href={`/estructura/permisos/${permiso.id}/revocar`}>Revocar</a>
-                    </li>
-                  ))}
-                </ul>
+                <>
+                  <div className="campo-con-icono">
+                    <Search size={16} className="icono-campo" aria-hidden="true" />
+                    <input
+                      type="search"
+                      placeholder="Buscar por nombre de permiso"
+                      value={busquedaPermisos}
+                      onChange={(evento) => setBusquedaPermisos(evento.target.value)}
+                      aria-label="Buscar por nombre de permiso"
+                    />
+                  </div>
+                  {permisosFiltrados.length === 0 && <p>Ningún permiso coincide con la búsqueda.</p>}
+                  {permisosFiltrados.length > 0 && (
+                    <ul className="lista-historial-resumido lista-desplazable">
+                      {permisosFiltrados.map((permiso) => (
+                        <li key={permiso.id}>
+                          <span style={{ fontWeight: 600 }}>{permiso.codigo}</span>
+                          <a href={`/estructura/permisos/${permiso.id}/revocar`}>Revocar</a>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </>
               )}
             </Card>
           </aside>
