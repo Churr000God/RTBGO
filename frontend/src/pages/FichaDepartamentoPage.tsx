@@ -249,10 +249,12 @@ export function FichaDepartamentoPage() {
 
   return (
     <AppShell>
-      {/* Ancho: sección con .layout-bitacora, igual que el resto de sus consumidores
-          (AsignacionesPage/PermisosPage/BitacoraAsignacionesPersonaPage) — dentro del
-          contenedor angosto de 720px la columna lateral "Por puesto" quedaba apretada y
-          el texto de puesto largo empujaba el chip de conteo a otra línea. */}
+      {/* Toda la página en el contenedor ancho (igual que AsignacionesPage/PermisosPage/
+          BitacoraAsignacionesPersonaPage, los otros consumidores de .layout-bitacora): dentro
+          del angosto de 720px la columna lateral "Por puesto" quedaba apretada y partía el
+          texto largo del puesto en dos líneas, empujando su chip de conteo a una tercera. Las
+          tarjetas de abajo (Área/Nombre/Fechas) se quedan en el mismo contenedor y en fila
+          (.rejilla-tarjetas) para no quedar descolgadas y desalineadas contra este ancho. */}
       <div className="contenedor-pagina contenedor-pagina--ancho">
         <nav className="migas">
           <a href="/estructura/departamentos">Departamentos</a> /{" "}
@@ -373,48 +375,49 @@ export function FichaDepartamentoPage() {
             </Card>
           </aside>
         </div>
-      </div>
 
-      {/* Angosto: mismas tarjetas de registro/edición que FichaAreaPage/FichaPuestoPage —
-          un formulario de un solo campo o un dato suelto no necesita 1200px, lo hace ver
-          vacío. Sólo la sección de arriba (browse-style) se beneficia del ancho extra. */}
-      <div className="contenedor-pagina">
-        <Card>
-          <h3>Área</h3>
-          <div className="dato">
-            <span>Área a la que pertenece</span>
-            <strong>{nombreArea ?? "—"}</strong>
-          </div>
-        </Card>
-
-        <Card as="form" onSubmit={handleRenombrar}>
-          <h3>Nombre del departamento</h3>
-          <Input
-            id="nombre_departamento"
-            name="nombre_departamento"
-            label="Nombre"
-            required
-            maxLength={100}
-            defaultValue={departamento.nombre_departamento}
-          />
-          <div className="botonera">
-            <button type="submit">Guardar</button>
-          </div>
-        </Card>
-
-        <Card>
-          <h3>Fechas</h3>
-          <div className="rejilla-datos">
+        {/* Misma sección ancha de arriba, no un contenedor angosto aparte: 3 tarjetas chicas
+            centradas en 720px quedaban descolgadas y desalineadas contra el borde izquierdo
+            de "Personas del departamento" — puestas en fila acá comparten el mismo borde y
+            usan el ancho sobrante en vez de dejarlo vacío alrededor. */}
+        <div className="rejilla-tarjetas">
+          <Card>
+            <h3>Área</h3>
             <div className="dato">
-              <span>Creado el</span>
-              <strong>{formatearFecha(departamento.creado_en)}</strong>
+              <span>Área a la que pertenece</span>
+              <strong>{nombreArea ?? "—"}</strong>
             </div>
-            <div className="dato">
-              <span>Última actualización</span>
-              <strong>{formatearFecha(departamento.actualizado_en)}</strong>
+          </Card>
+
+          <Card as="form" onSubmit={handleRenombrar}>
+            <h3>Nombre del departamento</h3>
+            <Input
+              id="nombre_departamento"
+              name="nombre_departamento"
+              label="Nombre"
+              required
+              maxLength={100}
+              defaultValue={departamento.nombre_departamento}
+            />
+            <div className="botonera">
+              <button type="submit">Guardar</button>
             </div>
-          </div>
-        </Card>
+          </Card>
+
+          <Card>
+            <h3>Fechas</h3>
+            <div className="rejilla-datos">
+              <div className="dato">
+                <span>Creado el</span>
+                <strong>{formatearFecha(departamento.creado_en)}</strong>
+              </div>
+              <div className="dato">
+                <span>Última actualización</span>
+                <strong>{formatearFecha(departamento.actualizado_en)}</strong>
+              </div>
+            </div>
+          </Card>
+        </div>
       </div>
     </AppShell>
   );

@@ -1258,6 +1258,25 @@ a.boton-con-icono {
   }
 }
 
+/* Fila de tarjetas chicas (un dato suelto o un formulario de un campo cada una) dentro de un
+   contenedor ancho — sin esto, tres .tarjeta-resumen apiladas a lo largo de 1200px+ se ven
+   como restos angostos flotando en el medio de la pantalla en vez de aprovechar el ancho.
+   auto-fit + minmax en vez de un número fijo de columnas: en pantallas angostas cae solo a
+   una columna apilada, sin necesitar un breakpoint aparte. */
+.rejilla-tarjetas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: 1.5rem;
+  align-items: start;
+}
+
+/* .tarjeta-resumen trae margin-bottom:1.5rem para cuando se apila sola — acá el espaciado ya
+   lo da el gap de la grilla; sin este reset, el margin se suma al gap en la columna angosta
+   (mobile) y deja un hueco doble entre tarjetas apiladas. */
+.rejilla-tarjetas > .tarjeta-resumen {
+  margin-bottom: 0;
+}
+
 .grupo-anio {
   margin-bottom: 1.5rem;
 }
