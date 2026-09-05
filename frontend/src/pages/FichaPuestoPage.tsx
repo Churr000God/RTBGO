@@ -406,7 +406,9 @@ export function FichaPuestoPage() {
                       {permisosFiltrados.map((permiso) => (
                         <li key={permiso.id}>
                           <span style={{ fontWeight: 600 }}>{permiso.codigo}</span>
-                          <a href={`/estructura/permisos/${permiso.id}/revocar`}>Revocar</a>
+                          <a href={`/estructura/permisos/${permiso.id}/revocar?puesto_id=${puesto.id}`}>
+                            Revocar
+                          </a>
                         </li>
                       ))}
                     </ul>

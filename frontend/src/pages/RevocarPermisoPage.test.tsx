@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { apiFetch } from "../lib/apiClient";
 import { RevocarPermisoPage } from "./RevocarPermisoPage";
@@ -42,9 +42,9 @@ function mockApiFetch(overrides: { vigentes?: Response; post?: (init: RequestIni
   });
 }
 
-function renderPagina(id = PUESTO_PERMISO_ID) {
+function renderPagina(id = PUESTO_PERMISO_ID, query = "") {
   render(
-    <MemoryRouter initialEntries={[`/estructura/permisos/${id}/revocar`]}>
+    <MemoryRouter initialEntries={[`/estructura/permisos/${id}/revocar${query}`]}>
       <Routes>
         <Route path="/estructura/permisos/:id/revocar" element={<RevocarPermisoPage />} />
       </Routes>
@@ -124,5 +124,59 @@ describe("RevocarPermisoPage", () => {
         screen.getByText(/no se pudo cargar este otorgamiento de permiso/i)
       ).toBeInTheDocument()
     );
+  });
+
+  describe("navegación de vuelta (deep-link ?puesto_id= desde la ficha de un puesto)", () => {
+    const locationOriginal = window.location;
+
+    afterEach(() => {
+      // jsdom no implementa navegación real (`window.location.href = x` no actualiza
+      // `location`, sólo tira "Not implemented: navigation" a stderr) — no hay forma de
+      // observar el destino de la redirección sin reemplazar location por un objeto plano
+      // asignable. Se restaura el real después de cada test para no afectar otros archivos.
+      Object.defineProperty(window, "location", { writable: true, value: locationOriginal });
+    });
+
+    function stubLocation(search: string) {
+      const pathname = `/estructura/permisos/${PUESTO_PERMISO_ID}/revocar`;
+      Object.defineProperty(window, "location", {
+        writable: true,
+        value: { pathname, search, href: `${pathname}${search}` },
+      });
+    }
+
+    it("con ?puesto_id=, Cancelar y una revocación exitosa vuelven a la ficha de ese puesto", async () => {
+      stubLocation("?puesto_id=puesto-ficticio-1");
+      mockApiFetch({});
+      renderPagina();
+      await waitFor(() => expect(screen.getByText("Puesto Ficticio Uno")).toBeInTheDocument());
+
+      expect(screen.getByRole("link", { name: /cancelar/i })).toHaveAttribute(
+        "href",
+        "/estructura/puestos/puesto-ficticio-1"
+      );
+
+      await userEvent.click(screen.getByRole("button", { name: /confirmar revocación/i }));
+
+      await waitFor(() =>
+        expect(window.location.href).toBe("/estructura/puestos/puesto-ficticio-1")
+      );
+    });
+
+    it("sin ?puesto_id= (llegado por otro camino), mantiene el comportamiento actual: vuelve a Permisos", async () => {
+      stubLocation("");
+      mockApiFetch({});
+      renderPagina();
+      await waitFor(() => expect(screen.getByText("Puesto Ficticio Uno")).toBeInTheDocument());
+
+      expect(screen.getByRole("link", { name: /cancelar/i })).toHaveAttribute(
+        "href",
+        "/estructura/permisos"
+      );
+
+      await userEvent.click(screen.getByRole("button", { name: /confirmar revocación/i }));
+
+      await waitFor(() => expect(window.location.href).toBe("/estructura/permisos"));
+    });
   });
 });

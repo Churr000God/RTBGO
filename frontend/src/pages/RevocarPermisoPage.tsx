@@ -29,6 +29,11 @@ export function RevocarPermisoPage() {
   const [otorgamiento, setOtorgamiento] = useState<PuestoPermiso | null>(null);
   const [estadoCarga, setEstadoCarga] = useState<EstadoCarga>("cargando");
   const [error, setError] = useState<string | null>(null);
+  // Deep-link desde "Revocar" en la ficha de un puesto (?puesto_id=...) — si vino de ahí, tanto
+  // cancelar como una revocación exitosa vuelven a esa ficha en vez de mandar a la pantalla
+  // general de Permisos, que era la única salida antes y obligaba a renavegar todo de nuevo.
+  const puestoId = new URLSearchParams(window.location.search).get("puesto_id");
+  const destino = puestoId ? `/estructura/puestos/${puestoId}` : "/estructura/permisos";
 
   useEffect(() => {
     // Sin GET por id para puesto_permiso todavía — se busca en /api/permisos/vigentes (estado
@@ -58,7 +63,7 @@ export function RevocarPermisoPage() {
       setError(await mensajeDeError(respuesta, "No se pudo revocar el permiso."));
       return;
     }
-    window.location.href = "/estructura/permisos";
+    window.location.href = destino;
   }
 
   return (
@@ -101,7 +106,7 @@ export function RevocarPermisoPage() {
 
         {error && <p role="alert">{error}</p>}
         <div className="botonera">
-          <a href="/estructura/permisos">Cancelar</a>
+          <a href={destino}>Cancelar</a>
           <button type="button" onClick={handleConfirmar} disabled={!otorgamiento}>
             Confirmar revocación
           </button>

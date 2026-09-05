@@ -266,7 +266,7 @@ describe("FichaPuestoPage", () => {
     expect(screen.queryByText("permiso_ficticio_tres")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: /revocar/i })).toHaveAttribute(
       "href",
-      "/estructura/permisos/puesto-permiso-ficticio-1/revocar"
+      `/estructura/permisos/puesto-permiso-ficticio-1/revocar?puesto_id=${PUESTO.id}`
     );
   });
 
