@@ -1,7 +1,14 @@
+"""API de bitacora_movimiento_persona (SCJ-PRO-02: suspender/reactivar/dar de baja).
+
+Gate de permisos: GET sin cambio -- no existe código de lectura para este módulo, sigue el
+gate débil. POST (cambio de estado) exige además requiere_permiso("cambio_estado_persona")
+(app/permisos.py)."""
+
 from fastapi import APIRouter, Depends
 from supabase import Client
 
 from app.deps import CallerIdentity, get_caller_client, get_caller_identity
+from app.permisos import requiere_permiso
 from app.schemas.movimientos import MovimientoCreate, MovimientoOut
 
 router = APIRouter(prefix="/api/personas/{persona_id}/movimientos", tags=["movimientos"])
@@ -13,6 +20,7 @@ def crear_movimiento(
     datos: MovimientoCreate,
     db: Client = Depends(get_caller_client),
     caller: CallerIdentity = Depends(get_caller_identity),
+    _permiso: None = Depends(requiere_permiso("cambio_estado_persona")),
 ) -> dict:
     """SCJ-PRO-02: el trigger trg_bitacora_sincroniza_persona actualiza persona.estado solo —
     este endpoint nunca hace UPDATE directo a personas.persona. registrado_por es el caller

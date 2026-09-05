@@ -1,14 +1,25 @@
+"""API de personas.persona (SCJ-PRO-01 alta persona+expediente).
+
+Gate de permisos: GET (listado, ficha) sin cambio -- no existe código de lectura para este
+módulo, sigue el gate débil de sólo get_caller_client (RLS) a propósito. POST (alta) exige
+además requiere_permiso("alta_personas_usuarios") (app/permisos.py)."""
+
 from fastapi import APIRouter, Depends
 from supabase import Client
 
 from app.deps import get_caller_client
+from app.permisos import requiere_permiso
 from app.schemas.personas import PersonaConExpediente, PersonaCreate, PersonaOut
 
 router = APIRouter(prefix="/api/personas", tags=["personas"])
 
 
 @router.post("", status_code=201, response_model=PersonaOut)
-def alta_persona(datos: PersonaCreate, db: Client = Depends(get_caller_client)) -> dict:
+def alta_persona(
+    datos: PersonaCreate,
+    db: Client = Depends(get_caller_client),
+    _permiso: None = Depends(requiere_permiso("alta_personas_usuarios")),
+) -> dict:
     """SCJ-PRO-01 paso A1: persona + expediente en una misma operación, en ese orden por la FK."""
     persona = (
         db.postgrest.schema("personas")

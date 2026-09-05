@@ -1,20 +1,24 @@
 """API de personas.permiso (catálogo) y personas.puesto_permiso (SCJ-PRO-05: otorgar/revocar).
 
-Gate de permisos: get_caller_client exige sólo Bearer token válido + RLS
-(personas.fn_caller_activo(), policy solo_caller_activo) -- cualquier usuario autenticado y
-activo puede llamar a este router. DESVIACIÓN CONSCIENTE respecto a SCJ-PRO-05 §II.1: el
-documento pide que sólo quien tenga puesto_permiso_edicion pueda otorgar/revocar, pero esa
-precondición de acceso NO se hace cumplir todavía en este corte -- conectarla en éste y en
-TODOS los demás routers del módulo (área/departamento/puesto/asignación) es un corte aparte,
-ya decidido con el usuario ("cerrar el gate"). Lo que SÍ se implementa acá es la lógica de
-negocio del proceso en sí: auto-otorgamiento (directo o por herencia via el organigrama) y la
-protección de "última fila" de puesto_permiso_edicion -- eso no depende de qué gate exista.
-"""
+Gate de permisos: get_caller_client (RLS) + requiere_permiso(...) (app/permisos.py) -- este
+último exige que el caller tenga, en alguno de sus puestos vigentes (directo o heredado), al
+menos uno de los códigos de permiso indicados. GET "" / /vigentes / /otorgados aceptan
+lectura O edición; POST /otorgar y /revocar exigen puesto_permiso_edicion (SCJ-PRO-05 §II.1,
+literal). El resto de la lógica de negocio del proceso (auto-otorgamiento directo o por
+herencia via el organigrama, protección de "última fila" de puesto_permiso_edicion) es
+independiente del gate y ya estaba implementada."""
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from supabase import Client
 
 from app.deps import CallerIdentity, get_caller_client, get_caller_identity
+from app.permisos import (
+    descendientes_incluido_si_mismo,
+    mapa_hijos_por_puesto,
+    requiere_permiso,
+    resolver_persona_id,
+    resolver_puestos_vigentes,
+)
 from app.schemas.permisos import (
     BitacoraPuestoPermisoOut,
     PermisoOut,
@@ -40,68 +44,27 @@ MENSAJE_ULTIMA_FILA_EDICION = (
 )
 
 
-def _persona_id_del_caller(db: Client, caller: CallerIdentity) -> str:
-    """fn_caller_activo() ya exige que el caller tenga fila en personas.usuario para llegar
-    hasta acá (mismo razonamiento que movimientos.py) -- no hace falta manejo de "no
-    encontrado"."""
-    fila = (
-        db.postgrest.schema("personas")
-        .table("usuario")
-        .select("persona_id")
-        .eq("auth_user_id", caller.auth_user_id)
-        .execute()
-        .data
-    )
-    return fila[0]["persona_id"]
-
-
-def _puestos_vigentes_de_persona(db: Client, persona_id: str) -> list[str]:
-    filas = (
-        db.postgrest.schema("personas")
-        .table("asignacion")
-        .select("puesto_id")
-        .eq("persona_id", persona_id)
-        .is_("vigente_hasta", "null")
-        .execute()
-        .data
-    )
-    return [fila["puesto_id"] for fila in filas]
-
-
-def _mapa_hijos_por_puesto(db: Client) -> dict[str, list[str]]:
-    """El árbol completo de puestos es chico (~15-20 filas) -- se trae entero y se arma en
-    memoria en vez de un RPC nuevo (WITH RECURSIVE), como recomienda el plan: es sólo lectura y
-    el volumen no lo justifica."""
-    filas = (
-        db.postgrest.schema("personas").table("puesto").select("id, reporta_a_id").execute().data
-    )
-    hijos: dict[str, list[str]] = {}
-    for fila in filas:
-        padre = fila["reporta_a_id"]
-        if padre is not None:
-            hijos.setdefault(padre, []).append(fila["id"])
-    return hijos
-
-
-def _descendientes_incluido_si_mismo(hijos: dict[str, list[str]], puesto_id: str) -> set[str]:
-    vistos = {puesto_id}
-    pendientes = [puesto_id]
-    while pendientes:
-        actual = pendientes.pop()
-        for hijo in hijos.get(actual, []):
-            if hijo not in vistos:
-                vistos.add(hijo)
-                pendientes.append(hijo)
-    return vistos
+PERMISOS_LECTURA_O_EDICION = (
+    "permiso_lectura",
+    "permiso_edicion",
+    "puesto_permiso_lectura",
+    "puesto_permiso_edicion",
+)
 
 
 @router.get("", response_model=list[PermisoOut])
-def listar_permisos(db: Client = Depends(get_caller_client)) -> list[dict]:
+def listar_permisos(
+    db: Client = Depends(get_caller_client),
+    _permiso: None = Depends(requiere_permiso(*PERMISOS_LECTURA_O_EDICION)),
+) -> list[dict]:
     return db.postgrest.schema("personas").table("permiso").select("*").order("codigo").execute().data
 
 
 @router.get("/vigentes", response_model=list[PuestoPermisoConDetalle])
-def listar_puesto_permiso_vigentes(db: Client = Depends(get_caller_client)) -> list[dict]:
+def listar_puesto_permiso_vigentes(
+    db: Client = Depends(get_caller_client),
+    _permiso: None = Depends(requiere_permiso(*PERMISOS_LECTURA_O_EDICION)),
+) -> list[dict]:
     """Estado ACTUAL de puesto_permiso (con el flag activo) -- a diferencia de /otorgados, que
     es el histórico de eventos. Devuelve todas las filas, activas e inactivas; el filtro de
     "sólo activas" lo hace el cliente."""
@@ -119,7 +82,10 @@ def listar_puesto_permiso_vigentes(db: Client = Depends(get_caller_client)) -> l
 
 
 @router.get("/otorgados", response_model=list[BitacoraPuestoPermisoOut])
-def listar_otorgados(db: Client = Depends(get_caller_client)) -> list[dict]:
+def listar_otorgados(
+    db: Client = Depends(get_caller_client),
+    _permiso: None = Depends(requiere_permiso(*PERMISOS_LECTURA_O_EDICION)),
+) -> list[dict]:
     """Histórico completo de otorgamientos/revocaciones -- a diferencia de asignacion (donde
     cada fila YA es un evento con vigente_desde/vigente_hasta), acá el registro de eventos vive
     aparte en bitacora_movimiento_puesto_permiso; puesto_permiso sólo tiene el estado derivado
@@ -156,6 +122,7 @@ def otorgar_permiso(
     datos: PuestoPermisoOtorgar,
     db: Client = Depends(get_caller_client),
     caller: CallerIdentity = Depends(get_caller_identity),
+    _permiso: None = Depends(requiere_permiso(CODIGO_PUESTO_PERMISO_EDICION)),
 ) -> dict:
     """SCJ-PRO-05 G0-G8."""
     puesto_destino = (
@@ -180,13 +147,13 @@ def otorgar_permiso(
     if not permiso or not permiso[0]["activo"]:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, MENSAJE_PERMISO_INVALIDO)
 
-    persona_id_caller = _persona_id_del_caller(db, caller)
-    puestos_vigentes_caller = _puestos_vigentes_de_persona(db, persona_id_caller)
+    persona_id_caller = resolver_persona_id(db, caller)
+    puestos_vigentes_caller = resolver_puestos_vigentes(db, persona_id_caller)
 
     if permiso[0]["heredable"]:
-        hijos = _mapa_hijos_por_puesto(db)
+        hijos = mapa_hijos_por_puesto(db)
         for puesto_caller in puestos_vigentes_caller:
-            if datos.puesto_id in _descendientes_incluido_si_mismo(hijos, puesto_caller):
+            if datos.puesto_id in descendientes_incluido_si_mismo(hijos, puesto_caller):
                 raise HTTPException(
                     status.HTTP_422_UNPROCESSABLE_ENTITY, MENSAJE_AUTOOTORGAMIENTO_POR_HERENCIA
                 )
@@ -221,6 +188,7 @@ def revocar_permiso(
     datos: PuestoPermisoRevocar,
     db: Client = Depends(get_caller_client),
     caller: CallerIdentity = Depends(get_caller_identity),
+    _permiso: None = Depends(requiere_permiso(CODIGO_PUESTO_PERMISO_EDICION)),
 ) -> dict:
     """SCJ-PRO-05 R0-R5."""
     fila = (

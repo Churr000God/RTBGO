@@ -85,6 +85,28 @@ describe("OtorgarPermisoPage", () => {
     );
   });
 
+  it("muestra el detail real del backend cuando el gate rechaza con 403 (sin puesto_permiso_edicion)", async () => {
+    mockApiFetch({
+      post: new Response(
+        JSON.stringify({
+          detail: "No tenés el permiso necesario (puesto_permiso_edicion) para esta acción.",
+        }),
+        { status: 403 }
+      ),
+    });
+
+    render(<OtorgarPermisoPage />);
+    await userEvent.selectOptions(await screen.findByLabelText(/puesto destino/i), "puesto-ficticio-1");
+    await userEvent.selectOptions(screen.getByLabelText(/^permiso$/i), "permiso_ficticio_uno");
+    await userEvent.click(screen.getByRole("button", { name: /^otorgar$/i }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("No tenés el permiso necesario (puesto_permiso_edicion) para esta acción.")
+      ).toBeInTheDocument()
+    );
+  });
+
   it("deshabilita el formulario cuando no hay puestos activos", async () => {
     mockApiFetch({ puestos: new Response(JSON.stringify([])) });
 

@@ -12,6 +12,16 @@ type Area = {
 
 type EstadoAreas = "cargando" | "listo" | "error";
 
+async function mensajeDeError(respuesta: Response, generico: string): Promise<string> {
+  try {
+    const cuerpo = await respuesta.json();
+    if (typeof cuerpo?.detail === "string") return cuerpo.detail;
+  } catch {
+    // cuerpo no era JSON legible — cae al genérico
+  }
+  return generico;
+}
+
 export function AltaDepartamentoPage() {
   const [areas, setAreas] = useState<Area[]>([]);
   const [estadoAreas, setEstadoAreas] = useState<EstadoAreas>("cargando");
@@ -49,7 +59,7 @@ export function AltaDepartamentoPage() {
       } else if (respuesta.status === 400 || respuesta.status === 422) {
         setError("El área seleccionada no existe o ya no está activa.");
       } else {
-        setError("No se pudo registrar el alta.");
+        setError(await mensajeDeError(respuesta, "No se pudo registrar el alta."));
       }
       return;
     }

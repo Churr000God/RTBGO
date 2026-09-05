@@ -18,6 +18,16 @@ const ETIQUETA_ESTADO: Record<string, string> = {
   baja_definitiva: "Baja definitiva",
 };
 
+async function mensajeDeError(respuesta: Response, generico: string): Promise<string> {
+  try {
+    const cuerpo = await respuesta.json();
+    if (typeof cuerpo?.detail === "string") return cuerpo.detail;
+  } catch {
+    // cuerpo no era JSON legible — cae al genérico
+  }
+  return generico;
+}
+
 export function CambiarEstadoPage() {
   const { id } = useParams<{ id: string }>();
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +52,7 @@ export function CambiarEstadoPage() {
       }),
     });
     if (!respuesta.ok) {
-      setError("No se pudo registrar el movimiento.");
+      setError(await mensajeDeError(respuesta, "No se pudo registrar el movimiento."));
       return;
     }
     window.location.href = `/personas/${id}`;

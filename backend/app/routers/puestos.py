@@ -1,11 +1,8 @@
 """API del catálogo personas.puesto (SCJ-PRO-03 alta, SCJ-PRO-06 desactivar/reactivar).
 Calcado de app/routers/departamentos.py -- mismo gate, misma forma de PATCH.
 
-Gate de permisos: get_caller_client exige sólo Bearer token válido + RLS
-(personas.fn_caller_activo(), policy solo_caller_activo) -- cualquier usuario autenticado y
-activo puede crear, renombrar y desactivar/reactivar puestos. No hay chequeo de rol/permiso
-todavía: personas.permiso, personas.puesto_permiso y personas.asignacion no existen. Cuando
-SCJ-PRO-05 se implemente, este router debe empezar a exigir puesto_edicion/puesto_lectura.
+Gate de permisos: get_caller_client (RLS) + requiere_permiso(...) (app/permisos.py) --
+lectura exige puesto_lectura o puesto_edicion; alta/renombrado/estado exigen puesto_edicion.
 
 reasignar departamento_id o reporta_a_id de un puesto existente está fuera de alcance
 (decisión tomada con el usuario) -- PuestoUpdate no acepta ninguno de los dos.
@@ -17,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from supabase import Client
 
 from app.deps import get_caller_client
+from app.permisos import requiere_permiso
 from app.schemas.puestos import PuestoCreate, PuestoEstado, PuestoOut, PuestoUpdate
 
 router = APIRouter(prefix="/api/puestos", tags=["puestos"])
@@ -31,7 +29,10 @@ MENSAJE_REACTIVACION_INVALIDA = (
 
 
 @router.get("", response_model=list[PuestoOut])
-def listar_puestos(db: Client = Depends(get_caller_client)) -> list[dict]:
+def listar_puestos(
+    db: Client = Depends(get_caller_client),
+    _permiso: None = Depends(requiere_permiso("puesto_lectura", "puesto_edicion")),
+) -> list[dict]:
     return (
         db.postgrest.schema("personas")
         .table("puesto")
@@ -43,7 +44,11 @@ def listar_puestos(db: Client = Depends(get_caller_client)) -> list[dict]:
 
 
 @router.post("", status_code=201, response_model=PuestoOut)
-def alta_puesto(datos: PuestoCreate, db: Client = Depends(get_caller_client)) -> dict:
+def alta_puesto(
+    datos: PuestoCreate,
+    db: Client = Depends(get_caller_client),
+    _permiso: None = Depends(requiere_permiso("puesto_edicion")),
+) -> dict:
     """SCJ-PRO-03 P0-P7. Se valida departamento_id y reporta_a_id antes del insert -- mismo
     criterio que departamento validando area_id: el error de FK de Postgres sería menos legible
     que estos 422. Sin chequeo de auto-referencia/ciclo: reporta_a_id siempre apunta a un
@@ -90,7 +95,11 @@ def alta_puesto(datos: PuestoCreate, db: Client = Depends(get_caller_client)) ->
 
 
 @router.get("/{puesto_id}", response_model=PuestoOut)
-def obtener_puesto(puesto_id: str, db: Client = Depends(get_caller_client)) -> dict:
+def obtener_puesto(
+    puesto_id: str,
+    db: Client = Depends(get_caller_client),
+    _permiso: None = Depends(requiere_permiso("puesto_lectura", "puesto_edicion")),
+) -> dict:
     fila = (
         db.postgrest.schema("personas")
         .table("puesto")
@@ -106,7 +115,10 @@ def obtener_puesto(puesto_id: str, db: Client = Depends(get_caller_client)) -> d
 
 @router.patch("/{puesto_id}", response_model=PuestoOut)
 def actualizar_puesto(
-    puesto_id: str, datos: PuestoUpdate, db: Client = Depends(get_caller_client)
+    puesto_id: str,
+    datos: PuestoUpdate,
+    db: Client = Depends(get_caller_client),
+    _permiso: None = Depends(requiere_permiso("puesto_edicion")),
 ) -> dict:
     """SCJ-PRO-03: renombrar/cambiar nivel/plazas. Sin 409: nombre_puesto no tiene UNIQUE."""
     fila = (
@@ -131,7 +143,10 @@ def actualizar_puesto(
 
 @router.patch("/{puesto_id}/estado", response_model=PuestoOut)
 def cambiar_estado_puesto(
-    puesto_id: str, datos: PuestoEstado, db: Client = Depends(get_caller_client)
+    puesto_id: str,
+    datos: PuestoEstado,
+    db: Client = Depends(get_caller_client),
+    _permiso: None = Depends(requiere_permiso("puesto_edicion")),
 ) -> dict:
     """SCJ-PRO-06 DP4 (desactivar) / RP1 (reactivar)."""
     puesto_actual = (

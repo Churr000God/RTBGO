@@ -8,6 +8,16 @@ function aMayusculas(evento: ChangeEvent<HTMLInputElement>) {
   evento.currentTarget.value = evento.currentTarget.value.toUpperCase();
 }
 
+async function mensajeDeError(respuesta: Response, generico: string): Promise<string> {
+  try {
+    const cuerpo = await respuesta.json();
+    if (typeof cuerpo?.detail === "string") return cuerpo.detail;
+  } catch {
+    // cuerpo no era JSON legible — cae al genérico
+  }
+  return generico;
+}
+
 export function AltaPersonaPage() {
   const [error, setError] = useState<string | null>(null);
 
@@ -32,7 +42,7 @@ export function AltaPersonaPage() {
       }),
     });
     if (!respuesta.ok) {
-      setError("No se pudo registrar el alta.");
+      setError(await mensajeDeError(respuesta, "No se pudo registrar el alta."));
       return;
     }
     const persona = await respuesta.json();

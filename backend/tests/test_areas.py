@@ -3,10 +3,43 @@ from unittest.mock import MagicMock
 from fastapi.testclient import TestClient
 from postgrest.exceptions import APIError
 
-from app.deps import get_caller_client
+from app.deps import CallerIdentity, get_caller_client, get_caller_identity
 from app.main import app
 
 AREA_ID = "33333333-3333-3333-3333-333333333333"
+
+# El gate de permisos real (requiere_permiso, conectado en el corte "cerrar el gate") exige
+# además de get_caller_client un get_caller_identity, y resuelve persona_id (tabla "usuario"),
+# puestos vigentes (tabla "asignacion") y el permiso directo (tabla "puesto_permiso") ANTES de
+# llegar al cuerpo del endpoint. area.py nunca toca esas 3 tablas por su cuenta, así que hacerlas
+# pasar siempre (sin importar qué código de permiso se pida) no interfiere con lo que cada test
+# ya prueba del propio router -- separado en test_gate_permisos.py el comportamiento real del
+# gate (403 sin permiso, herencia, edición-implica-lectura).
+GATE_AUTH_USER_ID = "auth-ficticio-gate"
+GATE_PERSONA_ID = "persona-ficticia-gate"
+GATE_PUESTO_ID = "puesto-ficticio-gate"
+GATE_IDENTITY = CallerIdentity(auth_user_id=GATE_AUTH_USER_ID, correo="gate-ficticio@example.com")
+
+
+def _tabla_gate(nombre_tabla):
+    tabla = MagicMock()
+    if nombre_tabla == "usuario":
+        tabla.select.return_value.eq.return_value.execute.return_value.data = [
+            {"persona_id": GATE_PERSONA_ID}
+        ]
+    elif nombre_tabla == "asignacion":
+        tabla.select.return_value.eq.return_value.is_.return_value.execute.return_value.data = [
+            {"puesto_id": GATE_PUESTO_ID}
+        ]
+    elif nombre_tabla == "puesto_permiso":
+        tabla.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = [
+            {"puesto_id": GATE_PUESTO_ID}
+        ]
+    return tabla
+
+
+def _override_identidad():
+    app.dependency_overrides[get_caller_identity] = lambda: GATE_IDENTITY
 
 
 def _fila_area(**overrides):
@@ -22,12 +55,17 @@ def _fila_area(**overrides):
 
 
 def test_listar_areas():
-    fake_client = MagicMock()
-    fake_client.postgrest.schema.return_value.table.return_value.select.return_value.order.return_value.execute.return_value.data = [
+    tabla_area = MagicMock()
+    tabla_area.select.return_value.order.return_value.execute.return_value.data = [
         _fila_area(),
         _fila_area(id="44444444-4444-4444-4444-444444444444", nombre_area="Operaciones"),
     ]
+    fake_client = MagicMock()
+    fake_client.postgrest.schema.return_value.table.side_effect = (
+        lambda nombre: tabla_area if nombre == "area" else _tabla_gate(nombre)
+    )
     app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
 
     client = TestClient(app)
     response = client.get("/api/areas", headers={"Authorization": "Bearer fake-token"})
@@ -40,11 +78,13 @@ def test_listar_areas():
 
 
 def test_alta_area_inserta_area():
+    tabla_area = MagicMock()
+    tabla_area.insert.return_value.execute.return_value.data = [_fila_area()]
     fake_client = MagicMock()
     tabla_mock = fake_client.postgrest.schema.return_value.table
-    insert_mock = tabla_mock.return_value.insert
-    insert_mock.return_value.execute.return_value.data = [_fila_area()]
+    tabla_mock.side_effect = lambda nombre: tabla_area if nombre == "area" else _tabla_gate(nombre)
     app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
 
     client = TestClient(app)
     response = client.post(
@@ -56,15 +96,18 @@ def test_alta_area_inserta_area():
     app.dependency_overrides.clear()
     assert response.status_code == 201
     assert response.json()["nombre_area"] == "Comercial"
-    assert tabla_mock.call_args_list[0].args[0] == "area"
-    assert insert_mock.call_args_list[0].args[0] == {"nombre_area": "Comercial"}
+    assert tabla_area.insert.call_args_list[0].args[0] == {"nombre_area": "Comercial"}
 
 
 def test_alta_area_normaliza_espacios_en_nombre():
+    tabla_area = MagicMock()
+    tabla_area.insert.return_value.execute.return_value.data = [_fila_area(nombre_area="Comercial Norte")]
     fake_client = MagicMock()
-    insert_mock = fake_client.postgrest.schema.return_value.table.return_value.insert
-    insert_mock.return_value.execute.return_value.data = [_fila_area(nombre_area="Comercial Norte")]
+    fake_client.postgrest.schema.return_value.table.side_effect = (
+        lambda nombre: tabla_area if nombre == "area" else _tabla_gate(nombre)
+    )
     app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
 
     client = TestClient(app)
     response = client.post(
@@ -75,19 +118,23 @@ def test_alta_area_normaliza_espacios_en_nombre():
 
     app.dependency_overrides.clear()
     assert response.status_code == 201
-    assert insert_mock.call_args_list[0].args[0] == {"nombre_area": "Comercial Norte"}
+    assert tabla_area.insert.call_args_list[0].args[0] == {"nombre_area": "Comercial Norte"}
 
 
 def test_alta_area_duplicada_devuelve_409():
-    fake_client = MagicMock()
-    insert_mock = fake_client.postgrest.schema.return_value.table.return_value.insert
-    insert_mock.return_value.execute.side_effect = APIError(
+    tabla_area = MagicMock()
+    tabla_area.insert.return_value.execute.side_effect = APIError(
         {
             "code": "23505",
             "message": 'duplicate key value violates unique constraint "uq_area_nombre"',
         }
     )
+    fake_client = MagicMock()
+    fake_client.postgrest.schema.return_value.table.side_effect = (
+        lambda nombre: tabla_area if nombre == "area" else _tabla_gate(nombre)
+    )
     app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
 
     client = TestClient(app)
     response = client.post(
@@ -101,13 +148,16 @@ def test_alta_area_duplicada_devuelve_409():
 
 
 def test_renombrar_area():
-    fake_client = MagicMock()
-    tabla_mock = fake_client.postgrest.schema.return_value.table
-    update_mock = tabla_mock.return_value.update
-    update_mock.return_value.eq.return_value.execute.return_value.data = [
+    tabla_area = MagicMock()
+    tabla_area.update.return_value.eq.return_value.execute.return_value.data = [
         _fila_area(nombre_area="Comercial y Marketing")
     ]
+    fake_client = MagicMock()
+    fake_client.postgrest.schema.return_value.table.side_effect = (
+        lambda nombre: tabla_area if nombre == "area" else _tabla_gate(nombre)
+    )
     app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
 
     client = TestClient(app)
     response = client.patch(
@@ -119,19 +169,23 @@ def test_renombrar_area():
     app.dependency_overrides.clear()
     assert response.status_code == 200
     assert response.json()["nombre_area"] == "Comercial y Marketing"
-    update_mock.return_value.eq.assert_called_with("id", AREA_ID)
+    tabla_area.update.return_value.eq.assert_called_with("id", AREA_ID)
 
 
 def test_renombrar_area_duplicada_devuelve_409():
-    fake_client = MagicMock()
-    update_mock = fake_client.postgrest.schema.return_value.table.return_value.update
-    update_mock.return_value.eq.return_value.execute.side_effect = APIError(
+    tabla_area = MagicMock()
+    tabla_area.update.return_value.eq.return_value.execute.side_effect = APIError(
         {
             "code": "23505",
             "message": 'duplicate key value violates unique constraint "uq_area_nombre"',
         }
     )
+    fake_client = MagicMock()
+    fake_client.postgrest.schema.return_value.table.side_effect = (
+        lambda nombre: tabla_area if nombre == "area" else _tabla_gate(nombre)
+    )
     app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
 
     client = TestClient(app)
     response = client.patch(
@@ -145,12 +199,16 @@ def test_renombrar_area_duplicada_devuelve_409():
 
 
 def test_desactivar_area():
-    fake_client = MagicMock()
-    update_mock = fake_client.postgrest.schema.return_value.table.return_value.update
-    update_mock.return_value.eq.return_value.execute.return_value.data = [
+    tabla_area = MagicMock()
+    tabla_area.update.return_value.eq.return_value.execute.return_value.data = [
         _fila_area(activo=False)
     ]
+    fake_client = MagicMock()
+    fake_client.postgrest.schema.return_value.table.side_effect = (
+        lambda nombre: tabla_area if nombre == "area" else _tabla_gate(nombre)
+    )
     app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
 
     client = TestClient(app)
     response = client.patch(
@@ -162,17 +220,21 @@ def test_desactivar_area():
     app.dependency_overrides.clear()
     assert response.status_code == 200
     assert response.json()["activo"] is False
-    datos_actualizados = update_mock.call_args_list[0].args[0]
+    datos_actualizados = tabla_area.update.call_args_list[0].args[0]
     assert datos_actualizados["activo"] is False
 
 
 def test_reactivar_area():
-    fake_client = MagicMock()
-    update_mock = fake_client.postgrest.schema.return_value.table.return_value.update
-    update_mock.return_value.eq.return_value.execute.return_value.data = [
+    tabla_area = MagicMock()
+    tabla_area.update.return_value.eq.return_value.execute.return_value.data = [
         _fila_area(activo=True)
     ]
+    fake_client = MagicMock()
+    fake_client.postgrest.schema.return_value.table.side_effect = (
+        lambda nombre: tabla_area if nombre == "area" else _tabla_gate(nombre)
+    )
     app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
 
     client = TestClient(app)
     response = client.patch(
@@ -187,11 +249,14 @@ def test_reactivar_area():
 
 
 def test_obtener_area():
+    tabla_area = MagicMock()
+    tabla_area.select.return_value.eq.return_value.execute.return_value.data = [_fila_area()]
     fake_client = MagicMock()
-    fake_client.postgrest.schema.return_value.table.return_value.select.return_value.eq.return_value.execute.return_value.data = [
-        _fila_area()
-    ]
+    fake_client.postgrest.schema.return_value.table.side_effect = (
+        lambda nombre: tabla_area if nombre == "area" else _tabla_gate(nombre)
+    )
     app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
 
     client = TestClient(app)
     response = client.get(f"/api/areas/{AREA_ID}", headers={"Authorization": "Bearer fake-token"})
@@ -202,11 +267,14 @@ def test_obtener_area():
 
 
 def test_obtener_area_no_encontrada():
+    tabla_area = MagicMock()
+    tabla_area.select.return_value.eq.return_value.execute.return_value.data = []
     fake_client = MagicMock()
-    fake_client.postgrest.schema.return_value.table.return_value.select.return_value.eq.return_value.execute.return_value.data = (
-        []
+    fake_client.postgrest.schema.return_value.table.side_effect = (
+        lambda nombre: tabla_area if nombre == "area" else _tabla_gate(nombre)
     )
     app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
 
     client = TestClient(app)
     response = client.get(f"/api/areas/{AREA_ID}", headers={"Authorization": "Bearer fake-token"})
@@ -216,10 +284,14 @@ def test_obtener_area_no_encontrada():
 
 
 def test_renombrar_area_no_encontrada():
+    tabla_area = MagicMock()
+    tabla_area.update.return_value.eq.return_value.execute.return_value.data = []
     fake_client = MagicMock()
-    update_mock = fake_client.postgrest.schema.return_value.table.return_value.update
-    update_mock.return_value.eq.return_value.execute.return_value.data = []
+    fake_client.postgrest.schema.return_value.table.side_effect = (
+        lambda nombre: tabla_area if nombre == "area" else _tabla_gate(nombre)
+    )
     app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
 
     client = TestClient(app)
     response = client.patch(
@@ -233,10 +305,14 @@ def test_renombrar_area_no_encontrada():
 
 
 def test_cambiar_estado_area_no_encontrada():
+    tabla_area = MagicMock()
+    tabla_area.update.return_value.eq.return_value.execute.return_value.data = []
     fake_client = MagicMock()
-    update_mock = fake_client.postgrest.schema.return_value.table.return_value.update
-    update_mock.return_value.eq.return_value.execute.return_value.data = []
+    fake_client.postgrest.schema.return_value.table.side_effect = (
+        lambda nombre: tabla_area if nombre == "area" else _tabla_gate(nombre)
+    )
     app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
 
     client = TestClient(app)
     response = client.patch(
@@ -247,6 +323,40 @@ def test_cambiar_estado_area_no_encontrada():
 
     app.dependency_overrides.clear()
     assert response.status_code == 404
+
+
+def test_listar_areas_sin_permiso_devuelve_403():
+    """Caller autenticado y activo, pero sin area_lectura ni area_edicion en ningún puesto
+    vigente -- el gate real debe rechazar antes de llegar al router."""
+    fake_client = MagicMock()
+
+    def side_effect(nombre_tabla):
+        tabla = MagicMock()
+        if nombre_tabla == "usuario":
+            tabla.select.return_value.eq.return_value.execute.return_value.data = [
+                {"persona_id": GATE_PERSONA_ID}
+            ]
+        elif nombre_tabla == "asignacion":
+            tabla.select.return_value.eq.return_value.is_.return_value.execute.return_value.data = [
+                {"puesto_id": GATE_PUESTO_ID}
+            ]
+        elif nombre_tabla == "puesto_permiso":
+            tabla.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = []
+        elif nombre_tabla == "permiso":
+            tabla.select.return_value.eq.return_value.execute.return_value.data = [
+                {"heredable": False}
+            ]
+        return tabla
+
+    fake_client.postgrest.schema.return_value.table.side_effect = side_effect
+    app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
+
+    client = TestClient(app)
+    response = client.get("/api/areas", headers={"Authorization": "Bearer fake-token"})
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 403
 
 
 def test_listar_areas_sin_token():

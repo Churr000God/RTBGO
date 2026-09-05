@@ -223,6 +223,99 @@ describe("AppShell", () => {
     expect(screen.queryByText("Alta de usuario")).not.toBeInTheDocument();
   });
 
+  it("oculta el grupo Personas y Usuarios cuando puede_ver_modulo_1 es false", async () => {
+    vi.mocked(apiFetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          acceso_permitido: true,
+          motivo_bloqueo: null,
+          puede_ver_modulo_1: false,
+          puede_ver_modulo_2: true,
+        }),
+        { status: 200 }
+      )
+    );
+
+    render(
+      <AppShell>
+        <p>Contenido protegido</p>
+      </AppShell>
+    );
+
+    await waitFor(() => expect(screen.getByText("Contenido protegido")).toBeInTheDocument());
+    expect(
+      screen.queryByRole("button", { name: /personas y usuarios/i })
+    ).not.toBeInTheDocument();
+    // no "atenuado" (Próximamente): directamente no está en el DOM
+    expect(screen.queryByText(/personas y usuarios/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /estructura organizacional/i })).toBeInTheDocument();
+  });
+
+  it("oculta el grupo Estructura organizacional cuando puede_ver_modulo_2 es false", async () => {
+    vi.mocked(apiFetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          acceso_permitido: true,
+          motivo_bloqueo: null,
+          puede_ver_modulo_1: true,
+          puede_ver_modulo_2: false,
+        }),
+        { status: 200 }
+      )
+    );
+
+    render(
+      <AppShell>
+        <p>Contenido protegido</p>
+      </AppShell>
+    );
+
+    await waitFor(() => expect(screen.getByText("Contenido protegido")).toBeInTheDocument());
+    expect(
+      screen.queryByRole("button", { name: /estructura organizacional/i })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/estructura organizacional/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /personas y usuarios/i })).toBeInTheDocument();
+  });
+
+  it("muestra ambos grupos cuando puede_ver_modulo_1 y puede_ver_modulo_2 son true", async () => {
+    vi.mocked(apiFetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          acceso_permitido: true,
+          motivo_bloqueo: null,
+          puede_ver_modulo_1: true,
+          puede_ver_modulo_2: true,
+        }),
+        { status: 200 }
+      )
+    );
+
+    render(
+      <AppShell>
+        <p>Contenido protegido</p>
+      </AppShell>
+    );
+
+    await waitFor(() => expect(screen.getByText("Contenido protegido")).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: /personas y usuarios/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /estructura organizacional/i })).toBeInTheDocument();
+  });
+
+  it("si /api/sesion falla (fail-open), muestra ambos grupos aunque no se sepan los permisos reales", async () => {
+    vi.mocked(apiFetch).mockRejectedValue(new Error("network down"));
+
+    render(
+      <AppShell>
+        <p>Contenido protegido</p>
+      </AppShell>
+    );
+
+    await waitFor(() => expect(screen.getByText("Contenido protegido")).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: /personas y usuarios/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /estructura organizacional/i })).toBeInTheDocument();
+  });
+
   it("un grupo sin items propios (p. ej. Panel) se muestra atenuado y sin botón expandible", async () => {
     vi.mocked(apiFetch).mockResolvedValue(
       new Response(JSON.stringify({ acceso_permitido: true, motivo_bloqueo: null }), { status: 200 })

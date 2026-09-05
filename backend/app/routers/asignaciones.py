@@ -1,11 +1,8 @@
 """API de personas.asignacion (SCJ-PRO-04: alta, terminar, cambiar de puesto).
 
-Gate de permisos: get_caller_client exige sólo Bearer token válido + RLS
-(personas.fn_caller_activo(), policy solo_caller_activo) -- cualquier usuario autenticado y
-activo puede administrar asignaciones. No hay chequeo de rol/permiso todavía: personas.permiso,
-personas.puesto_permiso y personas.asignacion (la tabla de permisos, no confundir con este
-router) no existen. Cuando SCJ-PRO-05 se implemente, este router debe empezar a exigir
-asignacion_edicion/asignacion_lectura.
+Gate de permisos: get_caller_client (RLS) + requiere_permiso(...) (app/permisos.py) --
+lectura exige asignacion_lectura o asignacion_edicion; alta/terminar/cambiar-puesto exigen
+asignacion_edicion.
 
 Sin endpoint anidado /api/personas/{id}/asignaciones -- a diferencia de movimientos.py (que sí
 es un sub-recurso dedicado), se reusa este mismo GET global tanto para la bitácora general como
@@ -19,6 +16,7 @@ from postgrest.exceptions import APIError
 from supabase import Client
 
 from app.deps import get_caller_client
+from app.permisos import requiere_permiso
 from app.schemas.asignaciones import (
     AsignacionCambiarPuesto,
     AsignacionConDetalle,
@@ -101,7 +99,10 @@ def _validar_puesto_con_plazas_libres(db: Client, puesto_id: str) -> None:
 
 
 @router.get("", response_model=list[AsignacionConDetalle])
-def listar_asignaciones(db: Client = Depends(get_caller_client)) -> list[dict]:
+def listar_asignaciones(
+    db: Client = Depends(get_caller_client),
+    _permiso: None = Depends(requiere_permiso("asignacion_lectura", "asignacion_edicion")),
+) -> list[dict]:
     filas = (
         db.postgrest.schema("personas")
         .table("asignacion")
@@ -114,7 +115,11 @@ def listar_asignaciones(db: Client = Depends(get_caller_client)) -> list[dict]:
 
 
 @router.get("/{asignacion_id}", response_model=AsignacionConDetalle)
-def obtener_asignacion(asignacion_id: str, db: Client = Depends(get_caller_client)) -> dict:
+def obtener_asignacion(
+    asignacion_id: str,
+    db: Client = Depends(get_caller_client),
+    _permiso: None = Depends(requiere_permiso("asignacion_lectura", "asignacion_edicion")),
+) -> dict:
     filas = (
         db.postgrest.schema("personas")
         .table("asignacion")
@@ -129,7 +134,11 @@ def obtener_asignacion(asignacion_id: str, db: Client = Depends(get_caller_clien
 
 
 @router.post("", status_code=201, response_model=AsignacionOut)
-def alta_asignacion(datos: AsignacionCreate, db: Client = Depends(get_caller_client)) -> dict:
+def alta_asignacion(
+    datos: AsignacionCreate,
+    db: Client = Depends(get_caller_client),
+    _permiso: None = Depends(requiere_permiso("asignacion_edicion")),
+) -> dict:
     """SCJ-PRO-04 N0-N8."""
     _validar_persona_activa(db, datos.persona_id)
     _validar_puesto_con_plazas_libres(db, datos.puesto_id)
@@ -159,7 +168,10 @@ def alta_asignacion(datos: AsignacionCreate, db: Client = Depends(get_caller_cli
 
 @router.patch("/{asignacion_id}/terminar", response_model=AsignacionOut)
 def terminar_asignacion(
-    asignacion_id: str, datos: AsignacionTerminar, db: Client = Depends(get_caller_client)
+    asignacion_id: str,
+    datos: AsignacionTerminar,
+    db: Client = Depends(get_caller_client),
+    _permiso: None = Depends(requiere_permiso("asignacion_edicion")),
 ) -> dict:
     """SCJ-PRO-04 T0-T1."""
     actual = (
@@ -192,7 +204,10 @@ def terminar_asignacion(
 
 @router.post("/{asignacion_id}/cambiar-puesto", response_model=AsignacionOut)
 def cambiar_puesto_asignacion(
-    asignacion_id: str, datos: AsignacionCambiarPuesto, db: Client = Depends(get_caller_client)
+    asignacion_id: str,
+    datos: AsignacionCambiarPuesto,
+    db: Client = Depends(get_caller_client),
+    _permiso: None = Depends(requiere_permiso("asignacion_edicion")),
 ) -> dict:
     """SCJ-PRO-04 C0-C4. El puesto nuevo se valida con las mismas 3 reglas del alta ANTES de
     invocar el RPC transaccional (cierra la asignación vieja y abre una nueva). Si la

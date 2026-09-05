@@ -4,6 +4,16 @@ import { ArrowRight, Building2 } from "lucide-react";
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
 
+async function mensajeDeError(respuesta: Response, generico: string): Promise<string> {
+  try {
+    const cuerpo = await respuesta.json();
+    if (typeof cuerpo?.detail === "string") return cuerpo.detail;
+  } catch {
+    // cuerpo no era JSON legible — cae al genérico
+  }
+  return generico;
+}
+
 export function AltaAreaPage() {
   const [error, setError] = useState<string | null>(null);
 
@@ -18,11 +28,11 @@ export function AltaAreaPage() {
       }),
     });
     if (!respuesta.ok) {
-      setError(
-        respuesta.status === 409
-          ? "Ya existe un área con ese nombre."
-          : "No se pudo registrar el alta.",
-      );
+      if (respuesta.status === 409) {
+        setError("Ya existe un área con ese nombre.");
+      } else {
+        setError(await mensajeDeError(respuesta, "No se pudo registrar el alta."));
+      }
       return;
     }
     const area = await respuesta.json();

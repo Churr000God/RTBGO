@@ -63,6 +63,36 @@ describe("AltaAreaPage", () => {
     );
   });
 
+  it("muestra el detail real del backend cuando el gate rechaza con 403 (sin area_edicion)", async () => {
+    vi.mocked(apiFetch).mockImplementation((path: string) => {
+      if (path === "/api/sesion") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ acceso_permitido: true, motivo_bloqueo: null }))
+        );
+      }
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            detail: "No tenés el permiso necesario (area_lectura o area_edicion) para esta acción.",
+          }),
+          { status: 403 }
+        )
+      );
+    });
+
+    render(<AltaAreaPage />);
+    await userEvent.type(await screen.findByLabelText(/nombre del área/i), "Comercial");
+    await userEvent.click(screen.getByRole("button", { name: /registrar/i }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          "No tenés el permiso necesario (area_lectura o area_edicion) para esta acción."
+        )
+      ).toBeInTheDocument()
+    );
+  });
+
   it("requiere el nombre del área (campo obligatorio del formulario)", async () => {
     vi.mocked(apiFetch).mockImplementation((path: string) => {
       if (path === "/api/sesion") {

@@ -22,6 +22,16 @@ function formatearFecha(fecha?: string | null): string {
   return valor.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+async function mensajeDeError(respuesta: Response, generico: string): Promise<string> {
+  try {
+    const cuerpo = await respuesta.json();
+    if (typeof cuerpo?.detail === "string") return cuerpo.detail;
+  } catch {
+    // cuerpo no era JSON legible — cae al genérico
+  }
+  return generico;
+}
+
 export function FichaAreaPage() {
   const { id } = useParams<{ id: string }>();
   const [area, setArea] = useState<Area | null>(null);
@@ -56,11 +66,11 @@ export function FichaAreaPage() {
       body: JSON.stringify({ nombre_area: f.get("nombre_area") }),
     });
     if (!respuesta.ok) {
-      setError(
-        respuesta.status === 409
-          ? "Ya existe un área con ese nombre."
-          : "No se pudo guardar el cambio.",
-      );
+      if (respuesta.status === 409) {
+        setError("Ya existe un área con ese nombre.");
+      } else {
+        setError(await mensajeDeError(respuesta, "No se pudo guardar el cambio."));
+      }
       return;
     }
     setArea(await respuesta.json());
@@ -73,7 +83,7 @@ export function FichaAreaPage() {
       body: JSON.stringify({ activo: nuevoActivo }),
     });
     if (!respuesta.ok) {
-      setError("No se pudo cambiar el estado del área.");
+      setError(await mensajeDeError(respuesta, "No se pudo cambiar el estado del área."));
       return;
     }
     setArea(await respuesta.json());

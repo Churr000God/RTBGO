@@ -4,6 +4,7 @@ from supabase import Client
 
 from app.config import Settings, get_settings
 from app.deps import get_caller_client, get_service_client
+from app.permisos import requiere_permiso
 from app.schemas.usuarios import UsuarioCreate, UsuarioOut
 
 router = APIRouter(prefix="/api/usuarios", tags=["usuarios"])
@@ -18,13 +19,14 @@ def alta_usuario(
     db: Client = Depends(get_service_client),
     settings: Settings = Depends(get_settings),
     _caller: Client = Depends(get_caller_client),
+    _permiso: None = Depends(requiere_permiso("alta_personas_usuarios")),
 ) -> dict:
     """SCJ-PRO-01: A2 (crear usuario) + A4 (invitación). A3 (bitácora) lo dispara
     trg_usuario_bitacora_alta en la base de datos, no hay nada que hacer aquí para eso.
     redirect_to es obligatorio: sin él, Supabase manda el link al Site URL (la raíz, el
     login), no a /completar-invitacion -- la persona invitada nunca llega a definir su
-    contraseña. _caller: sólo exige Bearer token (SCJ-PRA-01 #02) -- no hay chequeo de
-    rol todavía, cualquier caller con token válido puede invitar.
+    contraseña. _caller exige sólo Bearer token válido (RLS); _permiso exige además
+    alta_personas_usuarios (app/permisos.py) -- el mismo código que gatea el alta de persona.
 
     uq_usuario_persona (05_personas_estructura.sql) es la garantía real de "una persona, un
     usuario" -- se chequea acá antes para no invitar (crear cuenta de Auth + mandar correo) a

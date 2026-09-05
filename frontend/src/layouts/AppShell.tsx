@@ -16,16 +16,18 @@ import {
 
 import { supabase } from "../lib/supabaseClient";
 import { registrarErrorAuth } from "../lib/erroresAuth";
-import { consultarSesion } from "../lib/sesion";
+import { consultarSesion, type SesionOut } from "../lib/sesion";
 
 type EstadoAcceso = "verificando" | "permitido";
 
 type NavItem = { label: string; href: string; disponible: boolean };
 
-// `disponible` (a nivel de grupo y de item) es el punto de enganche del gate de permisos
-// futuro (SCJ-PRO-05): el día que exista `puesto_permiso`, este valor pasa a derivarse del
-// set de permisos del caller en vez de estar fijo aquí — por eso la estructura es data-driven
-// (este arreglo) y no JSX hardcodeado por pestaña.
+// `disponible` (a nivel de grupo y de item) es el punto de enganche del gate de permisos.
+// El de "Personas y Usuarios" y "Estructura organizacional" ya se deriva en tiempo real de
+// `sesion.puede_ver_modulo_1`/`puede_ver_modulo_2` (ver `gruposConGate` más abajo) — el valor
+// puesto acá abajo es sólo el default mientras la sesión no cargó o falló (fail-open). Los
+// items DENTRO de cada grupo siguen fijos: no hay granularidad más fina que "el módulo
+// completo" todavía.
 type NavGroup = { label: string; icono: LucideIcon; disponible: boolean; items: NavItem[] };
 
 const NAV_GROUPS: NavGroup[] = [
@@ -61,6 +63,7 @@ export function AppShell({ children }: Props) {
   const rutaActual = typeof window !== "undefined" ? window.location.pathname : "";
   const [correoUsuario, setCorreoUsuario] = useState<string | null>(null);
   const [estadoAcceso, setEstadoAcceso] = useState<EstadoAcceso>("verificando");
+  const [sesion, setSesion] = useState<SesionOut | null>(null);
   const [gruposAbiertos, setGruposAbiertos] = useState<Set<string>>(
     () =>
       new Set(
@@ -117,6 +120,7 @@ export function AppShell({ children }: Props) {
           window.location.href = `/cuenta-suspendida?motivo=${sesion.motivo_bloqueo ?? "suspension"}`;
           return;
         }
+        setSesion(sesion);
         setEstadoAcceso("permitido");
       })
       .catch((error) => {
@@ -142,6 +146,23 @@ export function AppShell({ children }: Props) {
     );
   }
 
+  // Gate real de los dos grupos con módulo: si la sesión no cargó (fail-open, mismo criterio
+  // que el guard de arriba) quedan visibles por default en vez de ocultarse por un error de
+  // red — la RLS del backend sigue siendo el control real, esto es sólo la UI del sidebar.
+  const gruposConGate = NAV_GROUPS.map((grupo) => {
+    if (grupo.label === "Personas y Usuarios") {
+      return { ...grupo, disponible: sesion?.puede_ver_modulo_1 ?? true };
+    }
+    if (grupo.label === "Estructura organizacional") {
+      return { ...grupo, disponible: sesion?.puede_ver_modulo_2 ?? true };
+    }
+    return grupo;
+  });
+  // Un grupo SIN items (Marcas, Jornadas, ...) con disponible:false se muestra atenuado
+  // ("Próximamente" — todavía no existe). Un grupo CON items sin permiso de módulo se oculta
+  // directo: no es "no construido todavía", es "no te corresponde verlo".
+  const gruposVisibles = gruposConGate.filter((grupo) => grupo.items.length === 0 || grupo.disponible);
+
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
       <aside
@@ -166,7 +187,7 @@ export function AppShell({ children }: Props) {
           Kairos
         </strong>
         <nav style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-          {NAV_GROUPS.map((grupo) => {
+          {gruposVisibles.map((grupo) => {
             const Icono = grupo.icono;
 
             if (grupo.items.length === 0) {

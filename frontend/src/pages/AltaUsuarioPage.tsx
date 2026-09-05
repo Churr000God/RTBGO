@@ -8,6 +8,16 @@ type PersonaOpcion = { id: string; primer_nombre: string; apellido_paterno: stri
 
 type EstadoPersonas = "cargando" | "listo" | "error";
 
+async function mensajeDeError(respuesta: Response, generico: string): Promise<string> {
+  try {
+    const cuerpo = await respuesta.json();
+    if (typeof cuerpo?.detail === "string") return cuerpo.detail;
+  } catch {
+    // cuerpo no era JSON legible — cae al genérico
+  }
+  return generico;
+}
+
 export function AltaUsuarioPage() {
   const [personas, setPersonas] = useState<PersonaOpcion[]>([]);
   const [estadoPersonas, setEstadoPersonas] = useState<EstadoPersonas>("cargando");
@@ -50,7 +60,7 @@ export function AltaUsuarioPage() {
       }),
     });
     if (!respuesta.ok) {
-      setError("No se pudo enviar la invitación.");
+      setError(await mensajeDeError(respuesta, "No se pudo enviar la invitación."));
       return;
     }
     setEnviado(true);

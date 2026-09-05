@@ -1,10 +1,7 @@
 """API del catálogo personas.area (SCJ-PRO-03 alta/renombrado, SCJ-PRO-06 desactivar/reactivar).
 
-Gate de permisos: get_caller_client exige sólo Bearer token válido + RLS
-(personas.fn_caller_activo(), policy solo_caller_activo) -- cualquier usuario autenticado y
-activo puede crear, renombrar y desactivar/reactivar áreas. No hay chequeo de rol/permiso
-todavía: personas.permiso, personas.puesto_permiso y personas.asignacion no existen. Cuando
-SCJ-PRO-05 se implemente, este router debe empezar a exigir area_edicion/area_lectura.
+Gate de permisos: get_caller_client (RLS) + requiere_permiso(...) (app/permisos.py) --
+lectura exige area_lectura o area_edicion; alta/renombrado/estado exigen area_edicion.
 
 PATCH /{area_id} y PATCH /{area_id}/estado son los primeros PATCH del proyecto (no había
 ningún PUT/PATCH previo en backend/app/routers/ para copiar 1:1). Forma elegida: cuerpo con
@@ -21,6 +18,7 @@ from postgrest.exceptions import APIError
 from supabase import Client
 
 from app.deps import get_caller_client
+from app.permisos import requiere_permiso
 from app.schemas.areas import AreaCreate, AreaEstado, AreaOut, AreaRename
 
 router = APIRouter(prefix="/api/areas", tags=["areas"])
@@ -31,7 +29,10 @@ MENSAJE_AREA_NO_ENCONTRADA = "Área no encontrada."
 
 
 @router.get("", response_model=list[AreaOut])
-def listar_areas(db: Client = Depends(get_caller_client)) -> list[dict]:
+def listar_areas(
+    db: Client = Depends(get_caller_client),
+    _permiso: None = Depends(requiere_permiso("area_lectura", "area_edicion")),
+) -> list[dict]:
     return (
         db.postgrest.schema("personas")
         .table("area")
@@ -43,7 +44,11 @@ def listar_areas(db: Client = Depends(get_caller_client)) -> list[dict]:
 
 
 @router.post("", status_code=201, response_model=AreaOut)
-def alta_area(datos: AreaCreate, db: Client = Depends(get_caller_client)) -> dict:
+def alta_area(
+    datos: AreaCreate,
+    db: Client = Depends(get_caller_client),
+    _permiso: None = Depends(requiere_permiso("area_edicion")),
+) -> dict:
     """SCJ-PRO-03 A0-A3. uq_area_nombre y ux_area_nombre_insensible (10_personas_area.sql) son
     la garantía real de unicidad -- este try/except sólo traduce la violación a un 409 legible."""
     try:
@@ -61,7 +66,11 @@ def alta_area(datos: AreaCreate, db: Client = Depends(get_caller_client)) -> dic
 
 
 @router.get("/{area_id}", response_model=AreaOut)
-def obtener_area(area_id: str, db: Client = Depends(get_caller_client)) -> dict:
+def obtener_area(
+    area_id: str,
+    db: Client = Depends(get_caller_client),
+    _permiso: None = Depends(requiere_permiso("area_lectura", "area_edicion")),
+) -> dict:
     fila = (
         db.postgrest.schema("personas")
         .table("area")
@@ -76,7 +85,12 @@ def obtener_area(area_id: str, db: Client = Depends(get_caller_client)) -> dict:
 
 
 @router.patch("/{area_id}", response_model=AreaOut)
-def renombrar_area(area_id: str, datos: AreaRename, db: Client = Depends(get_caller_client)) -> dict:
+def renombrar_area(
+    area_id: str,
+    datos: AreaRename,
+    db: Client = Depends(get_caller_client),
+    _permiso: None = Depends(requiere_permiso("area_edicion")),
+) -> dict:
     """SCJ-PRO-03 A1: renombrar área existente. Mismo 409 en duplicado que el alta."""
     try:
         fila = (
@@ -103,7 +117,10 @@ def renombrar_area(area_id: str, datos: AreaRename, db: Client = Depends(get_cal
 
 @router.patch("/{area_id}/estado", response_model=AreaOut)
 def cambiar_estado_area(
-    area_id: str, datos: AreaEstado, db: Client = Depends(get_caller_client)
+    area_id: str,
+    datos: AreaEstado,
+    db: Client = Depends(get_caller_client),
+    _permiso: None = Depends(requiere_permiso("area_edicion")),
 ) -> dict:
     """SCJ-PRO-06 DA1 (desactivar) / RA1 (reactivar)."""
     # TODO SCJ-PRO-06 DA1: cuando exista personas.departamento, rechazar la desactivación

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from supabase import Client
 
 from app.deps import CallerIdentity, get_caller_identity, get_service_client
+from app.permisos import tiene_permiso
 from app.schemas.sesion import SesionOut
 
 router = APIRouter(prefix="/api/sesion", tags=["sesion"])
@@ -57,6 +58,12 @@ def obtener_sesion(
     acceso_permitido = persona_estado == "activo"
     motivo_bloqueo = None if acceso_permitido else (persona_estado or "sin_persona")
 
+    puede_ver_modulo_1 = False
+    puede_ver_modulo_2 = False
+    if acceso_permitido:
+        puede_ver_modulo_1 = tiene_permiso(db, usuario["persona_id"], "ver_modulo_1")
+        puede_ver_modulo_2 = tiene_permiso(db, usuario["persona_id"], "ver_modulo_2")
+
     return {
         "auth_user_id": caller.auth_user_id,
         "correo": caller.correo,
@@ -65,4 +72,6 @@ def obtener_sesion(
         "persona_estado": persona_estado,
         "acceso_permitido": acceso_permitido,
         "motivo_bloqueo": motivo_bloqueo,
+        "puede_ver_modulo_1": puede_ver_modulo_1,
+        "puede_ver_modulo_2": puede_ver_modulo_2,
     }

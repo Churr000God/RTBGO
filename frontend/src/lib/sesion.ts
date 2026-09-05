@@ -8,6 +8,8 @@ export type SesionOut = {
   persona_estado: string | null;
   acceso_permitido: boolean;
   motivo_bloqueo: string | null;
+  puede_ver_modulo_1: boolean;
+  puede_ver_modulo_2: boolean;
 };
 
 let sesionEnVuelo: Promise<SesionOut> | null = null;

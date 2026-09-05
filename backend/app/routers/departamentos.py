@@ -1,12 +1,9 @@
 """API del catálogo personas.departamento (SCJ-PRO-03 alta/renombrado, SCJ-PRO-06
 desactivar/reactivar). Calcado de app/routers/areas.py -- mismo gate, misma forma de PATCH.
 
-Gate de permisos: get_caller_client exige sólo Bearer token válido + RLS
-(personas.fn_caller_activo(), policy solo_caller_activo) -- cualquier usuario autenticado y
-activo puede crear, renombrar y desactivar/reactivar departamentos. No hay chequeo de
-rol/permiso todavía: personas.permiso, personas.puesto_permiso y personas.asignacion no
-existen. Cuando SCJ-PRO-05 se implemente, este router debe empezar a exigir
-departamento_edicion/departamento_lectura.
+Gate de permisos: get_caller_client (RLS) + requiere_permiso(...) (app/permisos.py) --
+lectura exige departamento_lectura o departamento_edicion; alta/renombrado/estado exigen
+departamento_edicion.
 
 reasignar el area_id de un departamento existente está fuera de alcance (decisión tomada con
 el usuario) -- DepartamentoRename no acepta area_id, sólo AreaCreate lo tiene, y sólo en el
@@ -20,6 +17,7 @@ from postgrest.exceptions import APIError
 from supabase import Client
 
 from app.deps import get_caller_client
+from app.permisos import requiere_permiso
 from app.schemas.departamentos import (
     DepartamentoCreate,
     DepartamentoEstado,
@@ -36,7 +34,10 @@ MENSAJE_AREA_INVALIDA = "El área no existe o está inactiva."
 
 
 @router.get("", response_model=list[DepartamentoOut])
-def listar_departamentos(db: Client = Depends(get_caller_client)) -> list[dict]:
+def listar_departamentos(
+    db: Client = Depends(get_caller_client),
+    _permiso: None = Depends(requiere_permiso("departamento_lectura", "departamento_edicion")),
+) -> list[dict]:
     return (
         db.postgrest.schema("personas")
         .table("departamento")
@@ -48,7 +49,11 @@ def listar_departamentos(db: Client = Depends(get_caller_client)) -> list[dict]:
 
 
 @router.post("", status_code=201, response_model=DepartamentoOut)
-def alta_departamento(datos: DepartamentoCreate, db: Client = Depends(get_caller_client)) -> dict:
+def alta_departamento(
+    datos: DepartamentoCreate,
+    db: Client = Depends(get_caller_client),
+    _permiso: None = Depends(requiere_permiso("departamento_edicion")),
+) -> dict:
     """SCJ-PRO-03 D0-D3. area_id se valida antes del insert: departamento no tiene padre en
     area (a diferencia de area, que no tiene padre alguno), así que acá sí hace falta chequear
     que el area exista y esté activa -- si no, el error de FK de Postgres sería menos legible
@@ -79,7 +84,11 @@ def alta_departamento(datos: DepartamentoCreate, db: Client = Depends(get_caller
 
 
 @router.get("/{departamento_id}", response_model=DepartamentoOut)
-def obtener_departamento(departamento_id: str, db: Client = Depends(get_caller_client)) -> dict:
+def obtener_departamento(
+    departamento_id: str,
+    db: Client = Depends(get_caller_client),
+    _permiso: None = Depends(requiere_permiso("departamento_lectura", "departamento_edicion")),
+) -> dict:
     fila = (
         db.postgrest.schema("personas")
         .table("departamento")
@@ -95,7 +104,10 @@ def obtener_departamento(departamento_id: str, db: Client = Depends(get_caller_c
 
 @router.patch("/{departamento_id}", response_model=DepartamentoOut)
 def renombrar_departamento(
-    departamento_id: str, datos: DepartamentoRename, db: Client = Depends(get_caller_client)
+    departamento_id: str,
+    datos: DepartamentoRename,
+    db: Client = Depends(get_caller_client),
+    _permiso: None = Depends(requiere_permiso("departamento_edicion")),
 ) -> dict:
     """SCJ-PRO-03 D1: renombrar departamento existente. Mismo 409 en duplicado que el alta."""
     try:
@@ -123,7 +135,10 @@ def renombrar_departamento(
 
 @router.patch("/{departamento_id}/estado", response_model=DepartamentoOut)
 def cambiar_estado_departamento(
-    departamento_id: str, datos: DepartamentoEstado, db: Client = Depends(get_caller_client)
+    departamento_id: str,
+    datos: DepartamentoEstado,
+    db: Client = Depends(get_caller_client),
+    _permiso: None = Depends(requiere_permiso("departamento_edicion")),
 ) -> dict:
     """SCJ-PRO-06 DD1 (desactivar) / RD1 (reactivar)."""
     # TODO SCJ-PRO-06 DD1: cuando exista personas.puesto, rechazar la desactivación

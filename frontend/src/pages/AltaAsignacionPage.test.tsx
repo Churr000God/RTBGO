@@ -94,6 +94,29 @@ describe("AltaAsignacionPage", () => {
     );
   });
 
+  it("muestra el detail real del backend cuando el gate rechaza con 403 (sin asignacion_edicion)", async () => {
+    mockApiFetch({
+      post: new Response(
+        JSON.stringify({
+          detail: "No tenés el permiso necesario (asignacion_edicion) para esta acción.",
+        }),
+        { status: 403 }
+      ),
+    });
+
+    render(<AltaAsignacionPage />);
+    await userEvent.selectOptions(await screen.findByLabelText(/^persona$/i), "persona-ficticia-1");
+    await userEvent.selectOptions(screen.getByLabelText(/^puesto$/i), "puesto-ficticio-1");
+    await userEvent.type(screen.getByLabelText(/vigente desde/i), "2026-01-01");
+    await userEvent.click(screen.getByRole("button", { name: /registrar/i }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("No tenés el permiso necesario (asignacion_edicion) para esta acción.")
+      ).toBeInTheDocument()
+    );
+  });
+
   it("deshabilita el formulario cuando no hay personas activas", async () => {
     mockApiFetch({ personas: new Response(JSON.stringify([])) });
 

@@ -9,3 +9,5 @@ class SesionOut(BaseModel):
     persona_estado: str | None
     acceso_permitido: bool
     motivo_bloqueo: str | None  # suspension | baja_definitiva | sin_persona | sin_usuario | None
+    puede_ver_modulo_1: bool = False
+    puede_ver_modulo_2: bool = False
