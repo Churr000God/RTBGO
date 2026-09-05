@@ -1088,6 +1088,17 @@ a.boton-con-icono {
   max-width: 1200px;
 }
 
+/* Monitores anchos (>=96rem/1536px): 1200px seguía fijo ahí para siempre y dejaba franjas
+   vacías a los costados en pantallas grandes — el resto de .contenedor-pagina (720px, para
+   fichas/formularios de un solo campo) se deja como está a propósito: ensanchar un formulario
+   angosto lo hace ver vacío, no lo mejora; esto sólo afecta a las pantallas tipo directorio/
+   historial que sí tienen contenido para llenar el ancho extra. */
+@media (min-width: 96rem) {
+  .contenedor-pagina--ancho {
+    max-width: 1440px;
+  }
+}
+
 .encabezado-pagina {
   display: flex;
   align-items: flex-start;
@@ -1234,6 +1245,16 @@ a.boton-con-icono {
   .layout-bitacora {
     grid-template-columns: 2fr 1fr;
     align-items: start;
+  }
+}
+
+/* A la par de .contenedor-pagina--ancho de arriba: en 96rem+ el costado (1fr) ya tiene sitio
+   de sobra dentro de 1440px, pero fijamos un piso (minmax) para que nunca vuelva a angostarse
+   tanto como para partir una etiqueta larga en dos líneas y empujar su badge de conteo abajo
+   (bug real visto en la tarjeta "Por puesto" de FichaDepartamentoPage). */
+@media (min-width: 96rem) {
+  .layout-bitacora {
+    grid-template-columns: 2fr minmax(20rem, 1fr);
   }
 }
 

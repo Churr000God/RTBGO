@@ -249,7 +249,11 @@ export function FichaDepartamentoPage() {
 
   return (
     <AppShell>
-      <div className="contenedor-pagina">
+      {/* Ancho: sección con .layout-bitacora, igual que el resto de sus consumidores
+          (AsignacionesPage/PermisosPage/BitacoraAsignacionesPersonaPage) — dentro del
+          contenedor angosto de 720px la columna lateral "Por puesto" quedaba apretada y
+          el texto de puesto largo empujaba el chip de conteo a otra línea. */}
+      <div className="contenedor-pagina contenedor-pagina--ancho">
         <nav className="migas">
           <a href="/estructura/departamentos">Departamentos</a> /{" "}
           <strong>{departamento.nombre_departamento}</strong>
@@ -369,7 +373,12 @@ export function FichaDepartamentoPage() {
             </Card>
           </aside>
         </div>
+      </div>
 
+      {/* Angosto: mismas tarjetas de registro/edición que FichaAreaPage/FichaPuestoPage —
+          un formulario de un solo campo o un dato suelto no necesita 1200px, lo hace ver
+          vacío. Sólo la sección de arriba (browse-style) se beneficia del ancho extra. */}
+      <div className="contenedor-pagina">
         <Card>
           <h3>Área</h3>
           <div className="dato">
