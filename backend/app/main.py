@@ -28,6 +28,7 @@ from app.routers import asignaciones  # noqa: E402
 from app.routers import permisos  # noqa: E402
 from app.routers import jornada_asignada  # noqa: E402
 from app.routers import corridas_batch  # noqa: E402
+from app.routers import marcas  # noqa: E402
 
 app.include_router(personas.router)
 app.include_router(usuarios.router)
@@ -40,6 +41,7 @@ app.include_router(asignaciones.router)
 app.include_router(permisos.router)
 app.include_router(jornada_asignada.router)
 app.include_router(corridas_batch.router)
+app.include_router(marcas.router)
 
 
 @app.get("/salud")
