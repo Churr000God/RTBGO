@@ -113,7 +113,9 @@ def tiene_alguno(db: Client, persona_id: str, *codigos: str) -> bool:
 def requiere_permiso(*codigos: str):
     """Factory de dependencia FastAPI: Depends(requiere_permiso("area_edicion")). Se agrega
     ADEMÁS de get_caller_client (RLS), no en su lugar -- éste valida la lógica de negocio de
-    permisos, RLS sigue siendo la última línea de defensa real."""
+    permisos, RLS sigue siendo la última línea de defensa real. Varios códigos son OR (basta
+    uno) -- para lectura-o-edición. Para exigir TODOS los códigos (AND), usar
+    requiere_todos_los_permisos."""
 
     def dependencia(
         db: Client = Depends(get_caller_client),
@@ -124,6 +126,27 @@ def requiere_permiso(*codigos: str):
             raise HTTPException(
                 status.HTTP_403_FORBIDDEN,
                 f"No tenés el permiso necesario ({' o '.join(codigos)}) para esta acción.",
+            )
+
+    return dependencia
+
+
+def requiere_todos_los_permisos(*codigos: str):
+    """Como requiere_permiso, pero exige TODOS los códigos (AND), no basta con uno -- para un
+    endpoint que escribe en más de una tabla gateada por permisos distintos (SCJ-PRO-09:
+    jornada_asignada_edicion + patron_semanal_edicion no se puede asumir que el mapeo de
+    puesto_permiso los otorgue siempre juntos)."""
+
+    def dependencia(
+        db: Client = Depends(get_caller_client),
+        caller: CallerIdentity = Depends(get_caller_identity),
+    ) -> None:
+        persona_id = resolver_persona_id(db, caller)
+        faltantes = [codigo for codigo in codigos if not tiene_permiso(db, persona_id, codigo)]
+        if faltantes:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                f"No tenés los permisos necesarios ({', '.join(faltantes)}) para esta acción.",
             )
 
     return dependencia

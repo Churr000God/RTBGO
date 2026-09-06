@@ -60,9 +60,11 @@ def obtener_sesion(
 
     puede_ver_modulo_1 = False
     puede_ver_modulo_2 = False
+    puede_ver_modulo_3 = False
     if acceso_permitido:
         puede_ver_modulo_1 = tiene_permiso(db, usuario["persona_id"], "ver_modulo_1")
         puede_ver_modulo_2 = tiene_permiso(db, usuario["persona_id"], "ver_modulo_2")
+        puede_ver_modulo_3 = tiene_permiso(db, usuario["persona_id"], "ver_modulo_3")
 
     return {
         "auth_user_id": caller.auth_user_id,
@@ -74,4 +76,5 @@ def obtener_sesion(
         "motivo_bloqueo": motivo_bloqueo,
         "puede_ver_modulo_1": puede_ver_modulo_1,
         "puede_ver_modulo_2": puede_ver_modulo_2,
+        "puede_ver_modulo_3": puede_ver_modulo_3,
     }

@@ -3,7 +3,9 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="SCJ — Personas y Usuarios")
+from app.scheduler import lifespan
+
+app = FastAPI(title="SCJ — Personas y Usuarios", lifespan=lifespan)
 
 # Se lee directo del entorno (no de app.config.Settings) para no forzar, sólo por el
 # middleware de CORS, la validación de las credenciales de Supabase al importar el
@@ -24,6 +26,8 @@ from app.routers import departamentos  # noqa: E402
 from app.routers import puestos  # noqa: E402
 from app.routers import asignaciones  # noqa: E402
 from app.routers import permisos  # noqa: E402
+from app.routers import jornada_asignada  # noqa: E402
+from app.routers import corridas_batch  # noqa: E402
 
 app.include_router(personas.router)
 app.include_router(usuarios.router)
@@ -34,6 +38,8 @@ app.include_router(departamentos.router)
 app.include_router(puestos.router)
 app.include_router(asignaciones.router)
 app.include_router(permisos.router)
+app.include_router(jornada_asignada.router)
+app.include_router(corridas_batch.router)
 
 
 @app.get("/salud")
