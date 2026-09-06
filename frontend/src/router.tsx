@@ -12,6 +12,7 @@ import { BitacoraAsignacionesPersonaPage } from "./pages/BitacoraAsignacionesPer
 import { BitacoraMovimientosPage } from "./pages/BitacoraMovimientosPage";
 import { CambiarEstadoPage } from "./pages/CambiarEstadoPage";
 import { CambiarPuestoAsignacionPage } from "./pages/CambiarPuestoAsignacionPage";
+import { CapturaManualMarcaPage } from "./pages/CapturaManualMarcaPage";
 import { CompletarInvitacionPage } from "./pages/CompletarInvitacionPage";
 import { Configurar2FAPage } from "./pages/Configurar2FAPage";
 import { CuentaSuspendidaPage } from "./pages/CuentaSuspendidaPage";
@@ -66,4 +67,5 @@ export const router = createBrowserRouter([
   { path: "/estructura/permisos/:id/revocar", element: <RevocarPermisoPage /> },
   { path: "/tiempo/asignacion-jornada", element: <AsignarJornadaPage /> },
   { path: "/tiempo/corridas-batch", element: <PanelCorridasBatchPage /> },
+  { path: "/tiempo/captura-manual", element: <CapturaManualMarcaPage /> },
 ]);

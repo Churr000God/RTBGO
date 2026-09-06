@@ -58,6 +58,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Asignar jornada", href: "/tiempo/asignacion-jornada", disponible: true },
       { label: "Corridas de batch", href: "/tiempo/corridas-batch", disponible: true },
+      { label: "Captura manual de marca", href: "/tiempo/captura-manual", disponible: true },
     ],
   },
   { label: "Autorizaciones", icono: ShieldCheck, disponible: false, items: [] },
