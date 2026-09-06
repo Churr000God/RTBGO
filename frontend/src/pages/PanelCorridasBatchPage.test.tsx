@@ -28,7 +28,11 @@ const CORRIDAS = [
   },
 ];
 
-function mockApiFetch(opciones: { listado?: Response; disparar?: Response }) {
+function mockApiFetch(opciones: {
+  listado?: Response;
+  disparar?: Response;
+  dispararCorteQuincenal?: Response;
+}) {
   vi.mocked(apiFetch).mockImplementation((path: string, init?: RequestInit) => {
     if (path === "/api/sesion") {
       return Promise.resolve(
@@ -41,6 +45,23 @@ function mockApiFetch(opciones: { listado?: Response; disparar?: Response }) {
     if (path === "/api/corridas-batch/de-confianza" && init?.method === "POST") {
       return Promise.resolve(
         opciones.disparar ?? new Response(JSON.stringify({ ...CORRIDAS[0], intentos: 2 })),
+      );
+    }
+    if (path === "/api/corridas-batch/corte-quincenal" && init?.method === "POST") {
+      return Promise.resolve(
+        opciones.dispararCorteQuincenal ??
+          new Response(
+            JSON.stringify({
+              id: 2,
+              tipo_batch: "corte_quincenal",
+              fecha: "2026-09-16",
+              estado: "exitosa",
+              intentos: 1,
+              iniciado_en: "2026-09-16T10:00:00Z",
+              terminado_en: "2026-09-16T10:00:05Z",
+              detalle: "periodo 2026-09-01 a 2026-09-15: 1 procesada(s), 0 con déficit, 0 ya procesada(s), 0 pendiente(s) de cierre de día.",
+            }),
+          ),
       );
     }
     return Promise.reject(new Error(`ruta no mockeada: ${path}`));
@@ -121,6 +142,37 @@ describe("PanelCorridasBatchPage", () => {
 
     await waitFor(() =>
       expect(screen.getByText(/no se pudo cargar el listado de corridas/i)).toBeInTheDocument(),
+    );
+  });
+
+  it("lista una corrida de corte_quincenal con la etiqueta correcta y dispara el tercer botón", async () => {
+    mockApiFetch({
+      listado: new Response(
+        JSON.stringify([
+          {
+            id: 2,
+            tipo_batch: "corte_quincenal",
+            fecha: "2026-09-01",
+            estado: "exitosa",
+            intentos: 1,
+            iniciado_en: "2026-09-01T10:00:00Z",
+            terminado_en: "2026-09-01T10:00:05Z",
+            detalle: "periodo 2026-08-16 a 2026-08-31: 1 procesada(s), 0 con déficit, 0 ya procesada(s), 0 pendiente(s) de cierre de día.",
+          },
+        ]),
+      ),
+    });
+
+    render(<PanelCorridasBatchPage />);
+    await waitFor(() => expect(screen.getByText("Corte quincenal")).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole("button", { name: /disparar corte quincenal/i }));
+
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith(
+        "/api/corridas-batch/corte-quincenal",
+        expect.objectContaining({ method: "POST" }),
+      ),
     );
   });
 });

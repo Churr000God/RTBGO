@@ -30,6 +30,7 @@ type EstadoCarga = "cargando" | "listo" | "error";
 const TIPOS_BATCH_DISPARABLES: { codigo: string; ruta: string; etiqueta: string }[] = [
   { codigo: "de_confianza", ruta: "de-confianza", etiqueta: "Jornada de confianza" },
   { codigo: "cierre_dia", ruta: "cierre-dia", etiqueta: "Cierre de día" },
+  { codigo: "corte_quincenal", ruta: "corte-quincenal", etiqueta: "Corte quincenal" },
 ];
 
 const ETIQUETA_TIPO_BATCH: Record<string, string> = {

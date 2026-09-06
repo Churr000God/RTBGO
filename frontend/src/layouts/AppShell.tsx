@@ -74,7 +74,12 @@ const NAV_GROUPS: NavGroup[] = [
     disponible: true,
     items: [{ label: "Ausencias pendientes", href: "/tiempo/ausencias", disponible: true }],
   },
-  { label: "Reportes", icono: BarChart3, disponible: false, items: [] },
+  {
+    label: "Reportes",
+    icono: BarChart3,
+    disponible: true,
+    items: [{ label: "Banco de horas", href: "/tiempo/banco-de-horas", disponible: true }],
+  },
   { label: "Configuración", icono: Settings, disponible: false, items: [] },
 ];
 
@@ -180,15 +185,17 @@ export function AppShell({ children }: Props) {
     if (
       grupo.label === "Jornadas" ||
       grupo.label === "Marcas" ||
-      grupo.label === "Autorizaciones"
+      grupo.label === "Autorizaciones" ||
+      grupo.label === "Reportes"
     ) {
-      // Un solo permiso (ver_modulo_3) cubre las 3 — no hay ver_modulo_4/5 por separado,
-      // el catálogo de permisos de Tiempo (33_*.sql) sólo define uno para todo el módulo.
+      // Un solo permiso (ver_modulo_3) cubre las 4 — no hay ver_modulo_4/5 por separado,
+      // el catálogo de permisos de Tiempo (33_*.sql) sólo define uno para todo el módulo. El
+      // permiso fino de lectura (banco_de_horas_lectura) lo exige el endpoint, no el sidebar.
       return { ...grupo, disponible: sesion?.puede_ver_modulo_3 ?? true };
     }
     return grupo;
   });
-  // Un grupo SIN items (Reportes, Configuración, ...) con disponible:false se muestra atenuado
+  // Un grupo SIN items (Panel, Configuración, ...) con disponible:false se muestra atenuado
   // ("Próximamente" — todavía no existe). Un grupo CON items sin permiso de módulo se oculta
   // directo: no es "no construido todavía", es "no te corresponde verlo".
   const gruposVisibles = gruposConGate.filter((grupo) => grupo.items.length === 0 || grupo.disponible);

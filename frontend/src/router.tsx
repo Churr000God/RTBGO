@@ -8,6 +8,7 @@ import { AltaPuestoPage } from "./pages/AltaPuestoPage";
 import { AltaUsuarioPage } from "./pages/AltaUsuarioPage";
 import { AsignacionesPage } from "./pages/AsignacionesPage";
 import { AsignarJornadaPage } from "./pages/AsignarJornadaPage";
+import { BancoDeHorasPage } from "./pages/BancoDeHorasPage";
 import { BandejaAusenciasPage } from "./pages/BandejaAusenciasPage";
 import { BitacoraAsignacionesPersonaPage } from "./pages/BitacoraAsignacionesPersonaPage";
 import { BitacoraMovimientosPage } from "./pages/BitacoraMovimientosPage";
@@ -74,4 +75,5 @@ export const router = createBrowserRouter([
   { path: "/tiempo/excepciones", element: <ColaExcepcionesPage /> },
   { path: "/tiempo/excepciones/:id/corregir", element: <CorregirMarcaPage /> },
   { path: "/tiempo/ausencias", element: <BandejaAusenciasPage /> },
+  { path: "/tiempo/banco-de-horas", element: <BancoDeHorasPage /> },
 ]);
