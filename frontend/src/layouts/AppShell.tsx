@@ -50,7 +50,6 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Permisos", href: "/estructura/permisos", disponible: true },
     ],
   },
-  { label: "Marcas", icono: Clock, disponible: false, items: [] },
   {
     label: "Jornadas",
     icono: CalendarClock,
@@ -58,10 +57,23 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Asignar jornada", href: "/tiempo/asignacion-jornada", disponible: true },
       { label: "Corridas de batch", href: "/tiempo/corridas-batch", disponible: true },
-      { label: "Captura manual de marca", href: "/tiempo/captura-manual", disponible: true },
     ],
   },
-  { label: "Autorizaciones", icono: ShieldCheck, disponible: false, items: [] },
+  {
+    label: "Marcas",
+    icono: Clock,
+    disponible: true,
+    items: [
+      { label: "Captura manual de marca", href: "/tiempo/captura-manual", disponible: true },
+      { label: "Excepciones pendientes", href: "/tiempo/excepciones", disponible: true },
+    ],
+  },
+  {
+    label: "Autorizaciones",
+    icono: ShieldCheck,
+    disponible: true,
+    items: [{ label: "Ausencias pendientes", href: "/tiempo/ausencias", disponible: true }],
+  },
   { label: "Reportes", icono: BarChart3, disponible: false, items: [] },
   { label: "Configuración", icono: Settings, disponible: false, items: [] },
 ];
@@ -165,12 +177,18 @@ export function AppShell({ children }: Props) {
     if (grupo.label === "Estructura organizacional") {
       return { ...grupo, disponible: sesion?.puede_ver_modulo_2 ?? true };
     }
-    if (grupo.label === "Jornadas") {
+    if (
+      grupo.label === "Jornadas" ||
+      grupo.label === "Marcas" ||
+      grupo.label === "Autorizaciones"
+    ) {
+      // Un solo permiso (ver_modulo_3) cubre las 3 — no hay ver_modulo_4/5 por separado,
+      // el catálogo de permisos de Tiempo (33_*.sql) sólo define uno para todo el módulo.
       return { ...grupo, disponible: sesion?.puede_ver_modulo_3 ?? true };
     }
     return grupo;
   });
-  // Un grupo SIN items (Marcas, Jornadas, ...) con disponible:false se muestra atenuado
+  // Un grupo SIN items (Reportes, Configuración, ...) con disponible:false se muestra atenuado
   // ("Próximamente" — todavía no existe). Un grupo CON items sin permiso de módulo se oculta
   // directo: no es "no construido todavía", es "no te corresponde verlo".
   const gruposVisibles = gruposConGate.filter((grupo) => grupo.items.length === 0 || grupo.disponible);

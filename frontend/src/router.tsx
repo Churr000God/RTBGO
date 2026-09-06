@@ -8,11 +8,14 @@ import { AltaPuestoPage } from "./pages/AltaPuestoPage";
 import { AltaUsuarioPage } from "./pages/AltaUsuarioPage";
 import { AsignacionesPage } from "./pages/AsignacionesPage";
 import { AsignarJornadaPage } from "./pages/AsignarJornadaPage";
+import { BandejaAusenciasPage } from "./pages/BandejaAusenciasPage";
 import { BitacoraAsignacionesPersonaPage } from "./pages/BitacoraAsignacionesPersonaPage";
 import { BitacoraMovimientosPage } from "./pages/BitacoraMovimientosPage";
 import { CambiarEstadoPage } from "./pages/CambiarEstadoPage";
 import { CambiarPuestoAsignacionPage } from "./pages/CambiarPuestoAsignacionPage";
 import { CapturaManualMarcaPage } from "./pages/CapturaManualMarcaPage";
+import { ColaExcepcionesPage } from "./pages/ColaExcepcionesPage";
+import { CorregirMarcaPage } from "./pages/CorregirMarcaPage";
 import { CompletarInvitacionPage } from "./pages/CompletarInvitacionPage";
 import { Configurar2FAPage } from "./pages/Configurar2FAPage";
 import { CuentaSuspendidaPage } from "./pages/CuentaSuspendidaPage";
@@ -68,4 +71,7 @@ export const router = createBrowserRouter([
   { path: "/tiempo/asignacion-jornada", element: <AsignarJornadaPage /> },
   { path: "/tiempo/corridas-batch", element: <PanelCorridasBatchPage /> },
   { path: "/tiempo/captura-manual", element: <CapturaManualMarcaPage /> },
+  { path: "/tiempo/excepciones", element: <ColaExcepcionesPage /> },
+  { path: "/tiempo/excepciones/:id/corregir", element: <CorregirMarcaPage /> },
+  { path: "/tiempo/ausencias", element: <BandejaAusenciasPage /> },
 ]);
