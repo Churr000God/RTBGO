@@ -19,6 +19,11 @@ __pycache__/
 .venv/
 venv/
 .pytest_cache/
+.coverage
+
+# Cobertura de tests / build info (artefactos generados, no se versionan)
+coverage/
+*.tsbuildinfo
 
 # Worktrees de trabajo aislado (superpowers:using-git-worktrees)
 .worktrees/
