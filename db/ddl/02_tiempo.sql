@@ -310,9 +310,14 @@ CREATE TABLE tiempo.clasificacion_de_tiempo (
 );
 
 COMMENT ON TABLE tiempo.clasificacion_de_tiempo IS
-  'Ordinario, reposición o extra, sobre un tramo. tipo se calcula comparando las horas '
-  'acumuladas del tramo contra tope_legal vigente y contra si la persona tiene banco_de_horas '
-  'pendiente — la regla exacta del disparador queda pendiente de programar.';
+  'Ordinario, reposición o extra, sobre un tramo — cronológica y acumulada dentro del periodo '
+  'quincenal, nunca por día ni por proporción; el mismo tramo nunca se parte entre dos '
+  'clasificaciones. tipo lo calcula el batch de corte quincenal (SCJ-PRO-13), no un trigger de '
+  'esta base: recorre los tramos del periodo en orden acumulando contra horas_esperadas '
+  '(patron_semanal vigente, excluye domingo/festivo/bloqueado) — ordinario mientras no rebase lo '
+  'esperado, reposición mientras haya deuda previa en banco_de_horas, extra una vez agotada esa '
+  'deuda. No compara contra tope_legal — ese valor sólo topa la jornada al asignarla '
+  '(trg_patron_semanal_valida_tope_legal), no participa en esta clasificación.';
 
 -- ============================================================================
 -- Banco de horas
