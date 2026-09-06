@@ -1,6 +1,7 @@
 %% Modelo lógico del subsistema de Tiempo
-%% Documento: SCJ-MOD-02 · V1.1 · 2 de septiembre de 2026
+%% Documento: SCJ-MOD-02 · V2.2 · 5 de septiembre de 2026
 %% Exportar a: diagramas/export/logico.svg
+%% Export pendiente de regenerar (2026-09-05) — logico.svg sigue reflejando V1.1
 
 erDiagram
     persona ||--o{ marca : produce
@@ -8,6 +9,8 @@ erDiagram
     persona ||--o{ jornada_asignada : tiene
     persona ||--o{ ausencia : solicita
     persona ||--|| banco_de_horas : acumula
+    ausencia ||--o{ aprobacion_ausencia : requiere
+    persona ||--o{ aprobacion_ausencia : aprueba
 
     dia ||--o{ tramo : contiene
     marca ||--|| tramo : "abre (marca_apertura_id)"
@@ -30,12 +33,14 @@ erDiagram
         bigint id PK
         uuid evento_id UK
         bigint persona_id FK
-        uuid terminal_id
+        varchar terminal_id
         bigint secuencia_local
-        timestamptz momento_terminal
-        timestamptz momento_servidor
+        timestamptz momento_dispositivo
+        varchar desfase_local
+        timestamptz momento_recepcion
+        varchar estado_reloj
+        varchar version_software
         varchar origen
-        boolean reloj_sincronizado
         boolean requiere_revision
     }
     dia {
@@ -64,10 +69,12 @@ erDiagram
         bigint id PK
         bigint persona_id FK
         varchar tipo_jornada
-        daterange vigencia
+        date vigente_desde
+        date vigente_hasta
         boolean descuento_comida_fija
         int minutos_descuento_comida_fija
         numeric horas_semanales_calculadas
+        boolean genera_alerta_horario
     }
     patron_semanal {
         bigint id PK
@@ -81,6 +88,7 @@ erDiagram
     tope_legal {
         bigint id PK
         date vigente_desde UK
+        date vigente_hasta
         numeric maximo_semanal
         numeric maximo_extra
     }
@@ -88,6 +96,16 @@ erDiagram
         bigint id PK
         date fecha UK
         varchar nombre
+    }
+    corrida_batch {
+        bigint id PK
+        varchar tipo_batch
+        date fecha
+        varchar estado
+        smallint intentos
+        timestamptz iniciado_en
+        timestamptz terminado_en
+        text detalle
     }
     banco_de_horas {
         bigint id PK
@@ -122,6 +140,15 @@ erDiagram
         date fecha_fin
         varchar estado_autorizacion
         varchar documento_ref
+    }
+    aprobacion_ausencia {
+        bigint id PK
+        bigint ausencia_id FK
+        smallint numero_paso
+        bigint aprobador_id FK
+        varchar decision
+        text motivo
+        timestamptz decidido_en
     }
     parametro {
         bigint id PK

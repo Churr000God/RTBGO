@@ -23,7 +23,7 @@ Para cada una: dependencias funcionales, clave candidata, forma normal alcanzada
 **Dependencias funcionales**
 
 ```
-(terminal_id, secuencia) → persona_id, hora_terminal, reloj_sincronizado, origen
+(terminal_id, secuencia_local) → persona_id, momento_dispositivo, estado_reloj, origen
 id                       → todo
 ```
 

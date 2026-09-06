@@ -14,6 +14,13 @@ esquema.
 > para el detalle columna por columna mientras el generador no exista). Sólo se actualiza aquí el
 > resumen del esquema, que faltaba reflejar las tablas nuevas.
 
+> **Nota (2026-09-05, no sube de versión, mismo motivo):** `02_tiempo.sql` ahora tiene **15 tablas**
+> — se agregó `tiempo.aprobacion_ausencia` (`SCJ-DEC-05`, aceptada). Sección `III. Enumerados` ya
+> refleja `origen_marca` a 2 valores y el nuevo `estado_reloj`.
+
+> **Nota (2026-09-05, más tarde el mismo día, mismo motivo):** `02_tiempo.sql` ahora tiene **16
+> tablas** — se agregó `tiempo.corrida_batch` (`SCJ-PRO-12`).
+
 ---
 
 ## I. Resumen del esquema
@@ -72,10 +79,13 @@ esquema.
 
 | Enumerado | Valores | Usado en |
 |---|---|---|
-| `origen_marca` | `terminal`, `contingencia`, `captura_manual` | `marca.origen` |
+| `origen_marca` | `terminal`, `captura_manual` | `marca.origen` |
+| `estado_reloj` | `sincronizado`, `deriva`, `sin_sincronizar` | `marca.estado_reloj` |
 | `tipo_de_tiempo` | `ordinario`, `reposicion`, `extra` | |
 | `tipo_de_ausencia` | `vacaciones`, `permiso_con_goce`, `permiso_sin_goce`, `incapacidad`, `falta` | |
 | `salida_de_saldo` | `cubrir`, `arrastrar`, `descontar`, `condonar` | |
+| `tipo_batch` | `cierre_dia`, `corte_quincenal`, `de_confianza` | `corrida_batch.tipo_batch` |
+| `estado_batch` | `en_progreso`, `exitosa`, `fallida` | `corrida_batch.estado` |
 
 ---
 
@@ -91,6 +101,8 @@ Todos los valores son **de ejemplo**. Ver `SCJ-ESP-01 §VI.9`.
 | `umbral_aviso_pct` | entero | 100 | Porcentaje de la jornada semanal para avisar |
 | `umbral_escalamiento_pct` | entero | 200 | Porcentaje para escalar |
 | `descuento_pausa_no_registrada_min` | entero | 60 | Descuento fijo cuando la pausa no se marca |
+| `dias_habiles_correccion_marca` | entero | 30 | Ventana para corregir una marca, contada en días hábiles (`SCJ-PRO-10`) |
+| `hora_corrida_cierre_dia` | hora | 03:00 | Colchón tras `hora_corte_dia` antes de correr el batch de cierre, para dar tiempo a que sincronicen los terminales (`SCJ-PRO-12`) |
 
 ---
 

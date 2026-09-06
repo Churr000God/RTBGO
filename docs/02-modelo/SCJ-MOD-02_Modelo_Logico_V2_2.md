@@ -1,12 +1,31 @@
 # Modelo lógico — Subsistema de Tiempo
 
 **Sistema de Control de Jornada**
-Folio SCJ-MOD-02 · Versión 1.1 · 2 de septiembre de 2026
+Folio SCJ-MOD-02 · Versión 2.2 · 5 de septiembre de 2026
 
 > **Cambio de versión (V1.0 → V1.1, menor):** se completan los atributos de las 14 entidades, que
 > antes sólo estaban listadas por nombre. No se contradice nada de lo ya escrito — se precisa. Ver
 > DDL real en `db/ddl/02_tiempo.sql` y decisiones `SCJ-DEC-02`, `SCJ-DEC-03`, `SCJ-DEC-06`,
 > `SCJ-DEC-07`, `SCJ-DEC-09`, ya aceptadas.
+
+> **Cambio de versión (V1.1 → V2.0, mayor):** `marca` había divergido de `SCJ-CDT-01`/`SCJ-ESP-01`
+> sin decisión formal — se restauran `desfase_local` y `version_software` (faltaban), se restaura
+> `estado_reloj` como enum de 3 valores (estaba colapsado en un boolean `reloj_sincronizado`), se
+> renombran `momento_terminal`→`momento_dispositivo` y `momento_servidor`→`momento_recepcion` para
+> igualar los nombres cerrados del contrato, y `origen` vuelve a sus 2 valores reales
+> (`terminal`/`captura_manual`) — se elimina `contingencia`, que nunca tuvo respaldo en ningún
+> documento. Se agrega la entidad `aprobacion_ausencia` (15ª tabla del subsistema) para implementar
+> `SCJ-DEC-05` (aceptada el 2 de septiembre, el DDL seguía con el comentario "Propuesta"). Ver
+> reconciliación completa en bitácora 2026-09-05.
+
+> **Cambio de versión (V2.0 → V2.1, menor):** `jornada_asignada` gana `genera_alerta_horario`
+> (`SCJ-PRO-09`) — regla de negocio en un campo en vez de comparar `tipo_jornada` contra `'normal'`
+> por todo el código.
+
+> **Cambio de versión (V2.1 → V2.2, menor):** se agrega la entidad `corrida_batch` (16ª tabla) —
+> estado visible de los batches de orquestación (`SCJ-PRO-12`). Se corrige `dia.origen`: el `CHECK`
+> traía `'terminal'` por error (nunca se usó — el caso de marcas reales siempre fue `NULL`) y se
+> agrega `'ausencia_autorizada'`, el tercer caso real que `SCJ-PRO-12` necesita.
 
 Entidades, atributos, claves y cardinalidades del subsistema de Tiempo. Entregable E2 de
 `SCJ-ESP-01`. La justificación de normalización va aparte, en `SCJ-NRM-01`.
@@ -38,18 +57,20 @@ Ancla de claves foráneas. Una sola columna. Ver `SCJ-FRO-01`.
 | `id` | bigint | PK | No | Subrogada — `SCJ-DEC-08`, Opción B (aceptada) |
 | `evento_id` | uuid | UNIQUE | No | Llave de negocio, idempotencia global |
 | `persona_id` | uuid | FK → `persona` | No | Ya resuelto por el terminal, nunca la plantilla |
-| `terminal_id` | uuid | | Sí | Nulo salvo `origen = terminal` |
-| `secuencia_local` | bigint | | Sí | Contador del terminal, para detectar huecos |
-| `momento_terminal` | timestamptz | | No | Hora que reporta el dispositivo |
-| `momento_servidor` | timestamptz | | No | Hora de llegada al servidor |
-| `origen` | varchar(20) | | No | `terminal` / `contingencia` / `captura_manual` |
-| `reloj_sincronizado` | boolean | | No | Estado del reloj del terminal al momento de la marca |
+| `terminal_id` | varchar(32) | | No | Aparato o, en `captura_manual`, punto de captura |
+| `secuencia_local` | bigint | | Sí | Nulo salvo `origen = terminal`. Detecta huecos |
+| `momento_dispositivo` | timestamptz | | No | Hora que reporta el origen |
+| `desfase_local` | varchar(6) | | No | `±HH:MM` vigente en `momento_dispositivo` |
+| `momento_recepcion` | timestamptz | | No | Hora de llegada al servidor. No calcula |
+| `estado_reloj` | varchar(20) | | No | `sincronizado` / `deriva` / `sin_sincronizar` |
+| `version_software` | varchar(16) | | No | Versión del firmware o de la app que generó el evento |
+| `origen` | varchar(20) | | No | `terminal` / `captura_manual` |
 | `requiere_revision` | boolean | | No | Bandera rápida; detalle en `excepcion` |
 
 **Restricciones:**
 - `uq_marca_evento_id` — idempotencia por llave de negocio
 - `uq_marca_terminal_secuencia` (parcial, `WHERE origen = 'terminal'`) — huecos de secuencia, `SCJ-DEC-09`
-- `ck_marca_origen`, `ck_marca_secuencia_solo_terminal`
+- `ck_marca_origen`, `ck_marca_estado_reloj`, `ck_marca_desfase_local`, `ck_marca_secuencia_solo_terminal`
 
 ### II.3 `tramo`
 
@@ -79,6 +100,7 @@ Ancla de claves foráneas. Una sola columna. Ver `SCJ-FRO-01`.
 | `descuento_comida_fija` | boolean | | No | |
 | `minutos_descuento_comida_fija` | int | | Sí | No nulo si `descuento_comida_fija` |
 | `horas_semanales_calculadas` | numeric(6,2) | | Sí | Derivado de `patron_semanal` |
+| `genera_alerta_horario` | boolean | | No | `true`=`normal` (alerta si llega tarde/se pasa); `false`=`flexible`/`de_confianza` (`SCJ-PRO-09`) |
 
 ### II.5 `patron_semanal`
 
@@ -151,14 +173,14 @@ Ver `SCJ-ESP-01 §VI.6` y `SCJ-DEC-02` (aceptada).*
 |---|---|---|---|---|
 | `id` | bigint | PK | No | |
 | `marca_id` | bigint | FK → `marca` | No | |
-| `valor_corregido` | timestamptz | | No | Corrige `momento_terminal`; `persona_id` no se corrige aquí |
+| `valor_corregido` | timestamptz | | No | Corrige `momento_dispositivo`; `persona_id` no se corrige aquí |
 | `motivo` | text | | No | |
 | `autor_id` | uuid | FK → `persona` | No | Siempre humano |
 | `creado_en` | timestamptz | | No | |
 
 ### II.9 `ausencia`
 
-*Ver `SCJ-ESP-01 §VI.8` y `SCJ-DEC-05` (sigue propuesta — ver nota abajo).*
+*Ver `SCJ-ESP-01 §VI.8` y `SCJ-DEC-05` (aceptada, Opción C).*
 
 | Atributo | Tipo | Clave | Nulo | Descripción |
 |---|---|---|---|---|
@@ -167,14 +189,30 @@ Ver `SCJ-ESP-01 §VI.6` y `SCJ-DEC-02` (aceptada).*
 | `tipo_de_ausencia` | varchar(30) | | No | `vacaciones` / `permiso_con_goce` / `permiso_sin_goce` / `incapacidad` / `falta` |
 | `fecha_inicio` | date | | No | |
 | `fecha_fin` | date | | No | |
-| `estado_autorizacion` | varchar(20) | | No | `pendiente` / `autorizada` / `rechazada` |
+| `estado_autorizacion` | varchar(20) | | No | `pendiente` / `autorizada` / `rechazada` — **materializado**, escrito por trigger desde `aprobacion_ausencia` |
 | `documento_ref` | varchar(50) | | Sí | Evidencia cargada, exigida para pagar una falta justificada |
 
-> **`estado_autorizacion` es un placeholder de un solo paso.** No implementa el flujo de
-> autorización configurable de pasos variables que `SCJ-DEC-05` exige — esa decisión sigue
-> "Propuesta". Cuando se resuelva, esta columna probablemente se sustituye por las tablas
-> `tipo_de_ausencia` (definición de flujo) y `paso_de_autorizacion` (instancia por solicitud) que
-> ya estaban anticipadas en el nombre original de esta sección.
+### II.9-bis `aprobacion_ausencia`
+
+*Cadena de aprobación congelada al crear la solicitud — `SCJ-DEC-05`, Opción C. No hay tabla de
+"definición de flujo": quién aprueba cada paso lo resuelve la aplicación contra
+`personas.puesto_permiso`/`asignacion` (permiso `autorizar_ausencia`, heredable jerárquicamente) en
+el momento de crear la ausencia, y esta tabla sólo guarda el resultado ya resuelto.*
+
+| Atributo | Tipo | Clave | Nulo | Descripción |
+|---|---|---|---|---|
+| `id` | bigint | PK | No | |
+| `ausencia_id` | bigint | FK → `ausencia` | No | |
+| `numero_paso` | smallint | UNIQUE (con `ausencia_id`) | No | Orden de la cadena congelada |
+| `aprobador_id` | uuid | FK → `persona` | No | Persona específica, no un rol — congelada al crearse |
+| `decision` | varchar(20) | | No | `pendiente` / `autorizada` / `rechazada` |
+| `motivo` | text | | Sí | |
+| `decidido_en` | timestamptz | | Sí (`NULL` mientras `pendiente`) | |
+
+**Restricciones:** `uq_aprobacion_ausencia_paso` (`ausencia_id`, `numero_paso`),
+`ck_aprobacion_ausencia_decidido` (`decidido_en` nulo ⟺ `decision = 'pendiente'`). Un rechazo en
+cualquier paso cierra `ausencia.estado_autorizacion` en `rechazada`; todos los pasos en
+`autorizada` la cierran en `autorizada`.
 
 ### II.10 `parametro`
 
@@ -213,7 +251,7 @@ domingo/festivo sin autorización previa. Ver `SCJ-DEC-07` (aceptada).*
 | `fecha` | date | UNIQUE con `persona_id` | No | |
 | `estado` | varchar(20) | | No | `abierto` / `cerrado` / `bloqueado` / `revisado` — cuarto estado agregado en esta versión |
 | `horas_totales` | numeric(5,2) | | Sí | `[CALCULADO]`, suma de `tramo.minutos_trabajados` |
-| `origen` | varchar(20) | | Sí | Nulo salvo `automatico_confianza` (jornada `de_confianza`, sin marca/tramo) |
+| `origen` | varchar(20) | | Sí | Nulo si nace de marcas reales; `automatico_confianza` (jornada `de_confianza`, sin marca/tramo) o `ausencia_autorizada` (resuelto contra una ausencia, `SCJ-PRO-12`) |
 
 ### II.13 `dia_festivo`
 
@@ -226,6 +264,23 @@ fecha.*
 | `id` | bigint | PK | No | |
 | `fecha` | date | UNIQUE | No | |
 | `nombre` | varchar(100) | | No | |
+
+### II.14 `corrida_batch`
+
+*Estado visible de cada corrida de los batches de orquestación — `SCJ-PRO-12`. Sin FK a ninguna
+otra entidad: agrupa por `tipo_batch`/`fecha`, no por persona. El job automático y el botón manual
+son la misma invocación; reintentar/reprocesar es un `UPSERT` sobre la misma fila.*
+
+| Atributo | Tipo | Clave | Nulo | Descripción |
+|---|---|---|---|---|
+| `id` | bigint | PK | No | |
+| `tipo_batch` | varchar(20) | UNIQUE (con `fecha`) | No | `cierre_dia` / `corte_quincenal` / `de_confianza` |
+| `fecha` | date | UNIQUE (con `tipo_batch`) | No | |
+| `estado` | varchar(20) | | No | `en_progreso` / `exitosa` / `fallida` |
+| `intentos` | smallint | | No | Default 1, se incrementa en cada reintento/reproceso |
+| `iniciado_en` | timestamptz | | No | |
+| `terminado_en` | timestamptz | | Sí (`NULL` mientras `en_progreso`) | |
+| `detalle` | text | | Sí | Resumen legible, ej. personas pendientes tras 3 intentos |
 
 ---
 

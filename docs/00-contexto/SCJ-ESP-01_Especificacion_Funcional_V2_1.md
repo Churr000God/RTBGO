@@ -2,7 +2,7 @@
 # Especificación funcional — Subsistema de Tiempo
 
 **Distribuidora Central, S.A. de C.V. · Sistema de Control de Jornada (SCJ)**
-Folio SCJ-ESP-01 · Versión 1.0 · 18 de agosto de 2026 · Ciudad de México
+Folio SCJ-ESP-01 · Versión 2.1 · 5 de septiembre de 2026 · Ciudad de México
 
 Documento de entrada del proyecto. Define **qué debe poder representar el modelo de datos**, sin
 prescribir cómo. Junto con `SCJ-CTX-01`, `SCJ-CDT-01` y `SCJ-FRO-01` es todo lo que hace falta para
@@ -12,6 +12,17 @@ empezar `C1.1`.
 > políticas internas, ni información de negocio. Todos los valores numéricos que aparecen son
 > **ejemplos y parámetros**, no valores de operación. Las reglas de anonimización están en
 > `SCJ-ANO-01`.
+
+> **Cambio de versión (V1.0 → V2.0, mayor):** el valor de `origen` para el registro asistido pasa
+> de `asistido` a **`captura_manual`**, para que coincida con `SCJ-CDT-01 V2.0` y con `SCJ-MOD-02`/
+> el DDL, que ya usaban ese nombre sin que este documento se hubiera actualizado. `origen` sigue
+> siendo exactamente 2 valores — se descarta cualquier tercer valor (`contingencia`) que había
+> aparecido en el modelo lógico sin respaldo aquí. Ver bitácora 2026-09-05.
+
+> **Cambio de versión (V2.0 → V2.1, menor):** se precisa §VI.2 — un día `bloqueado` no entra al
+> corte quincenal hasta pasar a `revisado`. El relleno de "jornada pactada" ya descrito era
+> provisional; esto sólo hace explícito que el corte quincenal no debe tratarlo como definitivo
+> mientras el día siga sin revisión humana. No contradice nada ya escrito. `SCJ-PRO-12`.
 
 ---
 
@@ -170,7 +181,7 @@ Un terminal montado en pared identifica por huella digital y produce marcas. El 
 - **Nunca elimina ni edita una marca.** Su cola local es sólo-agregar
 - **Reintenta indefinidamente.** Una misma marca puede llegar al servidor varias veces
 
-### IV.2 Registro asistido (`origen = asistido`)
+### IV.2 Registro asistido (`origen = captura_manual`)
 
 La vía por la que marca **quien no otorgó consentimiento biométrico**, o quien no logra enrolar por
 desgaste del dedo. Es una **vía permanente y sin consecuencia alguna** para quien la use.
@@ -185,7 +196,7 @@ parada. La hora es real, no reconstruida — la toma el sistema al capturar, nun
 
 - El campo `origen` viaja en la marca. Es un valor cerrado de dos opciones que **no identifica a
   nadie**
-- `secuencia_local` **es nulo** cuando `origen = asistido`. Ese contador es del aparato
+- `secuencia_local` **es nulo** cuando `origen = captura_manual`. Ese contador es del aparato
 - El sistema debe poder **contar cuántas marcas asistidas acumula una persona en un periodo**. Si
   son muchas, algo está diciendo: o hay que reenrolarla, o el módulo está fallando
 
@@ -250,6 +261,13 @@ Funciona igual si falta la primera marca, la última, o una intermedia.
 
 > **Restricción de diseño:** el valor de relleno **no es una constante de ocho horas**. Es la
 > jornada pactada de esa persona ese día, que sale del modelo de jornadas con vigencia (§VI.3).
+
+**Un día `bloqueado` no entra al corte quincenal hasta que se revisa.** El relleno de §VI.2.3 es
+provisional, no autoritativo: el corte quincenal excluye del cálculo cualquier día que siga
+`bloqueado` (no cuenta como trabajado ni como deuda) y sólo lo toma en cuenta una vez que pasa a
+`revisado`, con el valor que haya quedado tras la revisión humana. Sin esta regla, un día que
+todavía no se resuelve podría generarle a alguien una deuda o un pago mal calculado en una quincena
+que después hay que corregir. Confirmado 2026-09-05, `SCJ-PRO-12`.
 
 **Marca tardía sobre día cerrado.** Una marca que llegue después de que el día quedó cerrado **no lo
 reabre automáticamente**. Entra con `motivo_revision = dia_cerrado` y RH decide si procede
@@ -398,8 +416,8 @@ el repositorio académico, sin excepción.
 | `momento_recepcion` | timestamp UTC | Sí | Cuándo llegó. Lo agrega el servidor. **No se usa para calcular** |
 | `estado_reloj` | enum | Sí | `sincronizado` \| `deriva` \| `sin_sincronizar` |
 | `terminal_id` | texto (≤32) | Sí | Identifica el aparato o el punto de captura |
-| `secuencia_local` | entero \| nulo | No | Contador monotónico del terminal. **Nulo si `origen = asistido`** |
-| `origen` | enum | Sí | `terminal` \| `asistido` |
+| `secuencia_local` | entero \| nulo | No | Contador monotónico del terminal. **Nulo si `origen = captura_manual`** |
+| `origen` | enum | Sí | `terminal` \| `captura_manual` |
 | `requiere_revision` | booleano | Sí | Verdadero si la marca entra señalada |
 | `motivo_revision` | enum \| nulo | Condicional | Obligatorio si `requiere_revision` es verdadero |
 | `version_software` | texto (≤16) | Sí | Versión del software que generó el evento |
@@ -564,7 +582,7 @@ más simple y más rápida de consultar.
 único globalmente; eso no obliga a que sea la primaria, pero lo permite.
 
 **IX.8 · Unicidad parcial.** La pareja `terminal_id` + `secuencia_local` es única **sólo cuando
-`origen = terminal`**; en el asistido, `secuencia_local` es nulo. ¿Se resuelve con un índice único
+`origen = terminal`**; en captura_manual, `secuencia_local` es nulo. ¿Se resuelve con un índice único
 parcial, con una restricción condicional, o de otro modo?
 
 | Pregunta | Archivo |
@@ -597,7 +615,7 @@ Cerradas por `SCJ-CDT-01`. Aplican en código, esquema y llaves de red, **sin ex
 | Estilo | `minusculas_con_guion_bajo` |
 | Acentos y ñ en identificadores | **Nunca** |
 | Llaves JSON | **Idénticas** a los nombres de columna |
-| Valores de enum | Cortos, sin acentos: `sincronizado`, `asistido`, `dia_cerrado` |
+| Valores de enum | Cortos, sin acentos: `sincronizado`, `captura_manual`, `dia_cerrado` |
 | Booleanos | Prefijo verbal: `requiere_revision` |
 | Timestamps | `momento_` + calificador: `momento_dispositivo`, `momento_recepcion` |
 | Identificadores | Sufijo `_id`: `persona_id`, `evento_id`, `terminal_id` |
@@ -635,7 +653,7 @@ de marcas verosímiles**, incluyendo deliberadamente los casos difíciles:
 - Deuda acumulada y episodios de reposición
 - Marcas que llegan fuera de orden, y con retraso de días
 - Marcas con `estado_reloj` en `deriva` y en `sin_sincronizar`
-- Marcas con `origen = asistido`, sin `secuencia_local`
+- Marcas con `origen = captura_manual`, sin `secuencia_local`
 - Marcas señaladas con cada uno de los cinco valores de `motivo_revision`
 - Huecos en la secuencia local de un terminal
 - Correcciones aplicadas sobre marcas existentes

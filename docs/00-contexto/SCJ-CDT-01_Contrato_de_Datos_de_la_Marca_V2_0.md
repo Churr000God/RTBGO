@@ -1,11 +1,19 @@
 # Contrato de datos de la marca
 
 **Distribuidora Central, S.A. de C.V. · Sistema de Control de Jornada (SCJ)**
-Folio SCJ-CDT-01 · Versión 1.1 · 18 de agosto de 2026 · Ciudad de México
+Folio SCJ-CDT-01 · Versión 2.0 · 5 de septiembre de 2026 · Ciudad de México
 
 > **Este documento no contiene datos reales.** Ni nombres, ni CURP, RFC, NSS o salarios, ni
 > políticas internas, ni información de negocio. Los valores numéricos que aparecen son
 > **ejemplos y parámetros**, no valores definitivos de operación.
+
+> **Cambio de versión (V1.1 → V2.0, mayor):** el valor de `origen` para el registro asistido pasa
+> de `asistido` a **`captura_manual`** — nombre definitivo, ya usado en `SCJ-MOD-02`/DDL desde el
+> 2 de septiembre; este documento no se había actualizado. Se elimina cualquier tercer valor de
+> `origen` (`contingencia` apareció sin respaldo en el modelo lógico y el DDL, nunca en este
+> contrato — queda descartado, `origen` sigue siendo exactamente 2 valores). Cambia el valor, no el
+> concepto: §XIII completo sigue aplicando tal cual. Ver reconciliación en `db/ddl/02_tiempo.sql` y
+> bitácora 2026-09-05.
 
 ---
 
@@ -115,7 +123,7 @@ Además del sobre común:
 | Campo | Tipo | Obligatorio | Descripción |
 |---|---|---|---|
 | `persona_id` | UUID | Sí | Referencia opaca. **Lo único que cruza la frontera** |
-| `origen` | enum | Sí | `terminal` \| `asistido` |
+| `origen` | enum | Sí | `terminal` \| `captura_manual` |
 | `requiere_revision` | booleano | Sí | Verdadero si la marca entra señalada |
 | `motivo_revision` | enum \| nulo | Condicional | Obligatorio si `requiere_revision` es verdadero |
 
@@ -472,7 +480,7 @@ parada. La hora es real, no reconstruida.
 |---|---|
 | Dónde se captura | Desde una computadora, no desde el aparato de pared |
 | Hora | **La toma el sistema al capturar.** RH no escribe hora a mano |
-| `origen` | `asistido` |
+| `origen` | `captura_manual` |
 | `terminal_id` | El identificador del punto de captura |
 | `secuencia_local` | **No aplica.** Ese contador es del aparato |
 | Idempotencia | Por `evento_id` generado al abrir el formulario. §VIII.2 |
@@ -502,7 +510,7 @@ subsistema de Tiempo ve un campo de dos valores y ni siquiera se entera de que e
 | Estilo | `minusculas_con_guion_bajo` |
 | Acentos y ñ en identificadores | **Nunca** |
 | Llaves JSON | **Idénticas** a los nombres de columna |
-| Valores de enum | Cortos, sin acentos: `sincronizado`, `asistido`, `no_enrolada` |
+| Valores de enum | Cortos, sin acentos: `sincronizado`, `captura_manual`, `no_enrolada` |
 | Booleanos | Prefijo verbal: `requiere_revision` |
 | Timestamps | `momento_` + calificador: `momento_dispositivo`, `momento_recepcion` |
 | Identificadores | Sufijo `_id`: `persona_id`, `evento_id`, `terminal_id` |

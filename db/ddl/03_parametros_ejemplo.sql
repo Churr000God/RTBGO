@@ -13,7 +13,9 @@ INSERT INTO tiempo.parametro (clave, valor, vigente_desde) VALUES
   ('ventana_banco_meses', '6', '2026-01-01'),
   ('umbral_aviso_pct', '100', '2026-01-01'),
   ('umbral_escalamiento_pct', '200', '2026-01-01'),
-  ('descuento_pausa_no_registrada_min', '60', '2026-01-01');
+  ('descuento_pausa_no_registrada_min', '60', '2026-01-01'),
+  ('dias_habiles_correccion_marca', '30', '2026-01-01'),
+  ('hora_corrida_cierre_dia', '03:00', '2026-01-01');
 
 COMMENT ON TABLE tiempo.parametro IS
   'Valor de regla de negocio, configurable. Ver comentario completo en 02_tiempo.sql — este '

@@ -12,7 +12,8 @@ Términos del dominio, con el significado exacto que tienen en este proyecto.
 
 | Término | Definición |
 |---|---|
-| **Marca** | Evento producido por el terminal cuando una persona se identifica. **No tiene tipo:** no existe "marca de entrada" ni "marca de salida". Es inmutable |
+| **Marca** | Evento producido por el terminal o por captura manual cuando una persona se identifica. **No tiene tipo:** no existe "marca de entrada" ni "marca de salida". Es inmutable |
+| **Captura manual** | `origen = captura_manual`. Vía ordinaria y permanente por la que marca quien no otorgó consentimiento biométrico o no logra enrolar — un usuario aprobado la registra desde un formulario, con hora tomada por el sistema al capturar, nunca escrita a mano. No es un ajuste posterior (eso es una corrección) — `SCJ-ESP-01 §IV.2`, `SCJ-PRO-07` |
 | **Tramo** | Par de marcas consecutivas: la impar abre, la par cierra. Unidad de tiempo trabajado |
 | **Jornada** | Suma de los tramos de un día. También, la jornada **asignada**: el horario pactado con vigencia |
 | **Paridad** | Invariante según el cual el número de marcas de un día cerrado es par |
