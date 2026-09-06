@@ -232,6 +232,77 @@ def test_disparar_cierre_dia_sin_body_usa_hoy():
     assert fecha_llamada == date.today()
 
 
+def test_disparar_corte_quincenal_llama_a_la_funcion_y_devuelve_su_resultado():
+    fake_caller_client = _fake_caller_client_secuencia(_entradas_gate())
+    fake_service_client = MagicMock()
+    app.dependency_overrides[get_caller_client] = lambda: fake_caller_client
+    app.dependency_overrides[get_service_client] = lambda: fake_service_client
+    _override_identidad()
+
+    resultado_esperado = {
+        "id": 5,
+        "tipo_batch": "corte_quincenal",
+        "fecha": "2026-09-16",
+        "estado": "exitosa",
+        "intentos": 1,
+        "iniciado_en": "2026-09-16T03:00:00+00:00",
+        "terminado_en": "2026-09-16T03:00:05+00:00",
+        "detalle": "periodo 2026-09-01 a 2026-09-15: 2 procesada(s), 0 con déficit, 0 ya procesada(s), 0 pendiente(s) de cierre de día.",
+    }
+
+    with patch(
+        "app.routers.corridas_batch.ejecutar_corte_quincenal",
+        return_value=resultado_esperado,
+    ) as mock_ejecutar:
+        client = TestClient(app)
+        response = client.post(
+            "/api/corridas-batch/corte-quincenal",
+            json={"fecha": "2026-09-16"},
+            headers={"Authorization": "Bearer fake-token"},
+        )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200, response.text
+    assert response.json()["tipo_batch"] == "corte_quincenal"
+    mock_ejecutar.assert_called_once()
+    (fecha_llamada, db_llamado), _ = mock_ejecutar.call_args
+    assert fecha_llamada.isoformat() == "2026-09-16"
+    assert db_llamado is fake_service_client
+
+
+def test_disparar_corte_quincenal_sin_body_usa_hoy():
+    """Mismo bug de de_confianza (default faltante) -- se prueba igual acá para no repetirlo."""
+    fake_caller_client = _fake_caller_client_secuencia(_entradas_gate())
+    app.dependency_overrides[get_caller_client] = lambda: fake_caller_client
+    app.dependency_overrides[get_service_client] = lambda: MagicMock()
+    _override_identidad()
+
+    with patch(
+        "app.routers.corridas_batch.ejecutar_corte_quincenal",
+        return_value={
+            "id": 6,
+            "tipo_batch": "corte_quincenal",
+            "fecha": "2026-09-16",
+            "estado": "exitosa",
+            "intentos": 1,
+            "iniciado_en": "2026-09-16T03:00:00+00:00",
+            "terminado_en": "2026-09-16T03:00:05+00:00",
+            "detalle": "periodo 2026-09-01 a 2026-09-15: 0 procesada(s), 0 con déficit, 0 ya procesada(s), 0 pendiente(s) de cierre de día.",
+        },
+    ) as mock_ejecutar:
+        client = TestClient(app)
+        response = client.post(
+            "/api/corridas-batch/corte-quincenal",
+            headers={"Authorization": "Bearer fake-token"},
+        )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200, response.text
+    mock_ejecutar.assert_called_once()
+    (fecha_llamada, _db), _ = mock_ejecutar.call_args
+    assert fecha_llamada == date.today()
+
+
 def test_disparar_batch_de_confianza_sin_permiso_devuelve_403():
     # Sin poseedor directo del código en puesto_permiso, tiene_permiso cae a heredable ->
     # mapa_hijos_por_puesto (select("id, reporta_a_id") sin filtros, shape distinto al resto) ->

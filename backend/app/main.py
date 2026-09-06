@@ -32,6 +32,7 @@ from app.routers import marcas  # noqa: E402
 from app.routers import correcciones  # noqa: E402
 from app.routers import ausencias  # noqa: E402
 from app.routers import excepciones  # noqa: E402
+from app.routers import banco_de_horas  # noqa: E402
 
 app.include_router(personas.router)
 app.include_router(usuarios.router)
@@ -48,6 +49,7 @@ app.include_router(marcas.router)
 app.include_router(correcciones.router)
 app.include_router(ausencias.router)
 app.include_router(excepciones.router)
+app.include_router(banco_de_horas.router)
 
 
 @app.get("/salud")

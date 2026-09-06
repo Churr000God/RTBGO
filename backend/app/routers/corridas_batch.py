@@ -1,6 +1,6 @@
 """API de tiempo.corrida_batch -- botón manual de los batches del subsistema Tiempo. SCJ-PRO-14
-(de_confianza) estrenó el patrón; SCJ-PRO-12 (cierre_dia) lo reusa sin volver a diseñarlo;
-SCJ-PRO-13 (corte_quincenal, Fase 4) lo va a reusar también.
+(de_confianza) estrenó el patrón; SCJ-PRO-12 (cierre_dia) y SCJ-PRO-13 (corte_quincenal) lo
+reusan sin volver a diseñarlo.
 
 Cada batch en sí corre con service_role (app/batches/*.py -- es un proceso de sistema, no un
 caller humano). Este router sólo gatea el botón manual con permiso antes de invocarlo.
@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends
 from supabase import Client
 
 from app.batches.cierre_dia import ejecutar_cierre_dia
+from app.batches.corte_quincenal import ejecutar_corte_quincenal
 from app.batches.de_confianza import ejecutar_batch_de_confianza
 from app.deps import get_caller_client, get_service_client
 from app.permisos import requiere_permiso
@@ -69,3 +70,17 @@ def disparar_cierre_dia(
     día es seguro."""
     fecha_efectiva = datos.fecha or date.today()
     return ejecutar_cierre_dia(fecha_efectiva, db_servicio)
+
+
+@router.post("/corte-quincenal", response_model=CorridaBatchOut)
+def disparar_corte_quincenal(
+    datos: EjecutarBatchRequest = EjecutarBatchRequest(),
+    db_servicio: Client = Depends(get_service_client),
+    _permiso: None = Depends(requiere_permiso(CODIGO_PERMISO_BATCH)),
+) -> dict:
+    """SCJ-PRO-13 Z1: botón manual, misma invocación que el job programado -- ejecutar_corte_
+    quincenal es idempotente por persona (cualquier tramo del periodo ya clasificado se salta),
+    repetir la corrida es seguro. `fecha` (día 1 o 16, o cualquier otra si es un reproceso
+    manual) determina el periodo -- ver _rango_periodo en app/batches/corte_quincenal.py."""
+    fecha_efectiva = datos.fecha or date.today()
+    return ejecutar_corte_quincenal(fecha_efectiva, db_servicio)

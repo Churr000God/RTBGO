@@ -5,6 +5,7 @@ from app.scheduler import (
     HORA_POR_DEFECTO,
     ID_JOB_BATCH_DE_CONFIANZA,
     ID_JOB_CIERRE_DIA,
+    ID_JOB_CORTE_QUINCENAL,
     _leer_hora_corrida_cierre_dia,
     lifespan,
 )
@@ -38,11 +39,13 @@ def test_error_leyendo_parametro_usa_default_no_tumba_arranque():
         assert _leer_hora_corrida_cierre_dia() == HORA_POR_DEFECTO
 
 
-def test_lifespan_arranca_ambos_jobs_a_la_misma_hora_y_apaga_el_scheduler():
+def test_lifespan_arranca_los_3_jobs_a_la_misma_hora_y_apaga_el_scheduler():
     """Sin pytest-asyncio en el proyecto -- se maneja el context manager async a mano con
     asyncio.run en vez de declarar el test como async def (quedaría sin correr, sin plugin).
-    de_confianza y cierre_dia comparten la misma hora leída una sola vez (SCJ-PRO-14: "mismo
-    colchón/hora que SCJ-PRO-12"), cada uno con su propio id fijo + replace_existing=True."""
+    Los 3 batches comparten la misma hora leída una sola vez (SCJ-PRO-14: "mismo colchón/hora
+    que SCJ-PRO-12"; corte_quincenal reusa la misma por no existir un parámetro propio), cada
+    uno con su propio id fijo + replace_existing=True. corte_quincenal además sólo dispara los
+    días 1 y 16."""
     fake_scheduler = MagicMock()
 
     async def escenario():
@@ -52,15 +55,22 @@ def test_lifespan_arranca_ambos_jobs_a_la_misma_hora_y_apaga_el_scheduler():
         ):
             app_falso = MagicMock()
             async with lifespan(app_falso):
-                assert fake_scheduler.add_job.call_count == 2
-                ids_configurados = {
-                    llamada.kwargs["id"] for llamada in fake_scheduler.add_job.call_args_list
+                assert fake_scheduler.add_job.call_count == 3
+                llamadas_por_id = {
+                    llamada.kwargs["id"]: llamada for llamada in fake_scheduler.add_job.call_args_list
                 }
-                assert ids_configurados == {ID_JOB_BATCH_DE_CONFIANZA, ID_JOB_CIERRE_DIA}
-                for llamada in fake_scheduler.add_job.call_args_list:
+                assert set(llamadas_por_id) == {
+                    ID_JOB_BATCH_DE_CONFIANZA,
+                    ID_JOB_CIERRE_DIA,
+                    ID_JOB_CORTE_QUINCENAL,
+                }
+                for llamada in llamadas_por_id.values():
                     assert llamada.kwargs["replace_existing"] is True
                     assert llamada.kwargs["hour"] == 3
                     assert llamada.kwargs["minute"] == 0
+                assert llamadas_por_id[ID_JOB_CORTE_QUINCENAL].kwargs["day"] == "1,16"
+                assert "day" not in llamadas_por_id[ID_JOB_BATCH_DE_CONFIANZA].kwargs
+                assert "day" not in llamadas_por_id[ID_JOB_CIERRE_DIA].kwargs
                 fake_scheduler.start.assert_called_once()
                 fake_scheduler.shutdown.assert_not_called()
 
