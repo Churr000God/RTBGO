@@ -29,6 +29,7 @@ type EstadoCarga = "cargando" | "listo" | "error";
 // distinto de `codigo`, que es el valor real de tipo_batch en la base (con guion bajo).
 const TIPOS_BATCH_DISPARABLES: { codigo: string; ruta: string; etiqueta: string }[] = [
   { codigo: "de_confianza", ruta: "de-confianza", etiqueta: "Jornada de confianza" },
+  { codigo: "cierre_dia", ruta: "cierre-dia", etiqueta: "Cierre de día" },
 ];
 
 const ETIQUETA_TIPO_BATCH: Record<string, string> = {
