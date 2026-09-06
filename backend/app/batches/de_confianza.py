@@ -9,102 +9,19 @@ corrida_batch e idempotencia por persona (SCJ-PRO-14 §III/§V). Corre como serv
 proceso de sistema, no un caller humano sujeto a RLS."""
 
 import logging
-from datetime import date, datetime, timezone
+from datetime import date
 
 from postgrest.exceptions import APIError
 from supabase import Client
 
+from app.batches._orquestacion import finalizar_corrida, upsert_corrida_en_progreso
 from app.config import get_settings
 from app.deps import get_service_client
 
 UNIQUE_VIOLATION = "23505"
+TIPO_BATCH = "de_confianza"
 
 logger = logging.getLogger(__name__)
-
-
-def _releer_y_marcar_en_progreso(db: Client, fecha_iso: str, ahora: str) -> dict:
-    fila = (
-        db.postgrest.schema("tiempo")
-        .table("corrida_batch")
-        .select("id, intentos")
-        .eq("tipo_batch", "de_confianza")
-        .eq("fecha", fecha_iso)
-        .execute()
-        .data[0]
-    )
-    return (
-        db.postgrest.schema("tiempo")
-        .table("corrida_batch")
-        .update(
-            {
-                "estado": "en_progreso",
-                "intentos": fila["intentos"] + 1,
-                "iniciado_en": ahora,
-                "terminado_en": None,
-                "detalle": None,
-            }
-        )
-        .eq("id", fila["id"])
-        .execute()
-        .data[0]
-    )
-
-
-def _upsert_corrida_en_progreso(db: Client, fecha_iso: str) -> dict:
-    """UPSERT manual, no .upsert() de postgrest -- 'intentos' se incrementa sobre el valor
-    existente, algo que un upsert declarativo no puede expresar sin leer antes. Ventana de
-    carrera entre el SELECT y el INSERT (el job programado y el botón manual cayendo a la vez
-    para el mismo (tipo_batch, fecha)): si el INSERT revienta con 23505 sobre
-    uq_corrida_batch_tipo_fecha, releer y actualizar en vez de propagar un 500 crudo -- mismo
-    criterio que _crear_dia_si_no_existe."""
-    existente = (
-        db.postgrest.schema("tiempo")
-        .table("corrida_batch")
-        .select("id, intentos")
-        .eq("tipo_batch", "de_confianza")
-        .eq("fecha", fecha_iso)
-        .execute()
-        .data
-    )
-    ahora = datetime.now(timezone.utc).isoformat()
-    if existente:
-        fila = existente[0]
-        return (
-            db.postgrest.schema("tiempo")
-            .table("corrida_batch")
-            .update(
-                {
-                    "estado": "en_progreso",
-                    "intentos": fila["intentos"] + 1,
-                    "iniciado_en": ahora,
-                    "terminado_en": None,
-                    "detalle": None,
-                }
-            )
-            .eq("id", fila["id"])
-            .execute()
-            .data[0]
-        )
-    try:
-        return (
-            db.postgrest.schema("tiempo")
-            .table("corrida_batch")
-            .insert(
-                {
-                    "tipo_batch": "de_confianza",
-                    "fecha": fecha_iso,
-                    "estado": "en_progreso",
-                    "intentos": 1,
-                    "iniciado_en": ahora,
-                }
-            )
-            .execute()
-            .data[0]
-        )
-    except APIError as error:
-        if error.code == UNIQUE_VIOLATION:
-            return _releer_y_marcar_en_progreso(db, fecha_iso, ahora)
-        raise
 
 
 def _personas_de_confianza_vigentes(db: Client, fecha_iso: str) -> list[str]:
@@ -154,7 +71,7 @@ def ejecutar_batch_de_confianza(fecha: date, db: Client | None = None) -> dict:
         db = get_service_client(get_settings())
 
     fecha_iso = fecha.isoformat()
-    corrida = _upsert_corrida_en_progreso(db, fecha_iso)
+    corrida = upsert_corrida_en_progreso(db, TIPO_BATCH, fecha_iso)
 
     creados = 0
     ya_existian = 0
@@ -183,17 +100,4 @@ def ejecutar_batch_de_confianza(fecha: date, db: Client | None = None) -> dict:
         detalle = f"{creados} día(s) creado(s), {ya_existian} ya existían."
         estado_final = "exitosa"
 
-    return (
-        db.postgrest.schema("tiempo")
-        .table("corrida_batch")
-        .update(
-            {
-                "estado": estado_final,
-                "terminado_en": datetime.now(timezone.utc).isoformat(),
-                "detalle": detalle,
-            }
-        )
-        .eq("id", corrida["id"])
-        .execute()
-        .data[0]
-    )
+    return finalizar_corrida(db, corrida["id"], estado_final, detalle)

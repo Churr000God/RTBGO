@@ -1,9 +1,9 @@
 """API de tiempo.corrida_batch -- botón manual de los batches del subsistema Tiempo. SCJ-PRO-14
-(de_confianza) estrena el patrón; SCJ-PRO-12/13 (cierre_dia/corte_quincenal, Fase 4) lo van a
-reusar sin volver a diseñarlo.
+(de_confianza) estrenó el patrón; SCJ-PRO-12 (cierre_dia) lo reusa sin volver a diseñarlo;
+SCJ-PRO-13 (corte_quincenal, Fase 4) lo va a reusar también.
 
-El batch en sí corre con service_role (app/batches/de_confianza.py -- es un proceso de sistema,
-no un caller humano). Este endpoint sólo gatea el botón manual con permiso antes de invocarlo.
+Cada batch en sí corre con service_role (app/batches/*.py -- es un proceso de sistema, no un
+caller humano). Este router sólo gatea el botón manual con permiso antes de invocarlo.
 
 Gateado con corrida_batch_edicion (heredable, mapeado a Responsable de Recursos Humanos/Gerente
 General/Gerente o Encargado de TI -- confirmado y aplicado por db). No existía en el catálogo
@@ -16,6 +16,7 @@ from datetime import date
 from fastapi import APIRouter, Depends
 from supabase import Client
 
+from app.batches.cierre_dia import ejecutar_cierre_dia
 from app.batches.de_confianza import ejecutar_batch_de_confianza
 from app.deps import get_caller_client, get_service_client
 from app.permisos import requiere_permiso
@@ -55,3 +56,16 @@ def disparar_batch_de_confianza(
     del mismo día es seguro."""
     fecha_efectiva = datos.fecha or date.today()
     return ejecutar_batch_de_confianza(fecha_efectiva, db_servicio)
+
+
+@router.post("/cierre-dia", response_model=CorridaBatchOut)
+def disparar_cierre_dia(
+    datos: EjecutarBatchRequest = EjecutarBatchRequest(),
+    db_servicio: Client = Depends(get_service_client),
+    _permiso: None = Depends(requiere_permiso(CODIGO_PERMISO_BATCH)),
+) -> dict:
+    """SCJ-PRO-12 Z1: botón manual, misma invocación que el job programado -- ejecutar_cierre_dia
+    es idempotente por persona (tiempo.dia ya resuelto se salta), repetir la corrida del mismo
+    día es seguro."""
+    fecha_efectiva = datos.fecha or date.today()
+    return ejecutar_cierre_dia(fecha_efectiva, db_servicio)
