@@ -918,7 +918,8 @@ a.boton-con-icono {
   cursor: pointer;
 }
 
-.opcion-seleccionable input[type="radio"] {
+.opcion-seleccionable input[type="radio"],
+.opcion-seleccionable input[type="checkbox"] {
   width: auto;
   margin-top: 0.2rem;
 }

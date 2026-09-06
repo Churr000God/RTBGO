@@ -51,7 +51,15 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   { label: "Marcas", icono: Clock, disponible: false, items: [] },
-  { label: "Jornadas", icono: CalendarClock, disponible: false, items: [] },
+  {
+    label: "Jornadas",
+    icono: CalendarClock,
+    disponible: true,
+    items: [
+      { label: "Asignar jornada", href: "/tiempo/asignacion-jornada", disponible: true },
+      { label: "Corridas de batch", href: "/tiempo/corridas-batch", disponible: true },
+    ],
+  },
   { label: "Autorizaciones", icono: ShieldCheck, disponible: false, items: [] },
   { label: "Reportes", icono: BarChart3, disponible: false, items: [] },
   { label: "Configuración", icono: Settings, disponible: false, items: [] },
@@ -155,6 +163,9 @@ export function AppShell({ children }: Props) {
     }
     if (grupo.label === "Estructura organizacional") {
       return { ...grupo, disponible: sesion?.puede_ver_modulo_2 ?? true };
+    }
+    if (grupo.label === "Jornadas") {
+      return { ...grupo, disponible: sesion?.puede_ver_modulo_3 ?? true };
     }
     return grupo;
   });

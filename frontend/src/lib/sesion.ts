@@ -10,6 +10,7 @@ export type SesionOut = {
   motivo_bloqueo: string | null;
   puede_ver_modulo_1: boolean;
   puede_ver_modulo_2: boolean;
+  puede_ver_modulo_3: boolean;
 };
 
 let sesionEnVuelo: Promise<SesionOut> | null = null;

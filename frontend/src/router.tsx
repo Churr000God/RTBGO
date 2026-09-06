@@ -7,6 +7,7 @@ import { AltaPersonaPage } from "./pages/AltaPersonaPage";
 import { AltaPuestoPage } from "./pages/AltaPuestoPage";
 import { AltaUsuarioPage } from "./pages/AltaUsuarioPage";
 import { AsignacionesPage } from "./pages/AsignacionesPage";
+import { AsignarJornadaPage } from "./pages/AsignarJornadaPage";
 import { BitacoraAsignacionesPersonaPage } from "./pages/BitacoraAsignacionesPersonaPage";
 import { BitacoraMovimientosPage } from "./pages/BitacoraMovimientosPage";
 import { CambiarEstadoPage } from "./pages/CambiarEstadoPage";
@@ -25,6 +26,7 @@ import { FichaPuestoPage } from "./pages/FichaPuestoPage";
 import { LoginPage } from "./pages/LoginPage";
 import { OlvideContrasenaPage } from "./pages/OlvideContrasenaPage";
 import { OtorgarPermisoPage } from "./pages/OtorgarPermisoPage";
+import { PanelCorridasBatchPage } from "./pages/PanelCorridasBatchPage";
 import { PermisosPage } from "./pages/PermisosPage";
 import { RestablecerContrasenaPage } from "./pages/RestablecerContrasenaPage";
 import { RevocarPermisoPage } from "./pages/RevocarPermisoPage";
@@ -62,4 +64,6 @@ export const router = createBrowserRouter([
   { path: "/estructura/permisos", element: <PermisosPage /> },
   { path: "/estructura/permisos/otorgar", element: <OtorgarPermisoPage /> },
   { path: "/estructura/permisos/:id/revocar", element: <RevocarPermisoPage /> },
+  { path: "/tiempo/asignacion-jornada", element: <AsignarJornadaPage /> },
+  { path: "/tiempo/corridas-batch", element: <PanelCorridasBatchPage /> },
 ]);
