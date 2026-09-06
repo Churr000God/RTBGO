@@ -721,8 +721,11 @@ BEGIN
   END IF;
 
   -- fuera_de_horario: contra el patrón semanal vigente de esa fecha, con tolerancia de retardo.
-  -- Si la persona no tiene jornada vigente ese día (o el día no está en su patrón), no se evalúa
-  -- aquí — eso es un problema de asignación de jornada, no de esta marca.
+  -- Si la persona no tiene jornada vigente ese día, no se evalúa aquí — eso es un problema de
+  -- asignación de jornada, no de esta marca. Si sí tiene jornada vigente pero ese día de la
+  -- semana no tiene fila en patron_semanal, SÍ se evalúa: el EXISTS de abajo da false (no hay
+  -- ninguna fila con la que comparar) y eso marca fuera_de_horario, correctamente -- fichar un día
+  -- que el patrón no contempla es justo el caso que este motivo debe señalar.
   SELECT ja.id INTO v_jornada_id
   FROM tiempo.jornada_asignada ja
   WHERE ja.persona_id = NEW.persona_id
