@@ -11,13 +11,14 @@ idempotencia de reintentos (doble clic, reintento de red). NUNCA se genera acá.
 capturista_id ni ningún campo de quién capturó: ese dato vive en el esquema Operación, fuera de
 alcance (SCJ-ESP-01 §I.4 regla 4, mismo criterio que genera_alerta_horario en SCJ-PRO-09)."""
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from postgrest.exceptions import APIError
 from supabase import Client
 
 from app.deps import get_caller_client
+from app.dias_habiles import _dias_habiles_limite, _dias_habiles_transcurridos, _festivos_entre
 from app.permisos import requiere_permiso
 from app.schemas.marcas import (
     MarcaCapturaManualCreate,
@@ -35,6 +36,11 @@ VERSION_SOFTWARE = "0.1.0"  # SCJ-PRO-07 D1: "versión de la app web" -- la fija
 # backend/pyproject.toml -> [project].version.
 
 MENSAJE_PERSONA_INVALIDA = "La persona no existe."
+MENSAJE_MOMENTO_FUTURO = "La hora del dispositivo no puede ser futura."
+MENSAJE_VENTANA_VENCIDA = (
+    "La captura retroactiva sólo admite hasta {dias} día(s) hábil(es) hacia atrás -- esa hora "
+    "ya venció esa ventana."
+)
 
 
 def _validar_persona_existe(db: Client, persona_id: str) -> None:
@@ -58,7 +64,7 @@ def _buscar_marca_por_evento_id(db: Client, evento_id: str) -> dict | None:
     filas = (
         db.postgrest.schema("tiempo")
         .table("marca")
-        .select("id, evento_id, requiere_revision, momento_recepcion")
+        .select("id, evento_id, requiere_revision, momento_dispositivo, momento_recepcion")
         .eq("evento_id", evento_id)
         .execute()
         .data
@@ -86,21 +92,44 @@ def _armar_respuesta(db: Client, marca_fila: dict, duplicado: bool) -> dict:
     return {
         "evento_id": marca_fila["evento_id"],
         "duplicado": duplicado,
+        "momento_dispositivo": marca_fila["momento_dispositivo"],
         "momento_recepcion": marca_fila["momento_recepcion"],
         "requiere_revision": marca_fila["requiere_revision"],
         "motivos_revision": motivos,
     }
 
 
-def _desfase_local_servidor() -> str:
-    """Desfase UTC vigente del servidor, formato '+HH:MM'/'-HH:MM' (ck_marca_desfase_local) --
-    tomado de la zona horaria configurada en el proceso, no hardcodeado, para que un despliegue
-    en otra zona no quede mintiendo el desfase."""
-    offset = datetime.now().astimezone().utcoffset()
+def _desfase_local_en(momento: datetime) -> str:
+    """Desfase UTC vigente EN momento (no el de 'ahora'), formato '+HH:MM'/'-HH:MM'
+    (ck_marca_desfase_local) -- SCJ-CDT-01 §VII.1. astimezone() sin argumento resuelve el offset
+    real de la zona horaria del proceso para ESE instante puntual (no uno fijo cacheado al
+    arrancar), relevante si algún día vuelve el horario de verano -- hoy en México da lo mismo,
+    pero la firma correcta evita tener que migrar datos entonces."""
+    offset = momento.astimezone().utcoffset()
     total_minutos = int(offset.total_seconds() // 60)
     signo = "+" if total_minutos >= 0 else "-"
     horas, minutos = divmod(abs(total_minutos), 60)
     return f"{signo}{horas:02d}:{minutos:02d}"
+
+
+def _validar_momento_dispositivo(momento: datetime) -> None:
+    """Sólo corre cuando el caller manda una hora explícita (None = ahora, siempre válido). RLS
+    (db/ddl/61_*.sql) ya pone un techo duro de 90 días calendario -- esto da el mensaje legible
+    y la ventana fina en días hábiles, que RLS no puede calcular sin duplicar lógica de
+    tiempo.dia_festivo/tiempo.parametro en SQL (mismo reparto que correcciones.py)."""
+    ahora = datetime.now(timezone.utc)
+    if momento > ahora:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, MENSAJE_MOMENTO_FUTURO)
+
+    limite = _dias_habiles_limite()
+    hoy = date.today()
+    fecha_momento = momento.date()
+    festivos = _festivos_entre(fecha_momento, hoy)
+    transcurridos = _dias_habiles_transcurridos(fecha_momento, hoy, festivos)
+    if transcurridos > limite:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, MENSAJE_VENTANA_VENCIDA.format(dias=limite)
+        )
 
 
 def _resolver_nombres_persona(db: Client, persona_ids: list[str]) -> dict[str, str]:
@@ -117,6 +146,27 @@ def _resolver_nombres_persona(db: Client, persona_ids: list[str]) -> dict[str, s
         .data
     )
     return {fila["id"]: f"{fila['primer_nombre']} {fila['apellido_paterno']}" for fila in filas}
+
+
+def _resolver_motivos_por_marca(db: Client, marca_ids: list[int]) -> dict[int, list[str]]:
+    """Mismo patrón y mismo criterio de "no consultar si no hace falta" que
+    _resolver_nombres_persona -- una sola consulta batch, nada si ninguna marca de la página
+    requiere revisión."""
+    if not marca_ids:
+        return {}
+    filas = (
+        db.postgrest.schema("tiempo")
+        .table("excepcion")
+        .select("marca_id, motivo_revision")
+        .in_("marca_id", marca_ids)
+        .order("id")
+        .execute()
+        .data
+    )
+    motivos: dict[int, list[str]] = {}
+    for fila in filas:
+        motivos.setdefault(fila["marca_id"], []).append(fila["motivo_revision"])
+    return motivos
 
 
 @router.get("", response_model=MarcaListaOut)
@@ -157,8 +207,17 @@ def listar_marcas(
     )
 
     nombres = _resolver_nombres_persona(db, sorted({fila["persona_id"] for fila in resultado.data}))
+    ids_con_revision = sorted(
+        {fila["id"] for fila in resultado.data if fila["requiere_revision"]}
+    )
+    motivos = _resolver_motivos_por_marca(db, ids_con_revision)
     marcas = [
-        {**fila, "persona_nombre": nombres.get(fila["persona_id"])} for fila in resultado.data
+        {
+            **fila,
+            "persona_nombre": nombres.get(fila["persona_id"]),
+            "motivos_revision": motivos.get(fila["id"], []),
+        }
+        for fila in resultado.data
     ]
     return {"total": resultado.count, "marcas": marcas}
 
@@ -181,7 +240,14 @@ def captura_manual(
 
     _validar_persona_existe(db, datos.persona_id)
 
-    ahora_iso = datetime.now(timezone.utc).isoformat()
+    ahora = datetime.now(timezone.utc)
+    if datos.momento_dispositivo is None:
+        momento_dispositivo = ahora
+    else:
+        momento_dispositivo = datos.momento_dispositivo
+        if momento_dispositivo.tzinfo is None:
+            momento_dispositivo = momento_dispositivo.replace(tzinfo=timezone.utc)
+        _validar_momento_dispositivo(momento_dispositivo)
 
     try:
         db.postgrest.schema("tiempo").table("marca").insert(
@@ -190,11 +256,9 @@ def captura_manual(
                 "persona_id": datos.persona_id,
                 "terminal_id": datos.terminal_id,
                 "secuencia_local": None,
-                # Misma marca de tiempo tomada una sola vez -- momento_dispositivo y
-                # momento_recepcion no pueden divergir en captura manual (SCJ-PRO-07 D1).
-                "momento_dispositivo": ahora_iso,
-                "momento_recepcion": ahora_iso,
-                "desfase_local": _desfase_local_servidor(),
+                "momento_dispositivo": momento_dispositivo.isoformat(),
+                "momento_recepcion": ahora.isoformat(),
+                "desfase_local": _desfase_local_en(momento_dispositivo),
                 "estado_reloj": "sincronizado",
                 "version_software": VERSION_SOFTWARE,
                 "origen": "captura_manual",

@@ -1,10 +1,17 @@
-from unittest.mock import MagicMock
+from datetime import datetime, timedelta, timezone
+from unittest.mock import MagicMock, patch
 
+import pytest
 from fastapi.testclient import TestClient
 from postgrest.exceptions import APIError
 
 from app.deps import CallerIdentity, get_caller_client, get_caller_identity
 from app.main import app
+from app.routers.marcas import (
+    MENSAJE_MOMENTO_FUTURO,
+    MENSAJE_VENTANA_VENCIDA,
+    _desfase_local_en,
+)
 
 EVENTO_ID = "11111111-1111-1111-1111-111111111111"
 PERSONA_ID = "aaaaaaaa-0000-0000-0000-000000000001"
@@ -78,6 +85,48 @@ def _tabla_in(datos):
     return tabla
 
 
+def _tabla_in_order(datos):
+    tabla = MagicMock()
+    tabla.select.return_value.in_.return_value.order.return_value.execute.return_value.data = datos
+    return tabla
+
+
+def _fake_service_client_config(limite_valor: str | None = None, festivos: list | None = None):
+    """tiempo.parametro/tiempo.dia_festivo -- config global que _validar_momento_dispositivo lee
+    con service_role vía app/dias_habiles.py (helper compartido con routers/correcciones.py).
+    Mismo fake que tests/test_correcciones.py, sin él get_service_client(get_settings())
+    pegaría contra el Supabase real de .env."""
+    fake = MagicMock()
+    tabla_parametro = MagicMock()
+    (
+        tabla_parametro.select.return_value.eq.return_value.lte.return_value.order.return_value
+        .limit.return_value.execute.return_value.data
+    ) = [{"valor": limite_valor}] if limite_valor is not None else []
+    tabla_festivo = MagicMock()
+    tabla_festivo.select.return_value.gte.return_value.lte.return_value.execute.return_value.data = (
+        festivos or []
+    )
+
+    def table_side_effect(nombre):
+        return {"parametro": tabla_parametro, "dia_festivo": tabla_festivo}[nombre]
+
+    fake.postgrest.schema.return_value.table.side_effect = table_side_effect
+    return fake
+
+
+@pytest.fixture(autouse=True)
+def _sin_red_real_para_ventana():
+    """Autouse: sólo entra en juego cuando el test manda momento_dispositivo explícito (None se
+    resuelve a ahora() sin pasar por _validar_momento_dispositivo). Por defecto cae al valor de
+    ejemplo (30 días hábiles) sin festivos -- los tests que necesiten otro valor usan su propio
+    `with patch(...)` puntual."""
+    with patch(
+        "app.dias_habiles.get_service_client",
+        return_value=_fake_service_client_config(),
+    ):
+        yield
+
+
 def _tabla_marca_insert():
     tabla = MagicMock()
     tabla.insert.return_value.execute.return_value.data = [{}]
@@ -123,6 +172,7 @@ def _fila_marca(**overrides):
         "id": MARCA_ID,
         "evento_id": EVENTO_ID,
         "requiere_revision": False,
+        "momento_dispositivo": "2026-09-06T12:00:00+00:00",
         "momento_recepcion": "2026-09-06T12:00:00+00:00",
     }
     fila.update(overrides)
@@ -370,3 +420,126 @@ def test_captura_manual_terminal_id_vacio_devuelve_422_sin_llegar_a_bd():
 
     app.dependency_overrides.clear()
     assert response.status_code == 422
+
+
+def test_captura_manual_con_hora_pasada_valida_se_persiste_tal_cual():
+    """El instante que declara el dispositivo no se pisa con now() -- SCJ-CDT-01 §VII.3."""
+    momento = datetime.now(timezone.utc) - timedelta(hours=2)
+    momento_iso = momento.isoformat()
+    tabla_insert = _tabla_marca_insert()
+    fake_client = _fake_client_secuencia(
+        _entradas_gate()
+        + [
+            ("marca", _tabla_marca_select([])),
+            ("persona", _tabla_select_simple([{"id": PERSONA_ID}])),
+            ("marca", tabla_insert),
+            (
+                "marca",
+                _tabla_marca_select([_fila_marca(momento_dispositivo=momento_iso)]),
+            ),
+        ]
+    )
+    app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
+
+    client = TestClient(app)
+    response = client.post(
+        "/api/marcas/captura-manual",
+        json=_payload(momento_dispositivo=momento_iso),
+        headers={"Authorization": "Bearer fake-token"},
+    )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 201, response.text
+    cuerpo = response.json()
+    assert datetime.fromisoformat(cuerpo["momento_dispositivo"].replace("Z", "+00:00")) == momento
+
+    insertado = tabla_insert.insert.call_args.args[0]
+    assert insertado["momento_dispositivo"] == momento_iso
+    assert insertado["desfase_local"] == _desfase_local_en(momento)
+    assert insertado["momento_recepcion"] != momento_iso
+
+
+def test_captura_manual_momento_dispositivo_futuro_devuelve_422():
+    momento_futuro = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
+    fake_client = _fake_client_secuencia(
+        _entradas_gate()
+        + [
+            ("marca", _tabla_marca_select([])),
+            ("persona", _tabla_select_simple([{"id": PERSONA_ID}])),
+        ]
+    )
+    app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
+
+    client = TestClient(app)
+    response = client.post(
+        "/api/marcas/captura-manual",
+        json=_payload(momento_dispositivo=momento_futuro),
+        headers={"Authorization": "Bearer fake-token"},
+    )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 422
+    assert response.json()["detail"] == MENSAJE_MOMENTO_FUTURO
+
+
+def test_captura_manual_momento_dispositivo_fuera_de_ventana_dias_habiles_devuelve_422():
+    """Fixture autouse cae al valor de ejemplo (30 días hábiles) -- 100 días de por medio lo
+    supera de sobra, mismo criterio que test_correcciones.py::test_corregir_marca_ventana_vencida
+    _devuelve_422."""
+    hace_100_dias = (datetime.now(timezone.utc) - timedelta(days=100)).isoformat()
+    fake_client = _fake_client_secuencia(
+        _entradas_gate()
+        + [
+            ("marca", _tabla_marca_select([])),
+            ("persona", _tabla_select_simple([{"id": PERSONA_ID}])),
+        ]
+    )
+    app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
+
+    client = TestClient(app)
+    response = client.post(
+        "/api/marcas/captura-manual",
+        json=_payload(momento_dispositivo=hace_100_dias),
+        headers={"Authorization": "Bearer fake-token"},
+    )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 422
+    assert response.json()["detail"] == MENSAJE_VENTANA_VENCIDA.format(dias=30)
+
+
+def test_listar_marcas_con_revision_trae_motivos_desde_excepcion():
+    fake_client = _fake_client_secuencia(
+        _entradas_gate()
+        + [
+            (
+                "marca",
+                _tabla_marca_lista(
+                    [_fila_marca_lista(requiere_revision=True)], total=1
+                ),
+            ),
+            (
+                "persona",
+                _tabla_in([{"id": PERSONA_ID, "primer_nombre": "Ana", "apellido_paterno": "Pérez"}]),
+            ),
+            (
+                "excepcion",
+                _tabla_in_order(
+                    [{"marca_id": MARCA_ID, "motivo_revision": "persona_inactiva"}]
+                ),
+            ),
+        ]
+    )
+    app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
+
+    client = TestClient(app)
+    response = client.get("/api/marcas", headers={"Authorization": "Bearer fake-token"})
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200, response.text
+    cuerpo = response.json()
+    assert cuerpo["marcas"][0]["motivos_revision"] == ["persona_inactiva"]

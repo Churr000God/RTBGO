@@ -40,11 +40,11 @@ from postgrest.exceptions import APIError
 from supabase import Client
 
 from app.batches._orquestacion import finalizar_corrida, upsert_corrida_en_progreso
+from app.catalogo_motivos_revision import MOTIVO_PARIDAD_IMPAR
 from app.config import get_settings
 from app.deps import get_service_client
 
 TIPO_BATCH = "cierre_dia"
-MOTIVO_PARIDAD_IMPAR = "paridad_impar"
 DOMINGO = 6  # date.weekday(): lunes=0 ... domingo=6
 UNIQUE_VIOLATION = "23505"
 

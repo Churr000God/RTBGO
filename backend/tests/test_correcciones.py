@@ -11,9 +11,9 @@ from app.main import app
 
 def _fake_service_client_config(limite_valor: str | None = None, festivos: list | None = None):
     """tiempo.parametro/tiempo.dia_festivo -- config global que _validar_ventana lee con
-    service_role (app/routers/correcciones.py). Sin este fake, get_service_client(get_settings())
-    construiría un cliente real contra el Supabase de .env y pegaría de verdad -- CLAUDE.md exige
-    que ningún test lo haga."""
+    service_role vía app/dias_habiles.py (helper compartido con routers/marcas.py). Sin este
+    fake, get_service_client(get_settings()) construiría un cliente real contra el Supabase de
+    .env y pegaría de verdad -- CLAUDE.md exige que ningún test lo haga."""
     fake = MagicMock()
     tabla_parametro = MagicMock()
     (
@@ -40,7 +40,7 @@ def _sin_red_real_para_ventana():
     test golpee Supabase real. Los tests que necesiten un valor/festivos específicos usan su
     propio `with patch(...)` puntual, que sobreescribe este durante su alcance."""
     with patch(
-        "app.routers.correcciones.get_service_client",
+        "app.dias_habiles.get_service_client",
         return_value=_fake_service_client_config(),
     ):
         yield

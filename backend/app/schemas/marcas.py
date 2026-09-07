@@ -7,6 +7,7 @@ class MarcaCapturaManualCreate(BaseModel):
     evento_id: str  # UUID v4, generado por el frontend al montar el formulario (SCJ-ESP-01 §VII.4)
     persona_id: str
     terminal_id: str  # punto de captura (ej. "rh-captura-01"), no un aparato físico
+    momento_dispositivo: datetime | None = None  # None = comportamiento actual, ahora
 
     @field_validator("terminal_id")
     @classmethod
@@ -20,6 +21,7 @@ class MarcaCapturaManualCreate(BaseModel):
 class MarcaCapturaManualOut(BaseModel):
     evento_id: str
     duplicado: bool
+    momento_dispositivo: datetime
     momento_recepcion: datetime
     requiere_revision: bool
     motivos_revision: list[str]
@@ -39,6 +41,7 @@ class MarcaListaItem(BaseModel):
     version_software: str
     origen: str
     requiere_revision: bool
+    motivos_revision: list[str]
 
 
 class MarcaListaOut(BaseModel):
