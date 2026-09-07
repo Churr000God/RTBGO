@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -78,7 +78,9 @@ describe("PanelCorridasBatchPage", () => {
 
     render(<PanelCorridasBatchPage />);
 
-    await waitFor(() => expect(screen.getByText("Jornada de confianza")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(within(screen.getByRole("table")).getByText("Jornada de confianza")).toBeInTheDocument(),
+    );
     expect(screen.getByText("2026-09-06")).toBeInTheDocument();
     expect(screen.getByText("Exitosa")).toBeInTheDocument();
     expect(screen.getByText("1 día(s) creado(s), 0 ya existían.")).toBeInTheDocument();
@@ -98,7 +100,9 @@ describe("PanelCorridasBatchPage", () => {
     mockApiFetch({});
 
     render(<PanelCorridasBatchPage />);
-    await waitFor(() => expect(screen.getByText("Jornada de confianza")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(within(screen.getByRole("table")).getByText("Jornada de confianza")).toBeInTheDocument(),
+    );
 
     await userEvent.click(screen.getByRole("button", { name: /disparar jornada de confianza/i }));
 
@@ -124,7 +128,9 @@ describe("PanelCorridasBatchPage", () => {
     });
 
     render(<PanelCorridasBatchPage />);
-    await waitFor(() => expect(screen.getByText("Jornada de confianza")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(within(screen.getByRole("table")).getByText("Jornada de confianza")).toBeInTheDocument(),
+    );
 
     await userEvent.click(screen.getByRole("button", { name: /disparar jornada de confianza/i }));
 
@@ -164,7 +170,9 @@ describe("PanelCorridasBatchPage", () => {
     });
 
     render(<PanelCorridasBatchPage />);
-    await waitFor(() => expect(screen.getByText("Corte quincenal")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(within(screen.getByRole("table")).getByText("Corte quincenal")).toBeInTheDocument(),
+    );
 
     await userEvent.click(screen.getByRole("button", { name: /disparar corte quincenal/i }));
 

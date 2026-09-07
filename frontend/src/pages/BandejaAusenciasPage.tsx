@@ -1,11 +1,12 @@
-import { useEffect, useState } from "react";
-import { AlertCircle, Check, Loader2, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { AlertCircle, Check, Loader2, Search, X } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
 import { Badge } from "../components/Badge";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { Input } from "../components/Input";
 
 type TipoAusenciaReclasificable =
   | "vacaciones"
@@ -24,6 +25,15 @@ type Ausencia = {
 };
 
 type EstadoCarga = "cargando" | "listo" | "error";
+
+type Orden = "fecha_desc" | "fecha_asc" | "persona_asc";
+
+function normalizar(texto: string): string {
+  return texto
+    .normalize("NFD")
+    .replace(new RegExp("[\\u0300-\\u036f]", "g"), "")
+    .toLowerCase();
+}
 
 const OPCIONES_RECLASIFICACION: { valor: TipoAusenciaReclasificable; etiqueta: string }[] = [
   { valor: "vacaciones", etiqueta: "Vacaciones" },
@@ -160,6 +170,10 @@ function FilaAusencia({ ausencia, onResuelta }: PropsFila) {
 export function BandejaAusenciasPage() {
   const [ausencias, setAusencias] = useState<Ausencia[]>([]);
   const [estadoCarga, setEstadoCarga] = useState<EstadoCarga>("cargando");
+  const [busqueda, setBusqueda] = useState("");
+  const [filtroDesde, setFiltroDesde] = useState("");
+  const [filtroHasta, setFiltroHasta] = useState("");
+  const [orden, setOrden] = useState<Orden>("fecha_desc");
 
   function cargar() {
     setEstadoCarga("cargando");
@@ -180,6 +194,32 @@ export function BandejaAusenciasPage() {
   useEffect(() => {
     cargar();
   }, []);
+
+  const filtradas = useMemo(() => {
+    const consulta = normalizar(busqueda.trim());
+    const desde = filtroDesde ? new Date(`${filtroDesde}T00:00:00`) : null;
+    const hasta = filtroHasta ? new Date(`${filtroHasta}T00:00:00`) : null;
+
+    const resultado = ausencias.filter((ausencia) => {
+      const coincideBusqueda = !consulta || normalizar(ausencia.persona_nombre ?? "").includes(consulta);
+      const fechaInicio = new Date(`${ausencia.fecha_inicio}T00:00:00`);
+      const coincideDesde = !desde || fechaInicio >= desde;
+      const coincideHasta = !hasta || fechaInicio <= hasta;
+      return coincideBusqueda && coincideDesde && coincideHasta;
+    });
+
+    return resultado.sort((a, b) => {
+      switch (orden) {
+        case "fecha_asc":
+          return a.fecha_inicio.localeCompare(b.fecha_inicio);
+        case "persona_asc":
+          return (a.persona_nombre ?? "").localeCompare(b.persona_nombre ?? "");
+        case "fecha_desc":
+        default:
+          return b.fecha_inicio.localeCompare(a.fecha_inicio);
+      }
+    });
+  }, [ausencias, busqueda, filtroDesde, filtroHasta, orden]);
 
   return (
     <AppShell>
@@ -223,11 +263,70 @@ export function BandejaAusenciasPage() {
         )}
 
         {estadoCarga === "listo" && ausencias.length > 0 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-            {ausencias.map((ausencia) => (
-              <FilaAusencia key={ausencia.id} ausencia={ausencia} onResuelta={cargar} />
-            ))}
-          </div>
+          <>
+            <div className="banda-metricas">
+              <div className="metrica">
+                <span className="etiqueta-metrica">
+                  <span className="punto punto--aviso" aria-hidden="true" />
+                  Pendientes de resolver
+                </span>
+                <strong>{ausencias.length}</strong>
+                <span className="detalle-metrica">
+                  {ausencias.length === 1 ? "falta detectada" : "faltas detectadas"}
+                </span>
+              </div>
+            </div>
+
+            <div className="barra-filtros">
+              <div className="campo-con-icono">
+                <Search size={16} className="icono-campo" aria-hidden="true" />
+                <input
+                  type="search"
+                  placeholder="Buscar por persona"
+                  value={busqueda}
+                  onChange={(evento) => setBusqueda(evento.target.value)}
+                  aria-label="Buscar por persona"
+                />
+              </div>
+              <div className="grupo-filtros-secundarios">
+                <Input
+                  id="filtro-inicio-desde"
+                  label="Desde"
+                  type="date"
+                  value={filtroDesde}
+                  onChange={(evento) => setFiltroDesde(evento.target.value)}
+                />
+                <Input
+                  id="filtro-inicio-hasta"
+                  label="Hasta"
+                  type="date"
+                  value={filtroHasta}
+                  onChange={(evento) => setFiltroHasta(evento.target.value)}
+                />
+                <select
+                  value={orden}
+                  onChange={(evento) => setOrden(evento.target.value as Orden)}
+                  aria-label="Ordenar por"
+                >
+                  <option value="fecha_desc">Fecha: más recientes primero</option>
+                  <option value="fecha_asc">Fecha: más antiguas primero</option>
+                  <option value="persona_asc">Persona (A-Z)</option>
+                </select>
+              </div>
+            </div>
+
+            {filtradas.length === 0 ? (
+              <div className="estado-vacio">
+                <p>Ninguna ausencia coincide con la búsqueda.</p>
+              </div>
+            ) : (
+              <div className="pila-tarjetas">
+                {filtradas.map((ausencia) => (
+                  <FilaAusencia key={ausencia.id} ausencia={ausencia} onResuelta={cargar} />
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
     </AppShell>

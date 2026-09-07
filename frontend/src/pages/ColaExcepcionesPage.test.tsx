@@ -1,4 +1,5 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { apiFetch } from "../lib/apiClient";
@@ -58,12 +59,40 @@ describe("ColaExcepcionesPage", () => {
     render(<ColaExcepcionesPage />);
 
     await waitFor(() => expect(screen.getByText("Persona Ficticia")).toBeInTheDocument());
-    expect(screen.getByText("fuera_de_horario")).toBeInTheDocument();
+    expect(within(screen.getByRole("table")).getByText("Fuera de horario")).toBeInTheDocument();
     expect(screen.queryByText("dia_sin_marca")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: /corregir/i })).toHaveAttribute(
       "href",
       "/tiempo/excepciones/1/corregir",
     );
+  });
+
+  it("filtra por persona y ordena por motivo", async () => {
+    mockApiFetch(
+      new Response(
+        JSON.stringify([
+          ...EXCEPCIONES,
+          {
+            id: 3,
+            marca_id: 30,
+            dia_id: null,
+            motivo_revision: "persona_inactiva",
+            estado: "pendiente",
+            creado_en: "2026-09-07T09:00:00Z",
+            persona_nombre: "Otra Persona",
+            momento_dispositivo: "2026-09-07T09:00:00Z",
+          },
+        ]),
+      ),
+    );
+
+    render(<ColaExcepcionesPage />);
+    const tabla = await screen.findByRole("table");
+    expect(within(tabla).getAllByRole("row")).toHaveLength(3); // encabezado + 2 filas
+
+    await userEvent.type(screen.getByLabelText(/buscar por persona/i), "otra");
+    await waitFor(() => expect(within(tabla).getAllByRole("row")).toHaveLength(2));
+    expect(within(tabla).getByText("Otra Persona")).toBeInTheDocument();
   });
 
   it("muestra estado vacío cuando no hay excepciones pendientes", async () => {

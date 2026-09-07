@@ -1,5 +1,13 @@
-import { useEffect, useState } from "react";
-import { AlertCircle, Loader2, PlayCircle } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  AlertCircle,
+  CalendarCheck2,
+  Landmark,
+  Loader2,
+  PlayCircle,
+  ShieldCheck,
+  type LucideIcon,
+} from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
@@ -27,10 +35,34 @@ type EstadoCarga = "cargando" | "listo" | "error";
 // tipo_batch presente en la respuesta sin cambios.
 // `ruta` es el slug con guiones del endpoint (POST /api/corridas-batch/de-confianza) —
 // distinto de `codigo`, que es el valor real de tipo_batch en la base (con guion bajo).
-const TIPOS_BATCH_DISPARABLES: { codigo: string; ruta: string; etiqueta: string }[] = [
-  { codigo: "de_confianza", ruta: "de-confianza", etiqueta: "Jornada de confianza" },
-  { codigo: "cierre_dia", ruta: "cierre-dia", etiqueta: "Cierre de día" },
-  { codigo: "corte_quincenal", ruta: "corte-quincenal", etiqueta: "Corte quincenal" },
+const TIPOS_BATCH_DISPARABLES: {
+  codigo: string;
+  ruta: string;
+  etiqueta: string;
+  descripcion: string;
+  icono: LucideIcon;
+}[] = [
+  {
+    codigo: "de_confianza",
+    ruta: "de-confianza",
+    etiqueta: "Jornada de confianza",
+    descripcion: "Cierra el día de quienes tienen jornada de confianza — sin marca que validar.",
+    icono: ShieldCheck,
+  },
+  {
+    codigo: "cierre_dia",
+    ruta: "cierre-dia",
+    etiqueta: "Cierre de día",
+    descripcion: "Calcula horas trabajadas y detecta faltas del día anterior, por persona.",
+    icono: CalendarCheck2,
+  },
+  {
+    codigo: "corte_quincenal",
+    ruta: "corte-quincenal",
+    etiqueta: "Corte quincenal",
+    descripcion: "Aplica el saldo del periodo al banco de horas de cada persona.",
+    icono: Landmark,
+  },
 ];
 
 const ETIQUETA_TIPO_BATCH: Record<string, string> = {
@@ -119,6 +151,16 @@ export function PanelCorridasBatchPage() {
 
   const corridasOrdenadas = [...corridas].sort((a, b) => b.fecha.localeCompare(a.fecha));
 
+  const metricas = useMemo(
+    () => ({
+      total: corridas.length,
+      exitosas: corridas.filter((c) => c.estado === "exitosa").length,
+      fallidas: corridas.filter((c) => c.estado === "fallida").length,
+      enProgreso: corridas.filter((c) => c.estado === "en_progreso").length,
+    }),
+    [corridas],
+  );
+
   return (
     <AppShell>
       <div className="contenedor-pagina contenedor-pagina--ancho">
@@ -134,20 +176,57 @@ export function PanelCorridasBatchPage() {
           </div>
         </div>
 
-        <div className="botonera" style={{ justifyContent: "flex-start", flexWrap: "wrap" }}>
-          {TIPOS_BATCH_DISPARABLES.map(({ codigo, ruta, etiqueta }) => (
-            <Button
-              key={codigo}
-              type="button"
-              variante="primario"
-              icono={PlayCircle}
-              posicionIcono="izquierda"
-              cargando={disparando === codigo}
-              textoCargando="Disparando…"
-              onClick={() => dispararBatch(codigo, ruta)}
-            >
-              Disparar {etiqueta}
-            </Button>
+        {estadoCarga === "listo" && corridas.length > 0 && (
+          <div className="banda-metricas">
+            <div className="metrica">
+              <span className="etiqueta-metrica">Corridas registradas</span>
+              <strong>{metricas.total}</strong>
+            </div>
+            <div className="metrica">
+              <span className="etiqueta-metrica">
+                <span className="punto punto--exito" aria-hidden="true" />
+                Exitosas
+              </span>
+              <strong>{metricas.exitosas}</strong>
+            </div>
+            <div className="metrica">
+              <span className="etiqueta-metrica">
+                <span className="punto punto--aviso" aria-hidden="true" />
+                En progreso
+              </span>
+              <strong>{metricas.enProgreso}</strong>
+            </div>
+            <div className="metrica">
+              <span className="etiqueta-metrica">
+                <span className="punto punto--peligro" aria-hidden="true" />
+                Fallidas
+              </span>
+              <strong>{metricas.fallidas}</strong>
+            </div>
+          </div>
+        )}
+
+        <div className="rejilla-acciones">
+          {TIPOS_BATCH_DISPARABLES.map(({ codigo, ruta, etiqueta, descripcion, icono: Icono }) => (
+            <div className="tarjeta-accion" key={codigo}>
+              <span className="icono-seccion">
+                <Icono size={20} aria-hidden="true" />
+              </span>
+              <strong>{etiqueta}</strong>
+              <p>{descripcion}</p>
+              <Button
+                type="button"
+                variante="primario"
+                icono={PlayCircle}
+                posicionIcono="izquierda"
+                cargando={disparando === codigo}
+                textoCargando="Disparando…"
+                aria-label={`Disparar ${etiqueta}`}
+                onClick={() => dispararBatch(codigo, ruta)}
+              >
+                Disparar
+              </Button>
+            </div>
           ))}
         </div>
 

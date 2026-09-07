@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -52,10 +52,11 @@ describe("BancoDeHorasPage", () => {
 
     render(<BancoDeHorasPage />);
 
-    await waitFor(() => expect(screen.getByText("Persona Endeudada")).toBeInTheDocument());
-    expect(screen.getByText("4.50 h en deuda")).toBeInTheDocument();
-    expect(screen.getByText("Persona Al Corriente")).toBeInTheDocument();
-    expect(screen.getByText("0.00 h sin deuda")).toBeInTheDocument();
+    const tabla = await screen.findByRole("table");
+    await waitFor(() => expect(within(tabla).getByText("Persona Endeudada")).toBeInTheDocument());
+    expect(within(tabla).getByText("4.50 h en deuda")).toBeInTheDocument();
+    expect(within(tabla).getByText("Persona Al Corriente")).toBeInTheDocument();
+    expect(within(tabla).getByText("0.00 h sin deuda")).toBeInTheDocument();
     expect(screen.getByText(/mostrando 2 de 2 personas/i)).toBeInTheDocument();
   });
 
@@ -63,12 +64,13 @@ describe("BancoDeHorasPage", () => {
     mockApiFetch();
 
     render(<BancoDeHorasPage />);
-    await waitFor(() => expect(screen.getByText("Persona Endeudada")).toBeInTheDocument());
+    const tabla = await screen.findByRole("table");
+    await waitFor(() => expect(within(tabla).getByText("Persona Endeudada")).toBeInTheDocument());
 
     await userEvent.type(screen.getByLabelText(/buscar por nombre/i), "endeudada");
 
-    expect(screen.getByText("Persona Endeudada")).toBeInTheDocument();
-    expect(screen.queryByText("Persona Al Corriente")).not.toBeInTheDocument();
+    expect(within(tabla).getByText("Persona Endeudada")).toBeInTheDocument();
+    expect(within(tabla).queryByText("Persona Al Corriente")).not.toBeInTheDocument();
     expect(screen.getByText(/mostrando 1 de 2 personas/i)).toBeInTheDocument();
   });
 
@@ -76,13 +78,29 @@ describe("BancoDeHorasPage", () => {
     mockApiFetch();
 
     render(<BancoDeHorasPage />);
-    await waitFor(() => expect(screen.getByText("Persona Endeudada")).toBeInTheDocument());
+    const tabla = await screen.findByRole("table");
+    await waitFor(() => expect(within(tabla).getByText("Persona Endeudada")).toBeInTheDocument());
 
     await userEvent.type(screen.getByLabelText(/buscar por nombre/i), "nadie-existe");
 
     await waitFor(() =>
       expect(screen.getByText(/no hay saldos que coincidan con la búsqueda/i)).toBeInTheDocument(),
     );
+  });
+
+  it("muestra el top en deuda con gráfica de barras y la lista de personas sin deuda", async () => {
+    mockApiFetch();
+
+    render(<BancoDeHorasPage />);
+
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "Top en deuda" })).toBeInTheDocument(),
+    );
+    expect(screen.getByRole("heading", { name: "Sin deuda" })).toBeInTheDocument();
+    // "Persona Endeudada" aparece en la barra de la gráfica y también en la tabla — alcanza con
+    // que exista al menos una vez fuera de la tabla (la barra) para confirmar que se armó.
+    const tabla = screen.getByRole("table");
+    expect(within(tabla).getByText("Persona Al Corriente")).toBeInTheDocument();
   });
 
   it("muestra el estado de error cuando falla la carga", async () => {

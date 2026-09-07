@@ -15,6 +15,10 @@ type BancoHoras = {
 
 type EstadoCarga = "cargando" | "listo" | "error";
 
+// Top N de la gráfica de deuda — suficiente para ver quién concentra más horas sin abrumar la
+// pantalla con una barra por persona si el padrón crece.
+const TOPE_GRAFICA_DEUDA = 8;
+
 function normalizar(texto: string): string {
   return texto
     .normalize("NFD")
@@ -64,6 +68,27 @@ export function BancoDeHorasPage() {
     return saldos.filter((s) => normalizar(s.persona_nombre ?? "").includes(consulta));
   }, [saldos, busqueda]);
 
+  const metricas = useMemo(() => {
+    const enDeuda = saldos.filter((s) => s.monto > 0);
+    return {
+      totalPersonas: saldos.length,
+      enDeuda: enDeuda.length,
+      sinDeuda: saldos.length - enDeuda.length,
+      horasAdeudadas: enDeuda.reduce((suma, s) => suma + s.monto, 0),
+    };
+  }, [saldos]);
+
+  // "Sin saldo a favor" (subtítulo de la página) => sin deuda es siempre monto=0 para todos —
+  // no hay una magnitud que rankear ahí, por eso ese grupo se muestra como lista, no como barras
+  // (una barra sin longitud no comunica nada). El ranking con barras sólo tiene sentido para
+  // quienes sí tienen deuda, donde el monto sí varía persona a persona.
+  const topEnDeuda = useMemo(
+    () => [...saldos].filter((s) => s.monto > 0).sort((a, b) => b.monto - a.monto).slice(0, TOPE_GRAFICA_DEUDA),
+    [saldos],
+  );
+  const montoMaximoEnDeuda = topEnDeuda[0]?.monto ?? 0;
+  const sinDeuda = useMemo(() => saldos.filter((s) => s.monto === 0), [saldos]);
+
   return (
     <AppShell>
       <div className="contenedor-pagina contenedor-pagina--ancho">
@@ -78,6 +103,74 @@ export function BancoDeHorasPage() {
             </p>
           </div>
         </div>
+
+        {estadoCarga === "listo" && saldos.length > 0 && (
+          <div className="banda-metricas">
+            <div className="metrica">
+              <span className="etiqueta-metrica">Personas con saldo</span>
+              <strong>{metricas.totalPersonas}</strong>
+            </div>
+            <div className="metrica">
+              <span className="etiqueta-metrica">
+                <span className="punto punto--peligro" aria-hidden="true" />
+                En deuda
+              </span>
+              <strong>{metricas.enDeuda}</strong>
+              <span className="detalle-metrica">{metricas.horasAdeudadas.toFixed(2)} h acumuladas</span>
+            </div>
+            <div className="metrica">
+              <span className="etiqueta-metrica">
+                <span className="punto punto--exito" aria-hidden="true" />
+                Sin deuda
+              </span>
+              <strong>{metricas.sinDeuda}</strong>
+            </div>
+          </div>
+        )}
+
+        {estadoCarga === "listo" && saldos.length > 0 && (
+          <div className="rejilla-tarjetas">
+            <div className="tarjeta-resumen">
+              <h3>Top en deuda</h3>
+              {topEnDeuda.length === 0 ? (
+                <p>Nadie tiene horas en deuda ahora mismo.</p>
+              ) : (
+                <div className="grafica-barras">
+                  {topEnDeuda.map((saldo) => (
+                    <div className="fila-grafica-barras" key={saldo.persona_id}>
+                      <span className="etiqueta-barra">{saldo.persona_nombre ?? "—"}</span>
+                      <div className="pista-barra">
+                        <div
+                          className="relleno-barra"
+                          style={{ transform: `scaleX(${saldo.monto / montoMaximoEnDeuda})` }}
+                        />
+                      </div>
+                      <span className="valor-barra">{saldo.monto.toFixed(2)} h</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {metricas.enDeuda > topEnDeuda.length && (
+                <p className="pie-tabla">y {metricas.enDeuda - topEnDeuda.length} persona(s) más en deuda</p>
+              )}
+            </div>
+
+            <div className="tarjeta-resumen">
+              <h3>Sin deuda</h3>
+              {sinDeuda.length === 0 ? (
+                <p>Nadie está sin deuda ahora mismo.</p>
+              ) : (
+                <div className="lista-chips-personas">
+                  {sinDeuda.map((saldo) => (
+                    <Badge variante="exito" key={saldo.persona_id}>
+                      {saldo.persona_nombre ?? "—"}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="barra-filtros">
           <div className="campo-con-icono">
