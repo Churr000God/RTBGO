@@ -118,4 +118,13 @@ nivel de motor.
 
 ## Revisión posterior a la implementación
 
-*(se llena al construir)*
+**Divergencia conocida (7 de septiembre de 2026):** esta decisión fija el borde semiabierto
+`[vigente_desde, vigente_hasta)` — `vigente_hasta` exclusivo. La implementación real de
+`tiempo.tope_legal` (`fn_tope_legal_crear_vigencia`, `59_*.sql`) y de `tiempo.parametro`
+(`fn_parametro_actualizar_valor`, `60_*.sql`) usa borde **inclusivo**:
+`vigente_hasta = nueva.vigente_desde - 1`. Decisión deliberada al construir la tercera pantalla
+del módulo Parámetros — mantener consistencia entre las dos vigencias ya implementadas pesó más
+que corregir el código para alinearlo con este documento. No se corrige el código; queda anotado
+acá como la convención real en uso. Si se implementa otra vigencia nueva (jornada asignada ya usa
+el mismo patrón inclusivo, ver `fn_jornada_asignar_renovar`), seguir el borde inclusivo, no el
+exclusivo de este documento.

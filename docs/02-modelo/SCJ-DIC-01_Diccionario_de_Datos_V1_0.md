@@ -96,7 +96,7 @@ Todos los valores son **de ejemplo**. Ver `SCJ-ESP-01 §VI.9`.
 | Clave | Tipo | Valor de ejemplo | Qué controla |
 |---|---|---|---|
 | `tolerancia_retardo_min` | entero | 10 | Minutos antes de considerar retardo |
-| `hora_corte_dia` | hora | 03:00 | A qué hora se considera cerrado un día |
+| `hora_corte_dia` | hora | 00:00 | A qué hora se considera cerrado un día |
 | `ventana_banco_meses` | entero | 6 | Duración de la ventana de resolución |
 | `umbral_aviso_pct` | entero | 100 | Porcentaje de la jornada semanal para avisar |
 | `umbral_escalamiento_pct` | entero | 200 | Porcentaje para escalar |
