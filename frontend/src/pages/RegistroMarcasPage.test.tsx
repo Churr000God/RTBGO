@@ -28,10 +28,13 @@ const MARCA_1 = {
   terminal_id: "rh-captura-01",
   secuencia_local: null,
   momento_dispositivo: "2026-09-07T12:00:00Z",
+  desfase_local: "-06:00",
   momento_recepcion: "2026-09-07T12:00:00Z",
   estado_reloj: "sincronizado",
   origen: "captura_manual",
+  version_software: "1.0.0",
   requiere_revision: false,
+  motivos_revision: [],
 };
 
 function mockApiFetch(opciones: { marcas?: Response } = {}) {
@@ -134,5 +137,38 @@ describe("RegistroMarcasPage", () => {
       .mocked(apiFetch)
       .mock.calls.filter(([path]) => (path as string).startsWith("/api/marcas?"));
     expect(llamadas.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("columna Ocurrió muestra momento_dispositivo + desfase_local, distinto de Recibida", async () => {
+    const marca = {
+      ...MARCA_1,
+      momento_dispositivo: "2026-09-07T08:00:00Z",
+      desfase_local: "-06:00",
+      momento_recepcion: "2026-09-07T14:00:00Z",
+    };
+    mockApiFetch({ marcas: new Response(JSON.stringify({ total: 1, marcas: [marca] })) });
+
+    render(<RegistroMarcasPage />);
+
+    const fila = await waitFor(() => screen.getByRole("row", { name: /persona ficticia uno/i }));
+    const celdas = within(fila).getAllByRole("cell");
+    const celdaOcurrio = celdas[4];
+    const celdaRecibida = celdas[5];
+    expect(celdaOcurrio).toHaveTextContent("-06:00");
+    expect(celdaOcurrio.textContent).not.toBe(celdaRecibida.textContent);
+  });
+
+  it("motivos_revision etiquetados aparecen bajo el badge de revisión", async () => {
+    const marca = {
+      ...MARCA_1,
+      requiere_revision: true,
+      motivos_revision: ["persona_inactiva", "dia_cerrado"],
+    };
+    mockApiFetch({ marcas: new Response(JSON.stringify({ total: 1, marcas: [marca] })) });
+
+    render(<RegistroMarcasPage />);
+
+    await waitFor(() => expect(screen.getByText(/requiere revisión/i)).toBeInTheDocument());
+    expect(screen.getByText(/persona inactiva, día ya cerrado/i)).toBeInTheDocument();
   });
 });

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, Loader2, RadioTower, Search } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
+import { etiquetaMotivo } from "../lib/motivosRevision";
 import { AppShell } from "../layouts/AppShell";
 import { Badge } from "../components/Badge";
 import { Input } from "../components/Input";
@@ -27,10 +28,13 @@ type Marca = {
   terminal_id: string;
   secuencia_local: number | null;
   momento_dispositivo: string;
+  desfase_local: string;
   momento_recepcion: string;
   estado_reloj: "sincronizado" | "deriva" | "sin_sincronizar";
   origen: "terminal" | "captura_manual";
+  version_software: string;
   requiere_revision: boolean;
+  motivos_revision: string[];
 };
 
 type RespuestaMarcas = { total: number; marcas: Marca[] };
@@ -142,8 +146,9 @@ export function RegistroMarcasPage() {
           <div>
             <h1>Registro de marcas</h1>
             <p className="subtitulo-pagina">
-              Feed de las marcas recibidas por el servidor — se refresca solo cada{" "}
-              {INTERVALO_REFRESCO_MS / 1000} segundos.
+              "Ocurrió" es la hora real del evento según el reloj del dispositivo — la que calcula
+              la jornada. "Recibida" es sólo cuándo llegó al servidor y nunca entra en ese cálculo.
+              El feed se refresca solo cada {INTERVALO_REFRESCO_MS / 1000} segundos.
             </p>
           </div>
         </div>
@@ -222,6 +227,7 @@ export function RegistroMarcasPage() {
                     <th>Terminal</th>
                     <th>Origen</th>
                     <th>Reloj</th>
+                    <th>Ocurrió</th>
                     <th>Recibida</th>
                     <th>Revisión</th>
                   </tr>
@@ -237,10 +243,20 @@ export function RegistroMarcasPage() {
                           {ETIQUETA_ESTADO_RELOJ[marca.estado_reloj]}
                         </Badge>
                       </td>
+                      <td>
+                        {formatearFechaHora(marca.momento_dispositivo)} ({marca.desfase_local})
+                      </td>
                       <td>{formatearFechaHora(marca.momento_recepcion)}</td>
                       <td>
                         {marca.requiere_revision ? (
-                          <Badge variante="aviso">Requiere revisión</Badge>
+                          <>
+                            <Badge variante="aviso">Requiere revisión</Badge>
+                            {marca.motivos_revision.length > 0 && (
+                              <div className="ayuda-campo">
+                                {marca.motivos_revision.map((motivo) => etiquetaMotivo(motivo)).join(", ")}
+                              </div>
+                            )}
+                          </>
                         ) : (
                           "—"
                         )}

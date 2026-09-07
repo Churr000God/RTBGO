@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, Loader2, Search, Wrench } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
+import { etiquetaMotivo } from "../lib/motivosRevision";
 import { AppShell } from "../layouts/AppShell";
 import { Badge } from "../components/Badge";
 import { Input } from "../components/Input";
@@ -27,15 +28,6 @@ function normalizar(texto: string): string {
     .replace(new RegExp("[\\u0300-\\u036f]", "g"), "")
     .toLowerCase();
 }
-
-// Mismos 3 motivos que calcula trg_marca_valida_revision (SCJ-PRO-11), ver también
-// CapturaManualMarcaPage — motivo_revision puede llegar combinado o con uno no listado, por eso
-// el fallback al valor crudo.
-const ETIQUETA_MOTIVO: Record<string, string> = {
-  persona_inactiva: "Persona inactiva",
-  dia_cerrado: "Día ya cerrado",
-  fuera_de_horario: "Fuera de horario",
-};
 
 function formatearFechaHora(fecha: string | null): string {
   if (!fecha) return "—";
@@ -148,7 +140,7 @@ export function ColaExcepcionesPage() {
             </div>
             {[...porMotivo.entries()].map(([motivo, cantidad]) => (
               <div className="metrica" key={motivo}>
-                <span className="etiqueta-metrica">{ETIQUETA_MOTIVO[motivo] ?? motivo}</span>
+                <span className="etiqueta-metrica">{etiquetaMotivo(motivo)}</span>
                 <strong>{cantidad}</strong>
               </div>
             ))}
@@ -176,7 +168,7 @@ export function ColaExcepcionesPage() {
                 <option value="">Motivo: Todos</option>
                 {motivosPresentes.map((motivo) => (
                   <option key={motivo} value={motivo}>
-                    {ETIQUETA_MOTIVO[motivo] ?? motivo}
+                    {etiquetaMotivo(motivo)}
                   </option>
                 ))}
               </select>
@@ -259,7 +251,7 @@ export function ColaExcepcionesPage() {
                     <td>{formatearFechaHora(excepcion.momento_dispositivo)}</td>
                     <td>
                       <Badge variante="aviso">
-                        {ETIQUETA_MOTIVO[excepcion.motivo_revision] ?? excepcion.motivo_revision}
+                        {etiquetaMotivo(excepcion.motivo_revision)}
                       </Badge>
                     </td>
                     <td>{formatearFechaHora(excepcion.creado_en)}</td>

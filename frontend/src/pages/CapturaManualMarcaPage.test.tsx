@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -36,6 +36,7 @@ function mockApiFetch(opciones: { post?: Response }) {
             JSON.stringify({
               evento_id: "evento-1",
               duplicado: false,
+              momento_dispositivo: "2026-09-06T10:00:00Z",
               momento_recepcion: "2026-09-06T12:00:00Z",
               requiere_revision: false,
               motivos_revision: [],
@@ -65,7 +66,7 @@ describe("CapturaManualMarcaPage", () => {
     await enviarCaptura();
 
     await waitFor(() => expect(screen.getByText(/marca registrada/i)).toBeInTheDocument());
-    expect(screen.getByText(/06 sep 2026/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/06 sep 2026/i).length).toBeGreaterThanOrEqual(2);
     expect(screen.queryByText(/quedó marcada para revisión/i)).not.toBeInTheDocument();
 
     const llamada = vi
@@ -76,6 +77,8 @@ describe("CapturaManualMarcaPage", () => {
     expect(cuerpo.terminal_id).toBe("rh-captura-01");
     expect(typeof cuerpo.evento_id).toBe("string");
     expect(cuerpo.evento_id.length).toBeGreaterThan(0);
+    expect(typeof cuerpo.momento_dispositivo).toBe("string");
+    expect(Number.isNaN(new Date(cuerpo.momento_dispositivo).getTime())).toBe(false);
   });
 
   it("requiere_revision=true muestra los motivos combinados", async () => {
@@ -84,6 +87,7 @@ describe("CapturaManualMarcaPage", () => {
         JSON.stringify({
           evento_id: "evento-2",
           duplicado: false,
+          momento_dispositivo: "2026-09-06T10:00:00Z",
           momento_recepcion: "2026-09-06T12:00:00Z",
           requiere_revision: true,
           motivos_revision: ["fuera_de_horario", "dia_cerrado"],
@@ -98,9 +102,7 @@ describe("CapturaManualMarcaPage", () => {
     await waitFor(() =>
       expect(screen.getByText(/quedó marcada para revisión/i)).toBeInTheDocument(),
     );
-    expect(
-      screen.getByText(/quedó fuera del horario del patrón, el día ya estaba cerrado/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/fuera de horario, día ya cerrado/i)).toBeInTheDocument();
   });
 
   it("evento_id duplicado (200) muestra 'Ya estaba registrada' sin insertar de nuevo", async () => {
@@ -109,6 +111,7 @@ describe("CapturaManualMarcaPage", () => {
         JSON.stringify({
           evento_id: "evento-3",
           duplicado: true,
+          momento_dispositivo: "2026-09-06T10:00:00Z",
           momento_recepcion: "2026-09-06T12:00:00Z",
           requiere_revision: false,
           motivos_revision: [],
@@ -122,5 +125,39 @@ describe("CapturaManualMarcaPage", () => {
 
     await waitFor(() => expect(screen.getByText(/ya estaba registrada/i)).toBeInTheDocument());
     expect(screen.queryByText(/^marca registrada/i)).not.toBeInTheDocument();
+  });
+
+  it("envía la hora elegida por el usuario en el input, no la de ahora", async () => {
+    mockApiFetch({});
+
+    render(<CapturaManualMarcaPage />);
+    const inputHora = await screen.findByLabelText(/momento del evento/i);
+    fireEvent.change(inputHora, { target: { value: "2026-01-01T08:30" } });
+    await enviarCaptura();
+
+    await waitFor(() => expect(screen.getByText(/marca registrada/i)).toBeInTheDocument());
+    const llamada = vi
+      .mocked(apiFetch)
+      .mock.calls.find(([path]) => path === "/api/marcas/captura-manual")!;
+    const cuerpo = JSON.parse(llamada[1]!.body as string);
+    expect(cuerpo.momento_dispositivo).toBe(new Date("2026-01-01T08:30").toISOString());
+  });
+
+  it("422 por hora futura o ventana vencida muestra el mensaje del backend", async () => {
+    mockApiFetch({
+      post: new Response(
+        JSON.stringify({ detail: "La hora del dispositivo no puede ser futura." }),
+        { status: 422 },
+      ),
+    });
+
+    render(<CapturaManualMarcaPage />);
+    await enviarCaptura();
+
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        /la hora del dispositivo no puede ser futura/i,
+      ),
+    );
   });
 });

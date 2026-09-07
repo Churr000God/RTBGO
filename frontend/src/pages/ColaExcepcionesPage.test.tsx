@@ -114,4 +114,32 @@ describe("ColaExcepcionesPage", () => {
       expect(screen.getByText(/no se pudo cargar la cola de excepciones/i)).toBeInTheDocument(),
     );
   });
+
+  it("motivo con sufijo concatenado (fn_ausencia_resuelve_excepcion) traduce sólo la parte anterior al separador", async () => {
+    mockApiFetch(
+      new Response(
+        JSON.stringify([
+          {
+            id: 4,
+            marca_id: 40,
+            dia_id: null,
+            motivo_revision: "dia_cerrado — resuelto por ausencia autorizada, carga tardía",
+            estado: "resuelto",
+            creado_en: "2026-09-07T09:00:00Z",
+            persona_nombre: "Persona Resuelta",
+            momento_dispositivo: "2026-09-07T09:00:00Z",
+          },
+        ]),
+      ),
+    );
+
+    render(<ColaExcepcionesPage />);
+
+    await waitFor(() => expect(screen.getByText("Persona Resuelta")).toBeInTheDocument());
+    expect(
+      within(screen.getByRole("table")).getByText(
+        "Día ya cerrado — resuelto por ausencia autorizada, carga tardía",
+      ),
+    ).toBeInTheDocument();
+  });
 });

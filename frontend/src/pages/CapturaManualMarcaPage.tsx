@@ -3,9 +3,11 @@ import { CheckCircle2, Fingerprint, Info } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { generarUuidV4 } from "../lib/uuid";
+import { etiquetaMotivo } from "../lib/motivosRevision";
 import { AppShell } from "../layouts/AppShell";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { Input } from "../components/Input";
 
 // Punto de captura fijo por estación de RH (SCJ-PRO-07 §II.3: "terminal_id" identifica el
 // aparato O el punto de captura, no hace falta un picker — candidato del propio proceso).
@@ -22,18 +24,21 @@ type EstadoCatalogo = "cargando" | "listo" | "error";
 
 type ResultadoCaptura = {
   evento_id: string;
+  momento_dispositivo: string;
   momento_recepcion: string;
   requiere_revision: boolean;
   motivos_revision: string[];
   duplicado?: boolean;
 };
 
-// Los 3 motivos que calcula trg_marca_valida_revision (SCJ-PRO-11) — pueden venir combinados.
-const ETIQUETA_MOTIVO_REVISION: Record<string, string> = {
-  persona_inactiva: "la persona está inactiva",
-  dia_cerrado: "el día ya estaba cerrado",
-  fuera_de_horario: "quedó fuera del horario del patrón",
-};
+// input[type=datetime-local] no lleva zona horaria — se interpreta como hora local del
+// navegador, que es justo lo que queremos capturar (momento real del evento, no UTC).
+function ahoraParaDatetimeLocal(): string {
+  const ahora = new Date();
+  ahora.setSeconds(0, 0);
+  ahora.setMinutes(ahora.getMinutes() - ahora.getTimezoneOffset());
+  return ahora.toISOString().slice(0, 16);
+}
 
 async function mensajeDeError(respuesta: Response, generico: string): Promise<string> {
   try {
@@ -67,6 +72,7 @@ export function CapturaManualMarcaPage() {
   // el mismo evento_id en vez de generar uno nuevo (evita marcas duplicadas por doble clic o
   // reintento de red).
   const [eventoId, setEventoId] = useState(() => generarUuidV4());
+  const [momentoDispositivo, setMomentoDispositivo] = useState(() => ahoraParaDatetimeLocal());
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [resultado, setResultado] = useState<ResultadoCaptura | null>(null);
@@ -95,6 +101,7 @@ export function CapturaManualMarcaPage() {
           evento_id: eventoId,
           persona_id: personaId,
           terminal_id: TERMINAL_ID,
+          momento_dispositivo: new Date(momentoDispositivo).toISOString(),
         }),
       });
       if (!respuesta.ok) {
@@ -118,6 +125,7 @@ export function CapturaManualMarcaPage() {
     setError(null);
     // Nueva captura = nuevo evento_id. El anterior ya sirvió su propósito de idempotencia.
     setEventoId(generarUuidV4());
+    setMomentoDispositivo(ahoraParaDatetimeLocal());
   }
 
   const sinPersonas = estadoPersonas === "listo" && personas.length === 0;
@@ -131,16 +139,18 @@ export function CapturaManualMarcaPage() {
         </nav>
         <h1>Captura manual de marca</h1>
         <p className="subtitulo-pagina">
-          Registra la entrada o salida de una persona que no marcó por terminal. La hora la toma
-          el servidor al confirmar, nadie la escribe a mano.
+          Registra la entrada o salida de una persona que no marcó por terminal, con el momento
+          real en que ocurrió el evento — la captura admite hasta unos días hábiles hacia atrás,
+          nunca una hora futura.
         </p>
 
         {resultado ? (
           <Card>
             <p className="boton-con-icono">
               <CheckCircle2 size={18} aria-hidden="true" />
-              {resultado.duplicado ? "Ya estaba registrada" : "Marca registrada"} · hora del
-              servidor: <strong>{formatearHoraServidor(resultado.momento_recepcion)}</strong>
+              {resultado.duplicado ? "Ya estaba registrada" : "Marca registrada"} · ocurrió:{" "}
+              <strong>{formatearHoraServidor(resultado.momento_dispositivo)}</strong> · recibida
+              por el servidor: <strong>{formatearHoraServidor(resultado.momento_recepcion)}</strong>
             </p>
             {resultado.requiere_revision && (
               <div className="tarjeta-info">
@@ -150,9 +160,7 @@ export function CapturaManualMarcaPage() {
                   {resultado.motivos_revision.length > 0 ? (
                     <>
                       :{" "}
-                      {resultado.motivos_revision
-                        .map((motivo) => ETIQUETA_MOTIVO_REVISION[motivo] ?? motivo)
-                        .join(", ")}
+                      {resultado.motivos_revision.map((motivo) => etiquetaMotivo(motivo)).join(", ")}
                       .
                     </>
                   ) : (
@@ -210,6 +218,16 @@ export function CapturaManualMarcaPage() {
                   </small>
                 )}
               </div>
+
+              <Input
+                id="momento_dispositivo"
+                label="Momento del evento"
+                type="datetime-local"
+                required
+                value={momentoDispositivo}
+                onChange={(evento) => setMomentoDispositivo(evento.target.value)}
+                ayuda="La hora real en que ocurrió la entrada o salida — no futura, ni más atrás de la ventana de días hábiles permitida."
+              />
             </fieldset>
 
             {error && <p role="alert">{error}</p>}
