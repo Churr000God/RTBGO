@@ -50,7 +50,7 @@ backend y un frontend que lo exponen. Ver `README.md` y `docs/00-contexto/SCJ-CT
   `--no-dev` (sin pytest) y el frontend prod es nginx sirviendo el bundle (sin npm/node); el script
   corta con un mensaje explícito en vez de fallar con un error de `docker exec`. Las pruebas
   siempre corren con `dev pruebas`.
-- **Tests:** backend `uv run pytest` (212 casos), frontend `npm test` (316 casos, 50 archivos).
+- **Tests:** backend `uv run pytest` (274 casos), frontend `npm test` (387 casos, 57 archivos).
   Ambos corren igual dentro de los contenedores (`./scripts/desplegar.sh <entorno> pruebas`).
   Cobertura instrumentada desde el 4 de septiembre de 2026: `uv run pytest --cov=app
   --cov-report=term-missing` (backend) y `npm run test:coverage` / `npm test -- --coverage`
@@ -148,6 +148,37 @@ backend y un frontend que lo exponen. Ver `README.md` y `docs/00-contexto/SCJ-CT
   transacción real. Ver `bitacora/2026-09-06_implementacion_subsistema_tiempo.md` para el detalle
   completo, incluidos los hallazgos de seguridad corregidos en el camino (ver gotcha abajo) y lo
   que quedó pendiente a propósito (relleno de día bloqueado, `SCJ-PRA-01 #14`).
+- **Módulo Parámetros de Tiempo, 3 de 4 pantallas (7 de septiembre de 2026):** auditoría
+  previa confirmó que `tiempo.parametro`/`tiempo.dia_festivo`/`tiempo.tope_legal` (tablas de
+  configuración del DDL desde `02_tiempo.sql`) nunca tuvieron pantalla propia — sólo se
+  consumían internamente. Nuevo grupo de sidebar "Parámetros" (gateado por el mismo
+  `puede_ver_modulo_3`). **Tope legal**: edición como vigencias versionadas (RPC
+  `fn_tope_legal_crear_vigencia`, `db/ddl/59_*.sql`, mismo patrón que
+  `fn_jornada_asignar_renovar`) + tabla de personas que superan el tope por semana, con 3
+  comparaciones independientes (`supera_semanal`/`supera_extra`/`supera_combinado`, cruzando
+  `tiempo.clasificacion_de_tiempo.tipo`) sobre horas *reales* trabajadas, no el patrón
+  contractual — regla de negocio documentada en `docs/03-decisiones/SCJ-DEC-10_*.md`. **Días
+  festivos**: CRUD sin migración DDL nueva (tabla/RLS/permisos ya existían) — alta libre,
+  `DELETE` (primer del proyecto) restringido a `fecha > hoy` estricta; dos vistas, Lista (filtros
+  client-side, catálogo chico) y Calendario (Mensual/Semanal, primer calendario de mes del
+  proyecto, `frontend/src/lib/calendario.ts`). Ambas pantallas usan `get_service_client` para
+  todo el acceso a datos (RLS deny-all en `tope_legal`/`dia_festivo`), `get_caller_client` sólo
+  para el gate de `requiere_permiso(...)`. **Parámetros del sistema** (mismo día, corte
+  posterior, vía `team-orchestrator` con 4 especialistas): edita las 8 claves de
+  `tiempo.parametro` como vigencias versionadas, RPC `fn_parametro_actualizar_valor`
+  (`db/ddl/60_*.sql`) con **borde inclusivo** (`vigente_hasta = nueva.vigente_desde - 1`,
+  divergente del semiabierto de `SCJ-DEC-04`, anotado ahí como decisión deliberada) y
+  `vigente_desde` siempre hoy — sin alta/baja de claves, sólo edición de valores existentes. Dos
+  cambios del mismo parámetro el mismo día son un `UPDATE` in-place, no una vigencia nueva.
+  Catálogo de descripción/tipo/unidad vive en código (`backend/app/catalogo_parametros.py`), no
+  en columnas — de las 8 claves, sólo 3 (`tolerancia_retardo_min`, `dias_habiles_correccion_marca`,
+  `hora_corrida_cierre_dia`) tienen efecto real en la lógica hoy, marcado en la UI con un badge
+  para las otras 5. Historial con búsqueda/rango de fechas/orden 100% client-side (dataset chico).
+  Falta "Movimiento de saldo" (cuarta pantalla, pendiente). Ver
+  `bitacora/2026-09-07_modulo_parametros_tope_legal_dias_festivos.md` (incluido un incidente real
+  de una sesión corriendo un RPC directo contra la BD real para depurar un bug, ver gotcha abajo)
+  y `bitacora/2026-09-07_parametros_del_sistema.md` (primer intento fallido de agente `Plan` del
+  proyecto, colgado 600s sin progreso — el plan se escribió a mano con la exploración ya hecha).
 
 ## Arquitectura y módulos
 
@@ -192,7 +223,7 @@ Cada una vive en su propio documento de decisión — no se duplican aquí, sól
   `http://localhost:5173` fijo a mano — esa configuración no vive en este repositorio. Al pasar a
   producción (`docker compose … prod`, frontend en `:8080`) hay que actualizarla ahí también, o
   los links de invitación/recuperación de contraseña no aterrizan en la app.
-- El DDL corre hasta `db/ddl/57_*.sql`. `personas.permiso`
+- El DDL corre hasta `db/ddl/60_*.sql`. `personas.permiso`
   es la única tabla del proyecto con clave natural (`codigo varchar PRIMARY KEY`) en vez de `uuid`
   — decisión deliberada, fiel a la redacción literal de `SCJ-PRO-05`, no un descuido a corregir.
 - Las tablas de bitácora inmutables (`bitacora_movimiento_persona`,
@@ -255,6 +286,18 @@ Cada una vive en su propio documento de decisión — no se duplican aquí, sól
   arriba) que la falta de atomicidad se descubrió recién en la revisión de seguridad de la fase,
   no en el diseño. Preguntarlo desde el arranque de cualquier endpoint/batch nuevo que toque 2+
   tablas.
+
+- **Ninguna sesión corre queries de escritura/RPC directo contra la BD real de Supabase para
+  "reproducir" o "depurar" un bug** — pasó una vez (7 de septiembre de 2026): al investigar un
+  422 en la asignación de jornada, `backend` corrió el RPC de asignación vía `psql` directo
+  contra producción (no contra datos sintéticos de prueba) para ver si reproducía, y de paso
+  cerró la jornada vigente real del administrador (alteró `tiempo.jornada_asignada.vigente_hasta`
+  de una fila real). El permission classifier bloqueó su propio intento de revertirlo, y
+  `orchestrator` correctamente rehusó ejecutar esa reversión en su lugar (habría sido rodear una
+  denegación ajena) — lo escaló al usuario, quien autorizó la restauración manual. El bug
+  original resultó transitorio. **Lección:** un bug se reproduce con tests/mocks o, si hace falta
+  BD real, con `SELECT` de sólo lectura y aprobación explícita del usuario antes de cualquier
+  `INSERT`/`UPDATE`/`DELETE`/RPC de escritura fuera de una migración versionada de `db/ddl/`.
 
 ## Historial de decisiones
 

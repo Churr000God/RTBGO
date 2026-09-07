@@ -1967,3 +1967,271 @@ a.boton-con-icono {
   color: var(--navy-medio);
   font-variant-numeric: tabular-nums;
 }
+
+/* ─── §subsistema tiempo (pase visual, 2026-09-07) ─── */
+/* Las 4 pestañas de Tiempo (Jornadas/Marcas/Autorizaciones/Reportes) llegaron funcionales pero
+   sin la capa de jerarquía visual que ya tienen Personas/Estructura Organizacional
+   (.banda-metricas, tarjetas con ícono) — esto las nivela sin traer una librería nueva:
+   reusa el mismo lenguaje (tarjeta-resumen, superficie, teal) en dos piezas nuevas. */
+
+/* Grilla de acciones disparables (PanelCorridasBatchPage): antes 3 <Button> sueltos en una fila
+   con inline style — ahora una tarjeta por tipo de batch, con ícono propio y texto de apoyo,
+   mismo tratamiento visual que .opcion-seleccionable/.icono-seccion del resto de la app. */
+.rejilla-acciones {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.tarjeta-accion {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  background: var(--blanco);
+  border: 1px solid rgba(0, 43, 91, 0.1);
+  border-radius: var(--radio-tarjeta);
+  box-shadow: var(--sombra-tarjeta);
+  padding: 1.1rem 1.25rem;
+}
+
+.tarjeta-accion .icono-seccion {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 10px;
+}
+
+.tarjeta-accion strong {
+  display: block;
+  color: var(--navy);
+  font-size: 0.95rem;
+}
+
+.tarjeta-accion p {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--navy-medio);
+  flex: 1;
+}
+
+.tarjeta-accion .boton-primario {
+  justify-content: center;
+  width: 100%;
+}
+
+/* Apilado vertical simple con espaciado uniforme (BandejaAusenciasPage) — reemplaza el
+   `style={{ display: "flex", ... }}` inline que había quedado ahí. */
+.pila-tarjetas {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Indicador de refresco automático (RegistroMarcasPage) — mismo tratamiento tipográfico que
+   .ayuda-campo, sólo movido a su propia clase por no ser un campo de formulario. */
+.indicador-en-vivo {
+  color: var(--navy-medio);
+  font-size: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+/* Gráfica de barras horizontal, CSS puro (sin librería) — mismo recipe que .barra-progreso
+   (pista + relleno con transform:scaleX), sólo horizontal y con etiqueta+valor a los costados.
+   Usada en BancoDeHorasPage para el top de personas con más horas en deuda. */
+.grafica-barras {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.fila-grafica-barras {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.fila-grafica-barras .etiqueta-barra {
+  flex: 0 0 9rem;
+  font-size: 0.85rem;
+  color: var(--navy);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fila-grafica-barras .pista-barra {
+  flex: 1;
+  height: 0.6rem;
+  border-radius: 999px;
+  background: rgba(0, 43, 91, 0.08);
+  overflow: hidden;
+}
+
+.fila-grafica-barras .relleno-barra {
+  height: 100%;
+  width: 100%;
+  transform-origin: left;
+  background: #b3261e;
+  border-radius: 999px;
+}
+
+.fila-grafica-barras .valor-barra {
+  flex: 0 0 auto;
+  min-width: 4.5rem;
+  text-align: right;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--navy-medio);
+}
+
+.lista-chips-personas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* Calendario semanal de la jornada asignada (FichaPersonaPage) — 7 tarjetas de día, CSS grid
+   puro. auto-fit en vez de 7 columnas fijas: en angosto cae a menos columnas apiladas en vez de
+   comprimir cada día a un ancho inservible. */
+.calendario-semanal {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+  gap: 0.75rem;
+}
+
+.dia-calendario {
+  border: 1px solid rgba(0, 43, 91, 0.12);
+  border-radius: 10px;
+  padding: 0.75rem 0.5rem;
+  text-align: center;
+}
+
+.dia-calendario--trabaja {
+  border-color: rgba(21, 152, 149, 0.35);
+  background: rgba(21, 152, 149, 0.05);
+}
+
+.dia-calendario--libre {
+  opacity: 0.5;
+}
+
+.dia-calendario .nombre-dia {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--navy-medio);
+  margin-bottom: 0.5rem;
+}
+
+.dia-calendario .horario-dia {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--navy);
+  font-variant-numeric: tabular-nums;
+}
+
+.dia-calendario .comida-dia {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--navy-medio);
+  margin-top: 0.2rem;
+}
+
+/* Varias insignias en una misma celda de tabla (ParametrosTopeLegalPage: motivos de exceso de
+   tope legal, 1 a 3 chips por persona) — .insignia ya trae su propio padding/radio, esto sólo
+   resuelve el layout de la celda que las contiene. */
+.grupo-insignias {
+  display: flex;
+  gap: 0.375rem;
+  flex-wrap: wrap;
+}
+
+/* ─── §calendario días festivos ─── */
+/* Cabecera compartida por las dos sub-vistas de calendario (mensual/semanal) de
+   DiasFestivosPage — título del período + navegación Anterior/Hoy/Siguiente. */
+
+.cabecera-calendario {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.titulo-periodo-calendario {
+  margin: 0;
+  text-transform: capitalize;
+}
+
+/* Grid de 7 columnas FIJAS a propósito — a diferencia de .calendario-semanal (auto-fit, pensada
+   para caber en cualquier ancho), un mes deja de leerse como mes si las columnas se reacomodan
+   en angosto; acá preferimos scroll horizontal de la página antes que perder la grilla. */
+.calendario-mensual {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(6rem, 1fr));
+  gap: 0.5rem;
+}
+
+.cabecera-dia-mes {
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--navy-medio);
+  padding-bottom: 0.4rem;
+}
+
+.celda-mes {
+  min-height: 4.5rem;
+  border: 1px solid rgba(0, 43, 91, 0.12);
+  border-radius: 10px;
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.celda-mes .numero-dia {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--navy);
+}
+
+.celda-mes .nombre-festivo {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--oro);
+  line-height: 1.2;
+}
+
+.celda-mes--adyacente {
+  opacity: 0.4;
+}
+
+.celda-mes--festivo {
+  background: rgba(173, 149, 81, 0.08);
+  border-color: rgba(173, 149, 81, 0.4);
+}
+
+.celda-mes--hoy {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 1px var(--teal);
+}
+
+/* Modificadores nuevos sobre .dia-calendario (FichaPersonaPage) para la vista Semanal de
+   festivos — --trabaja/--libre (jornada) y --festivo/--hoy (festivos) no se combinan nunca en
+   la misma pantalla, así que no hace falta resolver precedencia entre ellos. */
+.dia-calendario--festivo {
+  border-color: rgba(173, 149, 81, 0.4);
+  background: rgba(173, 149, 81, 0.08);
+}
+
+.dia-calendario--hoy {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 1px var(--teal);
+}

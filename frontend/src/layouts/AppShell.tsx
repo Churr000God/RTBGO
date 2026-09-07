@@ -10,6 +10,7 @@ import {
   LogOut,
   Settings,
   ShieldCheck,
+  SlidersHorizontal,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -64,6 +65,7 @@ const NAV_GROUPS: NavGroup[] = [
     icono: Clock,
     disponible: true,
     items: [
+      { label: "Registro de marcas", href: "/tiempo/marcas", disponible: true },
       { label: "Captura manual de marca", href: "/tiempo/captura-manual", disponible: true },
       { label: "Excepciones pendientes", href: "/tiempo/excepciones", disponible: true },
     ],
@@ -78,7 +80,20 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Reportes",
     icono: BarChart3,
     disponible: true,
-    items: [{ label: "Banco de horas", href: "/tiempo/banco-de-horas", disponible: true }],
+    items: [
+      { label: "Banco de horas", href: "/tiempo/banco-de-horas", disponible: true },
+      { label: "Alertas de retardo", href: "/tiempo/alertas-retardo", disponible: true },
+    ],
+  },
+  {
+    label: "Parámetros",
+    icono: SlidersHorizontal,
+    disponible: true,
+    items: [
+      { label: "Tope legal", href: "/tiempo/parametros/tope-legal", disponible: true },
+      { label: "Días festivos", href: "/tiempo/parametros/dias-festivos", disponible: true },
+      { label: "Parámetros del sistema", href: "/tiempo/parametros/sistema", disponible: true },
+    ],
   },
   { label: "Configuración", icono: Settings, disponible: false, items: [] },
 ];
@@ -186,9 +201,10 @@ export function AppShell({ children }: Props) {
       grupo.label === "Jornadas" ||
       grupo.label === "Marcas" ||
       grupo.label === "Autorizaciones" ||
-      grupo.label === "Reportes"
+      grupo.label === "Reportes" ||
+      grupo.label === "Parámetros"
     ) {
-      // Un solo permiso (ver_modulo_3) cubre las 4 — no hay ver_modulo_4/5 por separado,
+      // Un solo permiso (ver_modulo_3) cubre las 5 — no hay ver_modulo_4/5 por separado,
       // el catálogo de permisos de Tiempo (33_*.sql) sólo define uno para todo el módulo. El
       // permiso fino de lectura (banco_de_horas_lectura) lo exige el endpoint, no el sidebar.
       return { ...grupo, disponible: sesion?.puede_ver_modulo_3 ?? true };

@@ -8,7 +8,11 @@ import { AltaPuestoPage } from "./pages/AltaPuestoPage";
 import { AltaUsuarioPage } from "./pages/AltaUsuarioPage";
 import { AsignacionesPage } from "./pages/AsignacionesPage";
 import { AsignarJornadaPage } from "./pages/AsignarJornadaPage";
+import { AlertasDeRetardoPage } from "./pages/AlertasDeRetardoPage";
 import { BancoDeHorasPage } from "./pages/BancoDeHorasPage";
+import { DiasFestivosPage } from "./pages/DiasFestivosPage";
+import { ParametrosTopeLegalPage } from "./pages/ParametrosTopeLegalPage";
+import { ParametrosSistemaPage } from "./pages/ParametrosSistemaPage";
 import { BandejaAusenciasPage } from "./pages/BandejaAusenciasPage";
 import { BitacoraAsignacionesPersonaPage } from "./pages/BitacoraAsignacionesPersonaPage";
 import { BitacoraMovimientosPage } from "./pages/BitacoraMovimientosPage";
@@ -16,6 +20,7 @@ import { CambiarEstadoPage } from "./pages/CambiarEstadoPage";
 import { CambiarPuestoAsignacionPage } from "./pages/CambiarPuestoAsignacionPage";
 import { CapturaManualMarcaPage } from "./pages/CapturaManualMarcaPage";
 import { ColaExcepcionesPage } from "./pages/ColaExcepcionesPage";
+import { RegistroMarcasPage } from "./pages/RegistroMarcasPage";
 import { CorregirMarcaPage } from "./pages/CorregirMarcaPage";
 import { CompletarInvitacionPage } from "./pages/CompletarInvitacionPage";
 import { Configurar2FAPage } from "./pages/Configurar2FAPage";
@@ -72,8 +77,13 @@ export const router = createBrowserRouter([
   { path: "/tiempo/asignacion-jornada", element: <AsignarJornadaPage /> },
   { path: "/tiempo/corridas-batch", element: <PanelCorridasBatchPage /> },
   { path: "/tiempo/captura-manual", element: <CapturaManualMarcaPage /> },
+  { path: "/tiempo/marcas", element: <RegistroMarcasPage /> },
   { path: "/tiempo/excepciones", element: <ColaExcepcionesPage /> },
   { path: "/tiempo/excepciones/:id/corregir", element: <CorregirMarcaPage /> },
   { path: "/tiempo/ausencias", element: <BandejaAusenciasPage /> },
   { path: "/tiempo/banco-de-horas", element: <BancoDeHorasPage /> },
+  { path: "/tiempo/alertas-retardo", element: <AlertasDeRetardoPage /> },
+  { path: "/tiempo/parametros/tope-legal", element: <ParametrosTopeLegalPage /> },
+  { path: "/tiempo/parametros/dias-festivos", element: <DiasFestivosPage /> },
+  { path: "/tiempo/parametros/sistema", element: <ParametrosSistemaPage /> },
 ]);

@@ -36,6 +36,10 @@ from app.routers import correcciones  # noqa: E402
 from app.routers import ausencias  # noqa: E402
 from app.routers import excepciones  # noqa: E402
 from app.routers import banco_de_horas  # noqa: E402
+from app.routers import alertas_de_retardo  # noqa: E402
+from app.routers import tope_legal  # noqa: E402
+from app.routers import dias_festivos  # noqa: E402
+from app.routers import parametros  # noqa: E402
 
 app.include_router(personas.router)
 app.include_router(usuarios.router)
@@ -47,12 +51,17 @@ app.include_router(puestos.router)
 app.include_router(asignaciones.router)
 app.include_router(permisos.router)
 app.include_router(jornada_asignada.router)
+app.include_router(jornada_asignada.router_persona)
 app.include_router(corridas_batch.router)
 app.include_router(marcas.router)
 app.include_router(correcciones.router)
 app.include_router(ausencias.router)
 app.include_router(excepciones.router)
 app.include_router(banco_de_horas.router)
+app.include_router(alertas_de_retardo.router)
+app.include_router(tope_legal.router)
+app.include_router(dias_festivos.router)
+app.include_router(parametros.router)
 
 
 @app.get("/salud")
