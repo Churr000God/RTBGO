@@ -25,6 +25,11 @@ backend y un frontend que lo exponen. Ver `README.md` y `docs/00-contexto/SCJ-CT
   Manual: `cd backend && uv run uvicorn app.main:app --reload --port 8000`. Tests:
   `uv run pytest`. Lee `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
   `FRONTEND_URL` del `.env` de la raíz (no lee `DATABASE_URL`, eso es sólo para `psql`/DDL manual).
+  `FRONTEND_URL` acepta varios orígenes separados por coma desde el 6 de septiembre de 2026
+  (`parse_frontend_urls` en `config.py`/`main.py`) — sirve para trabajar por `localhost:5173` y por
+  una IP de Tailscale/LAN al mismo tiempo sin reiniciar; ver ejemplo en `.env.example`. El link de
+  invitación de usuarios (`routers/usuarios.py`) toma sólo el primero de la lista, necesita una
+  única URL.
 - **Frontend:** Vite + React + TypeScript, en `frontend/src/` (pages/layouts/router). Manual:
   `cd frontend && npm run dev` (puerto 5173). Tests: `npm test`. `diseno_paginas/` guarda el
   diseño de pantallas (mockups "Kairos") previo a implementarlas — sigue siendo la referencia
@@ -45,7 +50,7 @@ backend y un frontend que lo exponen. Ver `README.md` y `docs/00-contexto/SCJ-CT
   `--no-dev` (sin pytest) y el frontend prod es nginx sirviendo el bundle (sin npm/node); el script
   corta con un mensaje explícito en vez de fallar con un error de `docker exec`. Las pruebas
   siempre corren con `dev pruebas`.
-- **Tests:** backend `uv run pytest` (126 casos), frontend `npm test` (285 casos, 42 archivos).
+- **Tests:** backend `uv run pytest` (212 casos), frontend `npm test` (316 casos, 50 archivos).
   Ambos corren igual dentro de los contenedores (`./scripts/desplegar.sh <entorno> pruebas`).
   Cobertura instrumentada desde el 4 de septiembre de 2026: `uv run pytest --cov=app
   --cov-report=term-missing` (backend) y `npm run test:coverage` / `npm test -- --coverage`
@@ -120,6 +125,29 @@ backend y un frontend que lo exponen. Ver `README.md` y `docs/00-contexto/SCJ-CT
   para que el puesto administrador (`personas.puesto.es_administrador_generico`, columna nueva,
   inmutable por trigger) no pueda quedar sin acceso — ver gotcha abajo. Ver
   `bitacora/2026-09-05_pulido_permisos_estructura_y_proteccion_admin.md` para el detalle completo.
+- **Módulo Tiempo, los 8 procesos completos (`SCJ-PRO-07` a `SCJ-PRO-14`, 6 de septiembre de
+  2026):** entregado de punta a punta por el equipo de 6 especialistas vía `team-orchestrator`, en
+  4 fases con checkpoint del usuario entre cada una, siguiendo el orden de
+  `docs/07-procesos/PLAN_IMPLEMENTACION_TIEMPO.md` — **Fase 1** `SCJ-PRO-09` (Asignación de
+  jornada) → `SCJ-PRO-14` (Batch de confianza, estrena la orquestación compartida de los 3
+  batches); **Fase 2** `SCJ-PRO-11` (Registro por terminal, sólo verificación) → `SCJ-PRO-07`
+  (Captura manual de marca); **Fase 3** `SCJ-PRO-10` (Corrección de marca) y `SCJ-PRO-08`
+  (Detección de falta), en paralelo; **Fase 4** `SCJ-PRO-12` (Cierre de día) → `SCJ-PRO-13` (Corte
+  quincenal), las 2 piezas de mayor riesgo/impacto financiero. `db/ddl/` llega hasta `57_*.sql`.
+  Backend suma 8 routers (`jornada_asignada`, `corridas_batch`, `marcas`, `correcciones`,
+  `ausencias`, `excepciones`, `banco_de_horas`) + 3 batches (`de_confianza`/`cierre_dia`/
+  `corte_quincenal`, `backend/app/batches/`) orquestados con **APScheduler embebido en el lifespan
+  de FastAPI** (`backend/app/scheduler.py`, sin cron externo ni infraestructura nueva — el mismo
+  job programado y el botón manual invocan la misma función). Frontend suma 6 páginas bajo
+  `/tiempo/*`, sidebar con los grupos "Jornadas"/"Marcas"/"Autorizaciones"/"Reportes" (placeholders
+  que ya existían deshabilitados, activados en vez de crear grupos nuevos), todos gateados por el
+  mismo `puede_ver_modulo_3`. 3 RPC transaccionales nuevos (mismo patrón que
+  `fn_asignacion_cambiar_puesto`): `fn_jornada_asignar_renovar`, `fn_ausencia_resolver`,
+  `fn_corte_quincenal_aplicar_persona` — los 3 nacieron de encontrar, en la revisión de seguridad
+  de cada fase, que un endpoint escribía en más de una tabla relacionada con inserts sueltos sin
+  transacción real. Ver `bitacora/2026-09-06_implementacion_subsistema_tiempo.md` para el detalle
+  completo, incluidos los hallazgos de seguridad corregidos en el camino (ver gotcha abajo) y lo
+  que quedó pendiente a propósito (relleno de día bloqueado, `SCJ-PRA-01 #14`).
 
 ## Arquitectura y módulos
 
@@ -164,7 +192,7 @@ Cada una vive en su propio documento de decisión — no se duplican aquí, sól
   `http://localhost:5173` fijo a mano — esa configuración no vive en este repositorio. Al pasar a
   producción (`docker compose … prod`, frontend en `:8080`) hay que actualizarla ahí también, o
   los links de invitación/recuperación de contraseña no aterrizan en la app.
-- El DDL corre hasta `db/ddl/32_*.sql`. `personas.permiso`
+- El DDL corre hasta `db/ddl/57_*.sql`. `personas.permiso`
   es la única tabla del proyecto con clave natural (`codigo varchar PRIMARY KEY`) en vez de `uuid`
   — decisión deliberada, fiel a la redacción literal de `SCJ-PRO-05`, no un descuido a corregir.
 - Las tablas de bitácora inmutables (`bitacora_movimiento_persona`,
@@ -211,6 +239,22 @@ Cada una vive en su propio documento de decisión — no se duplican aquí, sól
   que efectivamente lo impide. Reglas documentadas en `SCJ-PRO-04/05/06 §V`. **Si se agrega un
   vector de mutación nuevo sobre `puesto`/`asignacion`/`puesto_permiso` en el futuro, hay que
   evaluar si también puede sacarle acceso al puesto administrador y protegerlo igual.**
+- **Todo `GRANT ALL` schema-wide nuevo debe traer, en el mismo corte, un inventario explícito de
+  qué tablas quedan con RLS real y cuáles quedan en deny-by-default.** Pasó dos veces con `tiempo`
+  (6 de septiembre de 2026): `38_tiempo_permisos.sql` (el equivalente de `08_personas_permisos.sql`
+  para el esquema `tiempo`, nunca había existido) dejó 14 tablas nuevas sin ninguna policy — `anon`
+  sin login podía leer/escribir/borrar directo por PostgREST, corregido con
+  `41_tiempo_rls_deny_default.sql`. Volvió a pasar con `tiempo.excepcion` específicamente: su RLS
+  se tuvo que apagar (`42_*.sql`) porque dos triggers no-`SECURITY DEFINER` necesitaban escribir
+  ahí como el caller humano, y nadie le revocó el `GRANT` heredado hasta que `marcas.py` empezó a
+  leerla en producción (`47_tiempo_excepcion_revoca_anon.sql`). **Revisar caso por caso, no asumir
+  que "ya está bien" por dejarlo como estaba antes de la migración anterior.**
+- **Un endpoint/batch que escribe en más de una tabla relacionada probablemente necesita un RPC
+  transaccional, no inserts sueltos** — pasó 3 veces en el módulo Tiempo
+  (`fn_jornada_asignar_renovar`, `fn_ausencia_resolver`, `fn_corte_quincenal_aplicar_persona`, ver
+  arriba) que la falta de atomicidad se descubrió recién en la revisión de seguridad de la fase,
+  no en el diseño. Preguntarlo desde el arranque de cualquier endpoint/batch nuevo que toque 2+
+  tablas.
 
 ## Historial de decisiones
 
