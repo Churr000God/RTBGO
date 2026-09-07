@@ -23,3 +23,24 @@ class MarcaCapturaManualOut(BaseModel):
     momento_recepcion: datetime
     requiere_revision: bool
     motivos_revision: list[str]
+
+
+class MarcaListaItem(BaseModel):
+    id: int
+    evento_id: str
+    persona_id: str
+    persona_nombre: str | None = None
+    terminal_id: str
+    secuencia_local: int | None = None
+    momento_dispositivo: datetime
+    momento_recepcion: datetime
+    desfase_local: str
+    estado_reloj: str
+    version_software: str
+    origen: str
+    requiere_revision: bool
+
+
+class MarcaListaOut(BaseModel):
+    total: int
+    marcas: list[MarcaListaItem]

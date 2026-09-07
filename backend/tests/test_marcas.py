@@ -55,6 +55,29 @@ def _tabla_excepcion_select(datos):
     return tabla
 
 
+def _tabla_marca_lista(datos, total):
+    """El builder real encadena select/eq/gte/lte/order/range antes de execute() -- cada método
+    devuelve el mismo builder (self), sólo execute() corta la cadena."""
+    tabla = MagicMock()
+    tabla.select.return_value = tabla
+    tabla.eq.return_value = tabla
+    tabla.gte.return_value = tabla
+    tabla.lte.return_value = tabla
+    tabla.order.return_value = tabla
+    tabla.range.return_value = tabla
+    resultado = MagicMock()
+    resultado.data = datos
+    resultado.count = total
+    tabla.execute.return_value = resultado
+    return tabla
+
+
+def _tabla_in(datos):
+    tabla = MagicMock()
+    tabla.select.return_value.in_.return_value.execute.return_value.data = datos
+    return tabla
+
+
 def _tabla_marca_insert():
     tabla = MagicMock()
     tabla.insert.return_value.execute.return_value.data = [{}]
@@ -104,6 +127,112 @@ def _fila_marca(**overrides):
     }
     fila.update(overrides)
     return fila
+
+
+def _fila_marca_lista(**overrides):
+    fila = {
+        "id": MARCA_ID,
+        "evento_id": EVENTO_ID,
+        "persona_id": PERSONA_ID,
+        "terminal_id": "rh-captura-01",
+        "secuencia_local": None,
+        "momento_dispositivo": "2026-09-06T12:00:00+00:00",
+        "momento_recepcion": "2026-09-06T12:00:00+00:00",
+        "desfase_local": "-06:00",
+        "estado_reloj": "sincronizado",
+        "version_software": "0.1.0",
+        "origen": "captura_manual",
+        "requiere_revision": False,
+    }
+    fila.update(overrides)
+    return fila
+
+
+def test_listar_marcas_devuelve_pagina_con_nombre_persona_resuelto():
+    fake_client = _fake_client_secuencia(
+        _entradas_gate()
+        + [
+            ("marca", _tabla_marca_lista([_fila_marca_lista()], total=1)),
+            (
+                "persona",
+                _tabla_in([{"id": PERSONA_ID, "primer_nombre": "Ana", "apellido_paterno": "Pérez"}]),
+            ),
+        ]
+    )
+    app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
+
+    client = TestClient(app)
+    response = client.get("/api/marcas", headers={"Authorization": "Bearer fake-token"})
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200, response.text
+    cuerpo = response.json()
+    assert cuerpo["total"] == 1
+    assert cuerpo["marcas"][0]["persona_nombre"] == "Ana Pérez"
+
+
+def test_listar_marcas_acepta_filtros_de_persona_fecha_hora_y_paginado():
+    fake_client = _fake_client_secuencia(
+        _entradas_gate()
+        + [
+            ("marca", _tabla_marca_lista([_fila_marca_lista()], total=1)),
+            (
+                "persona",
+                _tabla_in([{"id": PERSONA_ID, "primer_nombre": "Ana", "apellido_paterno": "Pérez"}]),
+            ),
+        ]
+    )
+    app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
+
+    client = TestClient(app)
+    response = client.get(
+        "/api/marcas",
+        params={
+            "persona_id": PERSONA_ID,
+            "desde": "2026-09-01T00:00:00",
+            "hasta": "2026-09-06T23:59:59",
+            "limite": 10,
+            "desplazamiento": 20,
+        },
+        headers={"Authorization": "Bearer fake-token"},
+    )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200, response.text
+
+
+def test_listar_marcas_sin_resultados_no_consulta_nombres_de_persona():
+    fake_client = _fake_client_secuencia(
+        _entradas_gate()
+        + [
+            ("marca", _tabla_marca_lista([], total=0)),
+        ]
+    )
+    app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
+
+    client = TestClient(app)
+    response = client.get("/api/marcas", headers={"Authorization": "Bearer fake-token"})
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200, response.text
+    assert response.json() == {"total": 0, "marcas": []}
+
+
+def test_listar_marcas_limite_fuera_de_rango_devuelve_422():
+    fake_client = _fake_client_secuencia(_entradas_gate())
+    app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
+
+    client = TestClient(app)
+    response = client.get(
+        "/api/marcas", params={"limite": 500}, headers={"Authorization": "Bearer fake-token"}
+    )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 422
 
 
 def test_captura_manual_exitosa_sin_revision():
