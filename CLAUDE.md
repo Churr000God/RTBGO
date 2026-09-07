@@ -50,7 +50,7 @@ backend y un frontend que lo exponen. Ver `README.md` y `docs/00-contexto/SCJ-CT
   `--no-dev` (sin pytest) y el frontend prod es nginx sirviendo el bundle (sin npm/node); el script
   corta con un mensaje explícito en vez de fallar con un error de `docker exec`. Las pruebas
   siempre corren con `dev pruebas`.
-- **Tests:** backend `uv run pytest` (274 casos), frontend `npm test` (387 casos, 57 archivos).
+- **Tests:** backend `uv run pytest` (278 casos), frontend `npm test` (396 casos, 58 archivos).
   Ambos corren igual dentro de los contenedores (`./scripts/desplegar.sh <entorno> pruebas`).
   Cobertura instrumentada desde el 4 de septiembre de 2026: `uv run pytest --cov=app
   --cov-report=term-missing` (backend) y `npm run test:coverage` / `npm test -- --coverage`
@@ -179,6 +179,19 @@ backend y un frontend que lo exponen. Ver `README.md` y `docs/00-contexto/SCJ-CT
   de una sesión corriendo un RPC directo contra la BD real para depurar un bug, ver gotcha abajo)
   y `bitacora/2026-09-07_parametros_del_sistema.md` (primer intento fallido de agente `Plan` del
   proyecto, colgado 600s sin progreso — el plan se escribió a mano con la exploración ya hecha).
+- **Registro de marcas: hora del dispositivo editable y motivo de revisión visible (7 de
+  septiembre de 2026, mismo día, corte posterior):** `momento_dispositivo`/`desfase_local`/
+  `motivo_revision` ya existían desde la reconciliación del 5 de septiembre — lo que faltaba era
+  que captura manual dejara de forzar `momento_dispositivo = momento_recepcion = now()` (perdía la
+  hora real del evento) y que la UI expusiera esos campos. `db/ddl/61_*.sql` endurece la policy
+  `marca_insert_captura_manual` con techo duro de 90 días + no futuro + `estado_reloj =
+  'sincronizado'` (RLS es la autorización real en `routers/marcas.py`, que usa
+  `get_caller_client`). Backend valida la ventana fina de días hábiles
+  (`dias_habiles_correccion_marca`, helper compartido movido a `app/dias_habiles.py`) y expone
+  `motivos_revision` en `GET /api/marcas`; catálogo de los 6 motivos reales en
+  `app/catalogo_motivos_revision.py`, espejado en frontend por `lib/motivosRevision.ts` (que
+  separa el sufijo que `fn_ausencia_resuelve_excepcion` concatena al resolver una excepción). Ver
+  `bitacora/2026-09-07_registro_marcas_hora_dispositivo.md`.
 
 ## Arquitectura y módulos
 
@@ -223,7 +236,7 @@ Cada una vive en su propio documento de decisión — no se duplican aquí, sól
   `http://localhost:5173` fijo a mano — esa configuración no vive en este repositorio. Al pasar a
   producción (`docker compose … prod`, frontend en `:8080`) hay que actualizarla ahí también, o
   los links de invitación/recuperación de contraseña no aterrizan en la app.
-- El DDL corre hasta `db/ddl/60_*.sql`. `personas.permiso`
+- El DDL corre hasta `db/ddl/61_*.sql`. `personas.permiso`
   es la única tabla del proyecto con clave natural (`codigo varchar PRIMARY KEY`) en vez de `uuid`
   — decisión deliberada, fiel a la redacción literal de `SCJ-PRO-05`, no un descuido a corregir.
 - Las tablas de bitácora inmutables (`bitacora_movimiento_persona`,
@@ -298,6 +311,12 @@ Cada una vive en su propio documento de decisión — no se duplican aquí, sól
   original resultó transitorio. **Lección:** un bug se reproduce con tests/mocks o, si hace falta
   BD real, con `SELECT` de sólo lectura y aprobación explícita del usuario antes de cualquier
   `INSERT`/`UPDATE`/`DELETE`/RPC de escritura fuera de una migración versionada de `db/ddl/`.
+- **`psql "$DATABASE_URL"` puede colgarse indefinidamente contra el pooler de Supabase** (puerto
+  `6543`) en esta máquina — el TCP conecta (confirmado con `openssl s_client`), pero el handshake
+  de Postgres/TLS nunca completa, tanto desde el sandbox de una sesión como desde la shell real del
+  usuario (7 de septiembre de 2026, aplicando `61_*.sql`). No es un problema de la migración ni de
+  credenciales. **Lección:** no reintentar `psql` más de 2-3 veces — pegar el archivo directo en el
+  SQL Editor del dashboard de Supabase.
 
 ## Historial de decisiones
 
