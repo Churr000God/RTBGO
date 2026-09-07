@@ -229,11 +229,69 @@ def test_listar_personas():
     assert cuerpo[1]["fecha_baja"] == "2026-06-15"
 
 
+def test_listar_personas_incluye_tiene_jornada_vigente():
+    persona_con_jornada = "11111111-1111-1111-1111-111111111111"
+    persona_sin_jornada = "44444444-4444-4444-4444-444444444444"
+
+    def side_effect(nombre_tabla):
+        tabla = MagicMock()
+        if nombre_tabla == "persona":
+            tabla.select.return_value.execute.return_value.data = [
+                {
+                    "id": persona_con_jornada,
+                    "primer_nombre": "Mariana",
+                    "segundo_nombre": None,
+                    "apellido_paterno": "Alcántara",
+                    "apellido_materno": None,
+                    "curp": "AARM910427MDFLVR03",
+                    "rfc": "AARM910427H8A",
+                    "nss": "62119145338",
+                    "fecha_nacimiento": "1991-04-27",
+                    "fecha_ingreso": "2026-01-01",
+                    "fecha_baja": None,
+                    "estado": "activo",
+                },
+                {
+                    "id": persona_sin_jornada,
+                    "primer_nombre": "Jorge",
+                    "segundo_nombre": None,
+                    "apellido_paterno": "Del Bosque",
+                    "apellido_materno": None,
+                    "curp": "DBJJ850101HDFLRR07",
+                    "rfc": "DBJJ850101H8A",
+                    "nss": "12345678901",
+                    "fecha_nacimiento": "1985-01-01",
+                    "fecha_ingreso": "2020-01-01",
+                    "fecha_baja": None,
+                    "estado": "activo",
+                },
+            ]
+        elif nombre_tabla == "jornada_asignada":
+            tabla.select.return_value.in_.return_value.is_.return_value.execute.return_value.data = [
+                {"persona_id": persona_con_jornada}
+            ]
+        return tabla
+
+    fake_client = MagicMock()
+    fake_client.postgrest.schema.return_value.table.side_effect = side_effect
+    app.dependency_overrides[get_caller_client] = lambda: fake_client
+
+    client = TestClient(app)
+    response = client.get("/api/personas", headers={"Authorization": "Bearer fake-token"})
+
+    app.dependency_overrides.clear()
+    cuerpo = {p["id"]: p for p in response.json()}
+    assert cuerpo[persona_con_jornada]["tiene_jornada_vigente"] is True
+    assert cuerpo[persona_sin_jornada]["tiene_jornada_vigente"] is False
+
+
 PERSONA_ID = "11111111-1111-1111-1111-111111111111"
 AUTH_USER_ID = "22222222-2222-2222-2222-222222222222"
 
 
-def _fake_db_ficha(fila_persona, filas_usuario=None, filas_asignacion=None):
+def _fake_db_ficha(
+    fila_persona, filas_usuario=None, filas_asignacion=None, filas_jornada_asignada=None
+):
     fake_client = MagicMock()
     tabla_mock = fake_client.postgrest.schema.return_value.table
 
@@ -250,6 +308,10 @@ def _fake_db_ficha(fila_persona, filas_usuario=None, filas_asignacion=None):
         elif nombre_tabla == "asignacion":
             tabla.select.return_value.eq.return_value.is_.return_value.execute.return_value.data = (
                 filas_asignacion or []
+            )
+        elif nombre_tabla == "jornada_asignada":
+            tabla.select.return_value.in_.return_value.is_.return_value.execute.return_value.data = (
+                filas_jornada_asignada or []
             )
         return tabla
 
@@ -274,6 +336,7 @@ def test_ficha_persona_incluye_expediente_y_tiene_usuario():
             "expediente": {"tipo_contrato": "indefinido", "documento_ref": "RTB-2026-001"},
         },
         filas_usuario=[{"auth_user_id": AUTH_USER_ID}],
+        filas_jornada_asignada=[{"persona_id": PERSONA_ID}],
     )
     app.dependency_overrides[get_caller_client] = lambda: fake_client
 
@@ -288,6 +351,7 @@ def test_ficha_persona_incluye_expediente_y_tiene_usuario():
     cuerpo = response.json()
     assert cuerpo["documento_ref"] == "RTB-2026-001"
     assert cuerpo["tiene_usuario"] is True
+    assert cuerpo["tiene_jornada_vigente"] is True
 
 
 def test_ficha_persona_sin_expediente_ni_usuario_no_crashea():

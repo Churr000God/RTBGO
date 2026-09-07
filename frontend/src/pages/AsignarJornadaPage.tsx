@@ -1,8 +1,9 @@
-import { type FormEvent, useEffect, useState } from "react";
-import { ArrowRight, CalendarClock, Clock } from "lucide-react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { ArrowRight, CalendarClock, CheckCircle2, Clock, Search } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
+import { Badge } from "../components/Badge";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { Input } from "../components/Input";
@@ -12,7 +13,15 @@ type Persona = {
   primer_nombre: string;
   apellido_paterno: string;
   estado: string;
+  tiene_jornada_vigente: boolean;
 };
+
+function normalizar(texto: string): string {
+  return texto
+    .normalize("NFD")
+    .replace(new RegExp("[\\u0300-\\u036f]", "g"), "")
+    .toLowerCase();
+}
 
 type TipoJornada = "normal" | "flexible" | "de_confianza";
 
@@ -72,8 +81,15 @@ export function AsignarJornadaPage() {
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [payloadPendiente, setPayloadPendiente] = useState<PayloadJornada | null>(null);
+  // El usuario pidió quedarse en esta pestaña tras guardar (antes redirigía a la ficha de la
+  // persona) — para poder asignar jornada a varias personas seguidas sin salir. `formKey`
+  // fuerza el remount del <form> para limpiar los inputs no controlados (horarios/radios del
+  // patrón semanal), que un simple setState no resetea.
+  const [exito, setExito] = useState<{ nombrePersona: string } | null>(null);
+  const [formKey, setFormKey] = useState(0);
+  const [busquedaCobertura, setBusquedaCobertura] = useState("");
 
-  useEffect(() => {
+  function cargarPersonas() {
     apiFetch("/api/personas")
       .then((r) => {
         if (!r.ok) throw new Error(`status ${r.status}`);
@@ -84,7 +100,9 @@ export function AsignarJornadaPage() {
         setEstadoPersonas("listo");
       })
       .catch(() => setEstadoPersonas("error"));
-  }, []);
+  }
+
+  useEffect(cargarPersonas, []);
 
   function alternarDia(dia: DiaSemana) {
     setDiasSeleccionados((anterior) => {
@@ -106,7 +124,15 @@ export function AsignarJornadaPage() {
         body: JSON.stringify(payload),
       });
       if (respuesta.ok) {
-        window.location.href = `/personas/${payload.persona_id}`;
+        // Se queda en la pestaña de asignación de jornadas (pedido del usuario) en vez de
+        // redirigir a la ficha de la persona — permite asignar la siguiente sin salir de acá.
+        const persona = personas.find((p) => p.id === payload.persona_id);
+        setExito({ nombrePersona: persona ? `${persona.primer_nombre} ${persona.apellido_paterno}` : "la persona" });
+        setPersonaId("");
+        setDiasSeleccionados(new Set());
+        setPayloadPendiente(null);
+        setFormKey((anterior) => anterior + 1);
+        cargarPersonas(); // refresca la cobertura de abajo: esta persona ya cuenta como "con jornada"
         return;
       }
       if (respuesta.status === 409 && !payload.confirma_cierre_vigente) {
@@ -131,6 +157,7 @@ export function AsignarJornadaPage() {
   async function handleSubmit(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     setError(null);
+    setExito(null);
     setPayloadPendiente(null);
     const f = new FormData(evento.currentTarget);
 
@@ -167,9 +194,113 @@ export function AsignarJornadaPage() {
   const sinPersonas = estadoPersonas === "listo" && personas.length === 0;
   const formularioDeshabilitado = sinPersonas || estadoPersonas === "error";
 
+  const coberturaMetricas = useMemo(
+    () => ({
+      total: personas.length,
+      conJornada: personas.filter((p) => p.tiene_jornada_vigente).length,
+    }),
+    [personas],
+  );
+
+  const coberturaFiltrada = useMemo(() => {
+    const consulta = normalizar(busquedaCobertura.trim());
+    return [...personas]
+      .filter((p) => !consulta || normalizar(`${p.primer_nombre} ${p.apellido_paterno}`).includes(consulta))
+      // Sin jornada primero — es lo accionable, lo que hay que resolver.
+      .sort((a, b) => {
+        if (a.tiene_jornada_vigente !== b.tiene_jornada_vigente) {
+          return a.tiene_jornada_vigente ? 1 : -1;
+        }
+        return a.primer_nombre.localeCompare(b.primer_nombre);
+      });
+  }, [personas, busquedaCobertura]);
+
+  function seleccionarParaAsignar(id: string) {
+    setPersonaId(id);
+    setExito(null);
+  }
+
   return (
     <AppShell>
-      <form onSubmit={handleSubmit} className="contenedor-pagina">
+      {estadoPersonas === "listo" && personas.length > 0 && (
+        <div className="contenedor-pagina contenedor-pagina--ancho">
+          <h2>Cobertura de jornadas</h2>
+          <p className="subtitulo-pagina">
+            Quién de la plantilla activa ya tiene jornada vigente y a quién le falta asignarle.
+          </p>
+
+          <div className="banda-metricas">
+            <div className="metrica">
+              <span className="etiqueta-metrica">Personas activas</span>
+              <strong>{coberturaMetricas.total}</strong>
+            </div>
+            <div className="metrica">
+              <span className="etiqueta-metrica">
+                <span className="punto punto--exito" aria-hidden="true" />
+                Con jornada
+              </span>
+              <strong>{coberturaMetricas.conJornada}</strong>
+            </div>
+            <div className="metrica">
+              <span className="etiqueta-metrica">
+                <span className="punto punto--peligro" aria-hidden="true" />
+                Sin jornada
+              </span>
+              <strong>{coberturaMetricas.total - coberturaMetricas.conJornada}</strong>
+            </div>
+          </div>
+
+          <div className="barra-filtros">
+            <div className="campo-con-icono">
+              <Search size={16} className="icono-campo" aria-hidden="true" />
+              <input
+                type="search"
+                placeholder="Buscar por nombre"
+                value={busquedaCobertura}
+                onChange={(evento) => setBusquedaCobertura(evento.target.value)}
+                aria-label="Buscar por nombre en la cobertura de jornadas"
+              />
+            </div>
+          </div>
+
+          <div className="tabla-desplazable lista-desplazable">
+            <table>
+              <thead>
+                <tr>
+                  <th>Persona</th>
+                  <th>Jornada</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {coberturaFiltrada.map((p) => (
+                  <tr key={p.id}>
+                    <td>
+                      {p.primer_nombre} {p.apellido_paterno}
+                    </td>
+                    <td>
+                      <Badge variante={p.tiene_jornada_vigente ? "exito" : "peligro"}>
+                        {p.tiene_jornada_vigente ? "Con jornada" : "Sin jornada"}
+                      </Badge>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="boton-con-icono"
+                        onClick={() => seleccionarParaAsignar(p.id)}
+                      >
+                        {p.tiene_jornada_vigente ? "Renovar" : "Asignar"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      <form key={formKey} onSubmit={handleSubmit} className="contenedor-pagina">
         <nav className="migas">
           <strong>Asignación de jornada</strong>
         </nav>
@@ -177,6 +308,16 @@ export function AsignarJornadaPage() {
         <p className="subtitulo-pagina">
           Da de alta o renueva la jornada y el patrón semanal de una persona.
         </p>
+
+        {exito && (
+          <div className="tarjeta-info">
+            <CheckCircle2 size={16} aria-hidden="true" />
+            <span>
+              Jornada asignada a <strong>{exito.nombrePersona}</strong>. Podés asignar otra desde
+              acá mismo.
+            </span>
+          </div>
+        )}
 
         <fieldset className="fieldset-formulario">
           <legend className="encabezado-fieldset">

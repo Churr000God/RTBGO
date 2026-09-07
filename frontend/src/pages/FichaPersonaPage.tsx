@@ -1,6 +1,15 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { AlertCircle, KeyRound, Loader2, Plus, RefreshCw, Repeat } from "lucide-react";
+import {
+  AlertCircle,
+  AlertTriangle,
+  CalendarClock,
+  KeyRound,
+  Loader2,
+  Plus,
+  RefreshCw,
+  Repeat,
+} from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
@@ -29,6 +38,7 @@ type Persona = {
   tipo_contrato: string | null;
   documento_ref: string | null;
   tiene_usuario: boolean;
+  tiene_jornada_vigente: boolean;
   puestos_vigentes: PuestoVigente[];
 };
 
@@ -70,12 +80,95 @@ function formatearFecha(fecha?: string | null): string {
 
 type EstadoCarga = "cargando" | "listo" | "error";
 
+type Motivo = "sin_marcas" | "fuera_de_tolerancia";
+
+type AlertaRetardo = {
+  fecha: string;
+  hora_entrada_programada: string;
+  hora_salida_programada: string;
+  motivo: Motivo;
+};
+
+const ETIQUETA_MOTIVO_ALERTA: Record<Motivo, string> = {
+  sin_marcas: "Sin marcas ese día",
+  fuera_de_tolerancia: "Fuera de tolerancia",
+};
+
+// Ventana del resumen en la ficha — 30 días alcanza para una vista rápida sin salir del
+// tope de 62 días que impone el backend; el historial completo vive en la pantalla de
+// Reportes › Alertas de retardo (enlace "Ver todas").
+const DIAS_VENTANA_RESUMEN_ALERTAS = 29;
+
+function aFechaISO(fecha: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${fecha.getFullYear()}-${pad(fecha.getMonth() + 1)}-${pad(fecha.getDate())}`;
+}
+
+type DiaSemana =
+  | "lunes"
+  | "martes"
+  | "miercoles"
+  | "jueves"
+  | "viernes"
+  | "sabado"
+  | "domingo";
+
+const DIAS_SEMANA: { valor: DiaSemana; etiqueta: string }[] = [
+  { valor: "lunes", etiqueta: "Lun" },
+  { valor: "martes", etiqueta: "Mar" },
+  { valor: "miercoles", etiqueta: "Mié" },
+  { valor: "jueves", etiqueta: "Jue" },
+  { valor: "viernes", etiqueta: "Vie" },
+  { valor: "sabado", etiqueta: "Sáb" },
+  { valor: "domingo", etiqueta: "Dom" },
+];
+
+const ETIQUETA_TIPO_JORNADA: Record<string, string> = {
+  normal: "Normal",
+  flexible: "Flexible",
+  de_confianza: "De confianza",
+};
+
+type PatronDia = {
+  dia_semana: DiaSemana;
+  hora_entrada: string;
+  hora_salida: string;
+  minutos_comida: number;
+};
+
+type JornadaVigente = {
+  tipo_jornada: string;
+  vigente_desde: string;
+  horas_semanales_calculadas: number | null;
+  patron_semanal: PatronDia[];
+};
+
+function formatearHora(hora: string): string {
+  // hora_entrada/hora_salida llegan "HH:MM:SS" (time de Postgres) — sólo interesa HH:MM.
+  return hora.slice(0, 5);
+}
+
 export function FichaPersonaPage() {
   const { id } = useParams<{ id: string }>();
   const [persona, setPersona] = useState<Persona | null>(null);
   const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
   const [asignaciones, setAsignaciones] = useState<Asignacion[]>([]);
   const [estadoCarga, setEstadoCarga] = useState<EstadoCarga>("cargando");
+  const [alertas, setAlertas] = useState<AlertaRetardo[]>([]);
+  // Independiente del resto de la ficha a propósito: el permiso de lectura de alertas
+  // (clasificacion_de_tiempo_lectura) es distinto del que ya exige ver la ficha — si el caller
+  // no lo tiene, la sección se oculta en vez de tirar abajo toda la página (mismo criterio
+  // fail-soft que el resto de bloques opcionales de esta ficha).
+  const [estadoAlertas, setEstadoAlertas] = useState<"cargando" | "listo" | "sin_permiso">(
+    "cargando",
+  );
+  const [jornadaVigente, setJornadaVigente] = useState<JornadaVigente | null>(null);
+  // "sin_jornada" (404 real del backend) es distinto de "sin_permiso" (403/otro error) — el
+  // primero es un dato legítimo que sí se muestra ("sin jornada asignada todavía"), el segundo
+  // oculta la tarjeta entera, mismo criterio fail-soft que la de alertas de acá arriba.
+  const [estadoJornada, setEstadoJornada] = useState<
+    "cargando" | "listo" | "sin_jornada" | "sin_permiso"
+  >("cargando");
 
   function cargar() {
     setEstadoCarga("cargando");
@@ -105,6 +198,47 @@ export function FichaPersonaPage() {
   useEffect(() => {
     cargar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    const hoy = new Date();
+    const inicio = new Date(hoy);
+    inicio.setDate(hoy.getDate() - DIAS_VENTANA_RESUMEN_ALERTAS);
+    const params = new URLSearchParams({
+      persona_id: id,
+      desde: aFechaISO(inicio),
+      hasta: aFechaISO(hoy),
+    });
+    apiFetch(`/api/alertas-de-retardo?${params.toString()}`)
+      .then((r) => {
+        if (!r.ok) throw new Error(`status ${r.status}`);
+        return r.json();
+      })
+      .then((datos: { alertas?: AlertaRetardo[] }) => {
+        setAlertas(datos.alertas ?? []);
+        setEstadoAlertas("listo");
+      })
+      .catch(() => setEstadoAlertas("sin_permiso"));
+  }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    apiFetch(`/api/personas/${id}/jornada-vigente`)
+      .then((r) => {
+        if (r.status === 404) {
+          setEstadoJornada("sin_jornada");
+          return null;
+        }
+        if (!r.ok) throw new Error(`status ${r.status}`);
+        return r.json();
+      })
+      .then((datos: JornadaVigente | null) => {
+        if (!datos || !Array.isArray(datos.patron_semanal)) return;
+        setJornadaVigente(datos);
+        setEstadoJornada("listo");
+      })
+      .catch(() => setEstadoJornada("sin_permiso"));
   }, [id]);
 
   if (estadoCarga === "cargando") {
@@ -308,6 +442,89 @@ export function FichaPersonaPage() {
             </ul>
           )}
         </div>
+
+        {(estadoJornada === "listo" || estadoJornada === "sin_jornada") && (
+          <div className="tarjeta-resumen">
+            <div className="fila-cabecera-tarjeta">
+              <h3>Jornada asignada</h3>
+              <a
+                href={`/tiempo/asignacion-jornada?persona_id=${persona.id}`}
+                className="boton-con-icono enlace-etiqueta"
+              >
+                <CalendarClock size={14} aria-hidden="true" />
+                {jornadaVigente ? "Renovar jornada" : "Asignar jornada"}
+              </a>
+            </div>
+            {estadoJornada === "sin_jornada" || !jornadaVigente ? (
+              <p>Sin jornada vigente asignada.</p>
+            ) : (
+              <>
+                <p className="meta-ficha">
+                  <span className="insignia insignia--neutra">
+                    {ETIQUETA_TIPO_JORNADA[jornadaVigente.tipo_jornada] ?? jornadaVigente.tipo_jornada}
+                  </span>{" "}
+                  vigente desde {formatearFecha(jornadaVigente.vigente_desde)}
+                  {jornadaVigente.horas_semanales_calculadas != null &&
+                    ` · ${jornadaVigente.horas_semanales_calculadas.toFixed(1)} h/semana`}
+                </p>
+                <div className="calendario-semanal">
+                  {DIAS_SEMANA.map(({ valor, etiqueta }) => {
+                    const dia = jornadaVigente.patron_semanal.find((p) => p.dia_semana === valor);
+                    return (
+                      <div
+                        key={valor}
+                        className={`dia-calendario ${dia ? "dia-calendario--trabaja" : "dia-calendario--libre"}`}
+                      >
+                        <span className="nombre-dia">{etiqueta}</span>
+                        {dia ? (
+                          <>
+                            <span className="horario-dia">
+                              {formatearHora(dia.hora_entrada)}–{formatearHora(dia.hora_salida)}
+                            </span>
+                            {dia.minutos_comida > 0 && (
+                              <span className="comida-dia">{dia.minutos_comida} min comida</span>
+                            )}
+                          </>
+                        ) : (
+                          <span className="horario-dia">Libre</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {estadoAlertas === "listo" && (
+          <div className="tarjeta-resumen">
+            <div className="fila-cabecera-tarjeta">
+              <h3>Alertas de retardo</h3>
+              <a
+                href={`/tiempo/alertas-retardo?persona_id=${persona.id}`}
+                className="enlace-etiqueta"
+              >
+                Ver todas →
+              </a>
+            </div>
+            {alertas.length === 0 ? (
+              <p>Sin alertas de retardo en los últimos {DIAS_VENTANA_RESUMEN_ALERTAS + 1} días.</p>
+            ) : (
+              <ul className="lista-historial-resumido">
+                {alertas.slice(0, 5).map((alerta) => (
+                  <li key={`${alerta.fecha}-${alerta.motivo}`}>
+                    <span className="insignia insignia--aviso">
+                      <AlertTriangle size={12} aria-hidden="true" />
+                      {ETIQUETA_MOTIVO_ALERTA[alerta.motivo]}
+                    </span>
+                    <span className="fecha-historial">{formatearFecha(alerta.fecha)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
 
         <div className="tarjeta-resumen">
           <div className="fila-cabecera-tarjeta">

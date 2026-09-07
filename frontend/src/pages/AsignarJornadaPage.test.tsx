@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -16,7 +16,13 @@ vi.mock("../lib/supabaseClient", () => ({
 }));
 
 const PERSONAS_ACTIVAS = [
-  { id: "persona-ficticia-1", primer_nombre: "Persona", apellido_paterno: "Ficticia Uno", estado: "activo" },
+  {
+    id: "persona-ficticia-1",
+    primer_nombre: "Persona",
+    apellido_paterno: "Ficticia Uno",
+    estado: "activo",
+    tiene_jornada_vigente: false,
+  },
 ];
 
 function mockApiFetch(opciones: {
@@ -85,6 +91,24 @@ describe("AsignarJornadaPage", () => {
     expect(cuerpo.confirma_cierre_vigente).toBeUndefined();
   });
 
+  it("se queda en la pestaña tras guardar y limpia el formulario para asignar otra", async () => {
+    mockApiFetch({});
+
+    const { container } = render(<AsignarJornadaPage />);
+    await llenarFormularioBasico();
+    await userEvent.click(screen.getByRole("button", { name: /registrar/i }));
+
+    await waitFor(() =>
+      expect(container.querySelector(".tarjeta-info")).toHaveTextContent(
+        /jornada asignada a\s*persona ficticia uno/i,
+      ),
+    );
+    // Sigue en la misma pestaña — el formulario (con la etiqueta "Persona") sigue montado.
+    expect(screen.getByLabelText(/^persona$/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^persona$/i)).toHaveValue("");
+    expect(screen.queryByRole("checkbox", { name: /lunes/i, checked: true })).not.toBeInTheDocument();
+  });
+
   it("muestra el diálogo de confirmación en 409 (SCJ01) y reintenta con confirma_cierre_vigente:true", async () => {
     mockApiFetch({
       post: [
@@ -151,6 +175,51 @@ describe("AsignarJornadaPage", () => {
 
     await waitFor(() => expect(screen.getByLabelText(/^persona$/i)).toBeInTheDocument());
     expect(screen.queryByText(/^jornadas$/i)).not.toBeInTheDocument();
+  });
+
+  it("muestra la cobertura de jornadas (con/sin jornada) y permite preseleccionar desde ahí", async () => {
+    const personas = [
+      { id: "persona-1", primer_nombre: "Ana", apellido_paterno: "Con Jornada", estado: "activo", tiene_jornada_vigente: true },
+      { id: "persona-2", primer_nombre: "Beto", apellido_paterno: "Sin Jornada", estado: "activo", tiene_jornada_vigente: false },
+    ];
+    vi.mocked(apiFetch).mockImplementation((path: string) => {
+      if (path === "/api/sesion") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ acceso_permitido: true, motivo_bloqueo: null })),
+        );
+      }
+      if (path === "/api/personas") {
+        return Promise.resolve(new Response(JSON.stringify(personas)));
+      }
+      return Promise.reject(new Error(`ruta no mockeada: ${path}`));
+    });
+
+    render(<AsignarJornadaPage />);
+
+    const tabla = await screen.findByRole("table");
+    expect(within(tabla).getByText("Con jornada")).toBeInTheDocument();
+    expect(within(tabla).getByText("Sin jornada")).toBeInTheDocument();
+    expect(screen.getByText("Personas activas").nextElementSibling).toHaveTextContent("2");
+
+    await userEvent.click(
+      within(tabla).getByRole("button", { name: /asignar/i }),
+    );
+    expect(screen.getByLabelText(/^persona$/i)).toHaveValue("persona-2");
+  });
+
+  it("refresca la cobertura de jornadas después de registrar una nueva", async () => {
+    mockApiFetch({});
+
+    render(<AsignarJornadaPage />);
+    await llenarFormularioBasico();
+    await userEvent.click(screen.getByRole("button", { name: /registrar/i }));
+
+    await waitFor(() => {
+      const llamadasPersonas = vi
+        .mocked(apiFetch)
+        .mock.calls.filter(([path]) => path === "/api/personas");
+      expect(llamadasPersonas.length).toBeGreaterThanOrEqual(2);
+    });
   });
 
   it("muestra el grupo Jornadas del sidebar cuando puede_ver_modulo_3 es true", async () => {

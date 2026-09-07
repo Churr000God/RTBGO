@@ -38,6 +38,7 @@ class PersonaOut(BaseModel):
     fecha_ingreso: date
     fecha_baja: date | None = None
     estado: str
+    tiene_jornada_vigente: bool = False
 
 
 class PuestoVigente(BaseModel):

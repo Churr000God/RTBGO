@@ -14,6 +14,25 @@ from app.schemas.personas import PersonaConExpediente, PersonaCreate, PersonaOut
 router = APIRouter(prefix="/api/personas", tags=["personas"])
 
 
+def _resolver_personas_con_jornada_vigente(db: Client, persona_ids: list[str]) -> set[str]:
+    """Cruza a tiempo.jornada_asignada (la única dirección que puede ir sin romper la frontera --
+    SCJ-FRO-01 sólo prohíbe que un atributo de identidad cruce de personas a tiempo, no una
+    lectura de conveniencia en sentido contrario). Un solo IN por lote en vez de una consulta por
+    persona -- mismo criterio que el resto de los resolvers de nombre cruzado del proyecto."""
+    if not persona_ids:
+        return set()
+    filas = (
+        db.postgrest.schema("tiempo")
+        .table("jornada_asignada")
+        .select("persona_id")
+        .in_("persona_id", persona_ids)
+        .is_("vigente_hasta", "null")
+        .execute()
+        .data
+    )
+    return {fila["persona_id"] for fila in filas}
+
+
 @router.post("", status_code=201, response_model=PersonaOut)
 def alta_persona(
     datos: PersonaCreate,
@@ -54,7 +73,16 @@ def alta_persona(
 
 @router.get("", response_model=list[PersonaOut])
 def listar_personas(db: Client = Depends(get_caller_client)) -> list[dict]:
-    return db.postgrest.schema("personas").table("persona").select("*").execute().data
+    """tiene_jornada_vigente alimenta la pestaña de asignación de jornadas (SCJ-PRO-09) -- mismo
+    criterio que tiene_usuario en ficha_persona: un booleano derivado, no la jornada completa."""
+    personas = db.postgrest.schema("personas").table("persona").select("*").execute().data
+    con_jornada_vigente = _resolver_personas_con_jornada_vigente(
+        db, [persona["id"] for persona in personas]
+    )
+    return [
+        {**persona, "tiene_jornada_vigente": persona["id"] in con_jornada_vigente}
+        for persona in personas
+    ]
 
 
 @router.get("/{persona_id}", response_model=PersonaConExpediente)
@@ -104,9 +132,12 @@ def ficha_persona(persona_id: str, db: Client = Depends(get_caller_client)) -> d
         for asignacion in asignaciones_vigentes
     ]
 
+    tiene_jornada_vigente = persona_id in _resolver_personas_con_jornada_vigente(db, [persona_id])
+
     return {
         **fila,
         **expediente,
         "tiene_usuario": tiene_usuario,
+        "tiene_jornada_vigente": tiene_jornada_vigente,
         "puestos_vigentes": puestos_vigentes,
     }

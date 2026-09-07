@@ -15,7 +15,7 @@ from postgrest.exceptions import APIError
 from supabase import Client
 
 from app.deps import get_caller_client
-from app.permisos import requiere_todos_los_permisos
+from app.permisos import requiere_permiso, requiere_todos_los_permisos
 from app.schemas.jornada_asignada import (
     JornadaAsignadaCreate,
     JornadaAsignadaOut,
@@ -24,9 +24,16 @@ from app.schemas.jornada_asignada import (
 
 router = APIRouter(prefix="/api/jornadas-asignadas", tags=["jornadas-asignadas"])
 
+# Segundo router del mismo módulo, con prefijo anidado bajo /api/personas/{persona_id} -- mismo
+# patrón que movimientos.py (recurso de Tiempo consultado desde el expediente de una persona, sin
+# mezclarlo con el prefijo propio de "jornadas-asignadas"). Vive en este archivo porque la lógica
+# es 100% de jornada_asignada, no de personas.py.
+router_persona = APIRouter(prefix="/api/personas/{persona_id}", tags=["jornadas-asignadas"])
+
 CODIGO_VIGENCIA_ACTIVA_SIN_CONFIRMAR = "SCJ01"
 
 MENSAJE_PERSONA_INVALIDA = "La persona no existe."
+MENSAJE_SIN_JORNADA_VIGENTE = "La persona no tiene jornada vigente."
 MENSAJE_VIGENCIA_ACTIVA_SIN_CONFIRMAR = (
     "Esta persona ya tiene una jornada vigente. Confirmá para cerrarla y asignar la nueva."
 )
@@ -159,3 +166,38 @@ def asignar_jornada(
     )
 
     return {**jornada_nueva, "patron_semanal": patron_insertado}
+
+
+@router_persona.get("/jornada-vigente", response_model=JornadaAsignadaOut)
+def jornada_vigente_de_persona(
+    persona_id: str,
+    db: Client = Depends(get_caller_client),
+    _permiso: None = Depends(
+        requiere_permiso("jornada_asignada_lectura", "jornada_asignada_edicion")
+    ),
+) -> dict:
+    """Para el expediente de la persona (calendario semanal) -- 404 si no tiene jornada vigente,
+    en vez de devolver null: es una URL de un solo recurso ("la jornada vigente de esta
+    persona"), no un listado que pueda venir vacío."""
+    filas = (
+        db.postgrest.schema("tiempo")
+        .table("jornada_asignada")
+        .select("*")
+        .eq("persona_id", persona_id)
+        .is_("vigente_hasta", "null")
+        .execute()
+        .data
+    )
+    if not filas:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, MENSAJE_SIN_JORNADA_VIGENTE)
+
+    jornada = filas[0]
+    patron = (
+        db.postgrest.schema("tiempo")
+        .table("patron_semanal")
+        .select("*")
+        .eq("jornada_asignada_id", jornada["id"])
+        .execute()
+        .data
+    )
+    return {**jornada, "patron_semanal": patron}

@@ -31,6 +31,7 @@ const PERSONA = {
   tipo_contrato: "indefinido",
   documento_ref: "RTB-2026-001",
   tiene_usuario: false,
+  tiene_jornada_vigente: false,
   puestos_vigentes: [] as Array<Record<string, unknown>>,
 };
 
@@ -363,5 +364,169 @@ describe("FichaPersonaPage", () => {
         (link) => link.getAttribute("href") === `/personas/${PERSONA.id}/bitacora-asignaciones`
       )
     ).toBe(true);
+  });
+
+  it("muestra las alertas de retardo de la persona con link a la pantalla completa", async () => {
+    vi.mocked(apiFetch).mockImplementation((path: string) => {
+      if (path === "/api/sesion") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ acceso_permitido: true, motivo_bloqueo: null }))
+        );
+      }
+      if (path.endsWith("/movimientos")) {
+        return Promise.resolve(new Response(JSON.stringify(MOVIMIENTOS)));
+      }
+      if (path === "/api/asignaciones") {
+        return Promise.resolve(new Response(JSON.stringify(ASIGNACIONES)));
+      }
+      if (path.startsWith("/api/alertas-de-retardo")) {
+        expect(path).toContain(`persona_id=${PERSONA.id}`);
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              alertas: [
+                {
+                  fecha: "2026-09-05",
+                  hora_entrada_programada: "09:00:00",
+                  hora_salida_programada: "18:00:00",
+                  motivo: "fuera_de_tolerancia",
+                },
+              ],
+            })
+          )
+        );
+      }
+      return Promise.resolve(new Response(JSON.stringify(PERSONA)));
+    });
+
+    renderPagina();
+
+    await waitFor(() => expect(screen.getByText("Fuera de tolerancia")).toBeInTheDocument());
+    expect(
+      screen.getByRole("link", { name: /ver todas/i })
+    ).toHaveAttribute("href", `/tiempo/alertas-retardo?persona_id=${PERSONA.id}`);
+  });
+
+  it("si /api/alertas-de-retardo falla (sin permiso), oculta la sección en vez de romper la ficha", async () => {
+    vi.mocked(apiFetch).mockImplementation((path: string) => {
+      if (path === "/api/sesion") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ acceso_permitido: true, motivo_bloqueo: null }))
+        );
+      }
+      if (path.endsWith("/movimientos")) {
+        return Promise.resolve(new Response(JSON.stringify(MOVIMIENTOS)));
+      }
+      if (path === "/api/asignaciones") {
+        return Promise.resolve(new Response(JSON.stringify(ASIGNACIONES)));
+      }
+      if (path.startsWith("/api/alertas-de-retardo")) {
+        return Promise.resolve(new Response(null, { status: 403 }));
+      }
+      return Promise.resolve(new Response(JSON.stringify(PERSONA)));
+    });
+
+    renderPagina();
+
+    await waitFor(() =>
+      expect(screen.getAllByText("Mariana Guadalupe Alcántara Ruvalcaba").length).toBeGreaterThan(0)
+    );
+    expect(screen.queryByText(/alertas de retardo/i)).not.toBeInTheDocument();
+  });
+
+  it("muestra el calendario semanal de la jornada vigente", async () => {
+    vi.mocked(apiFetch).mockImplementation((path: string) => {
+      if (path === "/api/sesion") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ acceso_permitido: true, motivo_bloqueo: null }))
+        );
+      }
+      if (path.endsWith("/movimientos")) {
+        return Promise.resolve(new Response(JSON.stringify(MOVIMIENTOS)));
+      }
+      if (path === "/api/asignaciones") {
+        return Promise.resolve(new Response(JSON.stringify(ASIGNACIONES)));
+      }
+      if (path.startsWith("/api/alertas-de-retardo")) {
+        return Promise.resolve(new Response(JSON.stringify({ alertas: [] })));
+      }
+      if (path.endsWith("/jornada-vigente")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              id: 1,
+              persona_id: PERSONA.id,
+              tipo_jornada: "normal",
+              vigente_desde: "2026-08-01",
+              vigente_hasta: null,
+              descuento_comida_fija: false,
+              minutos_descuento_comida_fija: null,
+              horas_semanales_calculadas: 40,
+              genera_alerta_horario: false,
+              patron_semanal: [
+                {
+                  id: 1,
+                  jornada_asignada_id: 1,
+                  dia_semana: "lunes",
+                  hora_entrada: "09:00:00",
+                  hora_salida: "18:00:00",
+                  minutos_comida: 60,
+                  horas_efectivas: 8,
+                },
+              ],
+            })
+          )
+        );
+      }
+      return Promise.resolve(new Response(JSON.stringify(PERSONA)));
+    });
+
+    renderPagina();
+
+    await waitFor(() => expect(screen.getByText("Jornada asignada")).toBeInTheDocument());
+    expect(screen.getByText(/vigente desde 01 ago 2026/i)).toBeInTheDocument();
+    expect(screen.getByText("09:00–18:00")).toBeInTheDocument();
+    expect(screen.getByText("60 min comida")).toBeInTheDocument();
+    // Domingo no está en el patrón -> "Libre".
+    expect(screen.getAllByText("Libre").length).toBe(6);
+    expect(screen.getByRole("link", { name: /renovar jornada/i })).toHaveAttribute(
+      "href",
+      `/tiempo/asignacion-jornada?persona_id=${PERSONA.id}`,
+    );
+  });
+
+  it("si la persona no tiene jornada vigente (404), muestra el estado sin jornada con link para asignar", async () => {
+    vi.mocked(apiFetch).mockImplementation((path: string) => {
+      if (path === "/api/sesion") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ acceso_permitido: true, motivo_bloqueo: null }))
+        );
+      }
+      if (path.endsWith("/movimientos")) {
+        return Promise.resolve(new Response(JSON.stringify(MOVIMIENTOS)));
+      }
+      if (path === "/api/asignaciones") {
+        return Promise.resolve(new Response(JSON.stringify(ASIGNACIONES)));
+      }
+      if (path.startsWith("/api/alertas-de-retardo")) {
+        return Promise.resolve(new Response(JSON.stringify({ alertas: [] })));
+      }
+      if (path.endsWith("/jornada-vigente")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ detail: "La persona no tiene jornada vigente." }), {
+            status: 404,
+          }),
+        );
+      }
+      return Promise.resolve(new Response(JSON.stringify(PERSONA)));
+    });
+
+    renderPagina();
+
+    await waitFor(() => expect(screen.getByText("Sin jornada vigente asignada.")).toBeInTheDocument());
+    expect(screen.getByRole("link", { name: /asignar jornada/i })).toHaveAttribute(
+      "href",
+      `/tiempo/asignacion-jornada?persona_id=${PERSONA.id}`,
+    );
   });
 });

@@ -360,3 +360,86 @@ def test_asignar_jornada_horario_invalido_devuelve_422_sin_llegar_a_bd():
 
     app.dependency_overrides.clear()
     assert response.status_code == 422
+
+
+def _fila_jornada_vigente(**overrides):
+    fila = {
+        "id": JORNADA_ID,
+        "persona_id": PERSONA_ID,
+        "tipo_jornada": "normal",
+        "vigente_desde": "2026-06-01",
+        "vigente_hasta": None,
+        "descuento_comida_fija": False,
+        "minutos_descuento_comida_fija": None,
+        "horas_semanales_calculadas": None,
+        "genera_alerta_horario": True,
+    }
+    fila.update(overrides)
+    return fila
+
+
+def _fila_patron_semanal(**overrides):
+    fila = {
+        "id": 1,
+        "jornada_asignada_id": JORNADA_ID,
+        "dia_semana": "lunes",
+        "hora_entrada": "09:00:00",
+        "hora_salida": "18:00:00",
+        "minutos_comida": 60,
+        "horas_efectivas": None,
+    }
+    fila.update(overrides)
+    return fila
+
+
+def _entradas_gate_or():
+    """requiere_permiso (OR) -- a diferencia de _entradas_gate() (AND, 2 códigos), basta un solo
+    tiene_permiso() que resuelve true en el primer código -- una sola vuelta de
+    asignacion/puesto_permiso, no dos."""
+    return [
+        ("usuario", _tabla_select_simple([{"persona_id": GATE_PERSONA_ID}])),
+        ("asignacion", _tabla_select_eq_is([{"puesto_id": GATE_PUESTO_ID}])),
+        ("puesto_permiso", _tabla_select_doble_eq([{"puesto_id": GATE_PUESTO_ID}])),
+    ]
+
+
+def test_jornada_vigente_de_persona_devuelve_jornada_y_patron():
+    fake_client = _fake_client_secuencia(
+        _entradas_gate_or()
+        + [
+            ("jornada_asignada", _tabla_select_eq_is([_fila_jornada_vigente()])),
+            ("patron_semanal", _tabla_select_simple([_fila_patron_semanal()])),
+        ]
+    )
+    app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
+
+    client = TestClient(app)
+    response = client.get(
+        f"/api/personas/{PERSONA_ID}/jornada-vigente",
+        headers={"Authorization": "Bearer fake-token"},
+    )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200, response.text
+    cuerpo = response.json()
+    assert cuerpo["tipo_jornada"] == "normal"
+    assert len(cuerpo["patron_semanal"]) == 1
+    assert cuerpo["patron_semanal"][0]["dia_semana"] == "lunes"
+
+
+def test_jornada_vigente_de_persona_sin_jornada_devuelve_404():
+    fake_client = _fake_client_secuencia(
+        _entradas_gate_or() + [("jornada_asignada", _tabla_select_eq_is([]))]
+    )
+    app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
+
+    client = TestClient(app)
+    response = client.get(
+        f"/api/personas/{PERSONA_ID}/jornada-vigente",
+        headers={"Authorization": "Bearer fake-token"},
+    )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 404
