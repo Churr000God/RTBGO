@@ -24,6 +24,7 @@ Folio SCJ-DEC-00 · Versión 1.0 · Agosto de 2026
 | `SCJ-DEC-07` | ¿`requiere_revision`/`motivo_revision` como atributos de la marca, o entidad de excepción? | Aceptada | 2026-09-02 |
 | `SCJ-DEC-08` | ¿`evento_id` es clave primaria de la marca, o alterna junto a una subrogada? | Aceptada | 2026-09-02 |
 | `SCJ-DEC-09` | ¿Cómo se aplica la unicidad de `terminal_id` + `secuencia_local`, condicional a `origen`? | Aceptada | 2026-09-02 |
+| `SCJ-DEC-10` | ¿Cómo se calcula la alerta de retardo por jornada normal? | Aceptada | 2026-09-07 |
 
 ### Estados
 
