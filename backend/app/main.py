@@ -3,6 +3,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.config import parse_frontend_urls
 from app.scheduler import lifespan
 
 app = FastAPI(title="SCJ — Personas y Usuarios", lifespan=lifespan)
@@ -10,9 +11,11 @@ app = FastAPI(title="SCJ — Personas y Usuarios", lifespan=lifespan)
 # Se lee directo del entorno (no de app.config.Settings) para no forzar, sólo por el
 # middleware de CORS, la validación de las credenciales de Supabase al importar el
 # módulo — eso rompería la colección de pruebas cuando no hay .env con esas llaves.
+# FRONTEND_URL admite varios orígenes separados por coma (localhost + IP de Tailscale al mismo
+# tiempo, por ejemplo) -- parse_frontend_urls los separa; un solo valor sigue funcionando igual.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[os.getenv("FRONTEND_URL", "http://localhost:5173")],
+    allow_origins=parse_frontend_urls(os.getenv("FRONTEND_URL", "http://localhost:5173")),
     allow_methods=["*"],
     allow_headers=["*"],
 )

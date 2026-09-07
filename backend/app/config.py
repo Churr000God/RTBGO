@@ -20,3 +20,11 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+def parse_frontend_urls(valor: str) -> list[str]:
+    """FRONTEND_URL admite varios orígenes separados por coma (ej. localhost + una IP de
+    Tailscale al mismo tiempo, para probar desde escritorio y celular sin reiniciar) -- separa,
+    recorta espacios y descarta vacíos. Un solo valor sin comas sigue devolviendo una lista de
+    uno, mismo comportamiento que antes."""
+    return [origen.strip() for origen in valor.split(",") if origen.strip()]

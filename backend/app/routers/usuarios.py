@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from postgrest.exceptions import APIError
 from supabase import Client
 
-from app.config import Settings, get_settings
+from app.config import Settings, get_settings, parse_frontend_urls
 from app.deps import get_caller_client, get_service_client
 from app.errores import manejar_violacion_unicidad
 from app.permisos import requiere_permiso
@@ -31,7 +31,10 @@ def alta_usuario(
     uq_usuario_persona (05_personas_estructura.sql) es la garantía real de "una persona, un
     usuario" -- se chequea acá antes para no invitar (crear cuenta de Auth + mandar correo) a
     alguien que de todos modos va a rebotar por la constraint. La segunda capa (except APIError)
-    cubre la carrera de dos altas casi simultáneas para la misma persona."""
+    cubre la carrera de dos altas casi simultáneas para la misma persona.
+
+    redirect_to necesita una única URL -- si FRONTEND_URL trae varios orígenes separados por
+    coma (localhost + IP de Tailscale), se usa el primero."""
     ya_tiene_usuario = (
         db.postgrest.schema("personas")
         .table("usuario")
@@ -43,9 +46,10 @@ def alta_usuario(
     if ya_tiene_usuario:
         raise HTTPException(status.HTTP_409_CONFLICT, MENSAJE_USUARIO_DUPLICADO)
 
+    frontend_url = parse_frontend_urls(settings.frontend_url)[0]
     invite = db.auth.admin.invite_user_by_email(
         datos.correo,
-        {"redirect_to": f"{settings.frontend_url}/completar-invitacion"},
+        {"redirect_to": f"{frontend_url}/completar-invitacion"},
     )
 
     try:
