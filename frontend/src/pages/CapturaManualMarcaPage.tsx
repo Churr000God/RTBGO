@@ -2,6 +2,7 @@ import { type FormEvent, useEffect, useState } from "react";
 import { CheckCircle2, Fingerprint, Info } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
+import { generarUuidV4 } from "../lib/uuid";
 import { AppShell } from "../layouts/AppShell";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
@@ -65,7 +66,7 @@ export function CapturaManualMarcaPage() {
   // enviarlo — es la llave de idempotencia. Si el usuario reintenta sin refrescar, se reenvía
   // el mismo evento_id en vez de generar uno nuevo (evita marcas duplicadas por doble clic o
   // reintento de red).
-  const [eventoId, setEventoId] = useState(() => crypto.randomUUID());
+  const [eventoId, setEventoId] = useState(() => generarUuidV4());
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [resultado, setResultado] = useState<ResultadoCaptura | null>(null);
@@ -116,7 +117,7 @@ export function CapturaManualMarcaPage() {
     setPersonaId("");
     setError(null);
     // Nueva captura = nuevo evento_id. El anterior ya sirvió su propósito de idempotencia.
-    setEventoId(crypto.randomUUID());
+    setEventoId(generarUuidV4());
   }
 
   const sinPersonas = estadoPersonas === "listo" && personas.length === 0;
