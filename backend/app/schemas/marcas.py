@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, field_validator
 
@@ -35,6 +36,7 @@ class MarcaListaItem(BaseModel):
     terminal_id: str
     secuencia_local: int | None = None
     momento_dispositivo: datetime
+    momento_efectivo: datetime
     momento_recepcion: datetime
     desfase_local: str
     estado_reloj: str
@@ -43,6 +45,7 @@ class MarcaListaItem(BaseModel):
     requiere_revision: bool
     motivos_revision: list[str]
     excepcion_pendiente_id: int | None = None
+    estado_revision: Literal["sin_revision", "pendiente", "resuelta"]
 
 
 class MarcaListaOut(BaseModel):

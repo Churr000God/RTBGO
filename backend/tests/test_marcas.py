@@ -207,6 +207,7 @@ def test_listar_marcas_devuelve_pagina_con_nombre_persona_resuelto():
                 "persona",
                 _tabla_in([{"id": PERSONA_ID, "primer_nombre": "Ana", "apellido_paterno": "Pérez"}]),
             ),
+            ("correccion", _tabla_in_order([])),
         ]
     )
     app.dependency_overrides[get_caller_client] = lambda: fake_client
@@ -220,6 +221,8 @@ def test_listar_marcas_devuelve_pagina_con_nombre_persona_resuelto():
     cuerpo = response.json()
     assert cuerpo["total"] == 1
     assert cuerpo["marcas"][0]["persona_nombre"] == "Ana Pérez"
+    assert cuerpo["marcas"][0]["momento_efectivo"] == cuerpo["marcas"][0]["momento_dispositivo"]
+    assert cuerpo["marcas"][0]["estado_revision"] == "sin_revision"
 
 
 def test_listar_marcas_acepta_filtros_de_persona_fecha_hora_y_paginado():
@@ -231,6 +234,7 @@ def test_listar_marcas_acepta_filtros_de_persona_fecha_hora_y_paginado():
                 "persona",
                 _tabla_in([{"id": PERSONA_ID, "primer_nombre": "Ana", "apellido_paterno": "Pérez"}]),
             ),
+            ("correccion", _tabla_in_order([])),
         ]
     )
     app.dependency_overrides[get_caller_client] = lambda: fake_client
@@ -538,6 +542,18 @@ def test_listar_marcas_con_revision_trae_motivos_desde_excepcion():
                     ]
                 ),
             ),
+            (
+                "correccion",
+                _tabla_in_order(
+                    [
+                        {
+                            "marca_id": MARCA_ID,
+                            "valor_corregido": "2026-09-06T12:15:00+00:00",
+                            "creado_en": "2026-09-06T13:00:00+00:00",
+                        }
+                    ]
+                ),
+            ),
         ]
     )
     app.dependency_overrides[get_caller_client] = lambda: fake_client
@@ -551,6 +567,9 @@ def test_listar_marcas_con_revision_trae_motivos_desde_excepcion():
     cuerpo = response.json()
     assert cuerpo["marcas"][0]["motivos_revision"] == ["persona_inactiva"]
     assert cuerpo["marcas"][0]["excepcion_pendiente_id"] == 900
+    assert cuerpo["marcas"][0]["estado_revision"] == "pendiente"
+    assert cuerpo["marcas"][0]["momento_efectivo"] == "2026-09-06T12:15:00Z"
+    assert cuerpo["marcas"][0]["momento_efectivo"] != cuerpo["marcas"][0]["momento_dispositivo"]
 
 
 def test_listar_marcas_con_excepcion_ya_resuelta_no_expone_pendiente():
@@ -582,6 +601,7 @@ def test_listar_marcas_con_excepcion_ya_resuelta_no_expone_pendiente():
                     ]
                 ),
             ),
+            ("correccion", _tabla_in_order([])),
         ]
     )
     app.dependency_overrides[get_caller_client] = lambda: fake_client
@@ -595,6 +615,7 @@ def test_listar_marcas_con_excepcion_ya_resuelta_no_expone_pendiente():
     cuerpo = response.json()
     assert cuerpo["marcas"][0]["motivos_revision"] == ["persona_inactiva"]
     assert cuerpo["marcas"][0]["excepcion_pendiente_id"] is None
+    assert cuerpo["marcas"][0]["estado_revision"] == "resuelta"
 
 
 def test_listar_marcas_sin_excepciones_excepcion_pendiente_id_es_none():
@@ -606,6 +627,7 @@ def test_listar_marcas_sin_excepciones_excepcion_pendiente_id_es_none():
                 "persona",
                 _tabla_in([{"id": PERSONA_ID, "primer_nombre": "Ana", "apellido_paterno": "Pérez"}]),
             ),
+            ("correccion", _tabla_in_order([])),
         ]
     )
     app.dependency_overrides[get_caller_client] = lambda: fake_client
@@ -616,5 +638,6 @@ def test_listar_marcas_sin_excepciones_excepcion_pendiente_id_es_none():
 
     app.dependency_overrides.clear()
     assert response.status_code == 200, response.text
+    assert response.json()["marcas"][0]["estado_revision"] == "sin_revision"
     cuerpo = response.json()
     assert cuerpo["marcas"][0]["excepcion_pendiente_id"] is None

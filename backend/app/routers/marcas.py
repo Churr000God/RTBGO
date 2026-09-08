@@ -180,6 +180,40 @@ def _resolver_motivos_y_pendiente_por_marca(
     return motivos, pendientes
 
 
+def _resolver_momento_efectivo_por_marca(db: Client, marca_ids: list[int]) -> dict[int, datetime]:
+    """Mismo cálculo que el trigger SQL fn_correccion_valida (db/ddl/02_tiempo.sql:414-419):
+    COALESCE(último tiempo.correccion.valor_corregido por marca_id ordenado por creado_en DESC,
+    momento_dispositivo si no hay corrección). tiempo.marca es INSERT-only (SCJ-DEC-03) -- la
+    corrección vive en otra tabla, así que este helper corre sobre TODAS las marcas de la
+    página, no sólo las que requieren_revision (una marca puede tener corrección aunque ya no
+    requiera revisión)."""
+    if not marca_ids:
+        return {}
+    filas = (
+        db.postgrest.schema("tiempo")
+        .table("correccion")
+        .select("marca_id, valor_corregido, creado_en")
+        .in_("marca_id", marca_ids)
+        .order("creado_en", desc=True)
+        .execute()
+        .data
+    )
+    efectivo: dict[int, datetime] = {}
+    for fila in filas:
+        efectivo.setdefault(fila["marca_id"], fila["valor_corregido"])
+    return efectivo
+
+
+def _estado_revision(requiere_revision: bool, excepcion_pendiente_id: int | None) -> str:
+    """Derivado de campos ya calculados, sin query nueva. requiere_revision es de una sola vía
+    (nunca baja a false) -- por eso no alcanza sola para saber si ya se resolvió."""
+    if not requiere_revision:
+        return "sin_revision"
+    if excepcion_pendiente_id is not None:
+        return "pendiente"
+    return "resuelta"
+
+
 @router.get("", response_model=MarcaListaOut)
 def listar_marcas(
     db: Client = Depends(get_caller_client),
@@ -222,12 +256,18 @@ def listar_marcas(
         {fila["id"] for fila in resultado.data if fila["requiere_revision"]}
     )
     motivos, pendientes = _resolver_motivos_y_pendiente_por_marca(db, ids_con_revision)
+    ids_pagina = sorted({fila["id"] for fila in resultado.data})
+    efectivos = _resolver_momento_efectivo_por_marca(db, ids_pagina)
     marcas = [
         {
             **fila,
             "persona_nombre": nombres.get(fila["persona_id"]),
             "motivos_revision": motivos.get(fila["id"], []),
             "excepcion_pendiente_id": pendientes.get(fila["id"]),
+            "momento_efectivo": efectivos.get(fila["id"], fila["momento_dispositivo"]),
+            "estado_revision": _estado_revision(
+                fila["requiere_revision"], pendientes.get(fila["id"])
+            ),
         }
         for fila in resultado.data
     ]
