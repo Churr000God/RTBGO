@@ -80,6 +80,24 @@ def _resolver_nombres_persona(db: Client, persona_ids: list[str]) -> dict[str, s
     return {fila["id"]: f"{fila['primer_nombre']} {fila['apellido_paterno']}" for fila in filas}
 
 
+def _resolver_tipos_por_tramo(db: Client, tramo_ids: list[int]) -> dict[int, str]:
+    """tramo_id es UNIQUE en tiempo.clasificacion_de_tiempo (uq_clasificacion_de_tiempo_tramo) --
+    1:1, no hace falta acumular en lista. El batch de corte quincenal (SCJ-PRO-13) es lo que la
+    calcula, no un trigger -- un tramo puede no tener fila todavía (tipo=None), típicamente el
+    tramo "en curso" (nunca se clasifica hasta que cierra)."""
+    if not tramo_ids:
+        return {}
+    filas = (
+        db.postgrest.schema("tiempo")
+        .table("clasificacion_de_tiempo")
+        .select("tramo_id, tipo")
+        .in_("tramo_id", tramo_ids)
+        .execute()
+        .data
+    )
+    return {fila["tramo_id"]: fila["tipo"] for fila in filas}
+
+
 @router.get("", response_model=TramoListaOut)
 def listar_tramos(
     db_servicio: Client = Depends(get_service_client),
@@ -122,5 +140,13 @@ def listar_tramos(
     nombres = _resolver_nombres_persona(
         db_servicio, sorted({fila["persona_id"] for fila in filas})
     )
-    tramos = [{**fila, "persona_nombre": nombres.get(fila["persona_id"])} for fila in filas]
+    tipos = _resolver_tipos_por_tramo(db_servicio, sorted({fila["id"] for fila in filas}))
+    tramos = [
+        {
+            **fila,
+            "persona_nombre": nombres.get(fila["persona_id"]),
+            "tipo": tipos.get(fila["id"]),
+        }
+        for fila in filas
+    ]
     return {"total": resultado.count, "tramos": tramos}

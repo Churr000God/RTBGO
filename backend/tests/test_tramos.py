@@ -132,12 +132,22 @@ def _tabla_persona(busqueda_ids=None, nombres=None):
     return tabla
 
 
-def _fake_service_client(tramo=None, persona=None):
+def _tabla_clasificacion(tipos=None):
+    tabla = MagicMock()
+    tabla.select.return_value.in_.return_value.execute.return_value.data = tipos or []
+    return tabla
+
+
+def _fake_service_client(tramo=None, persona=None, clasificacion=None):
+    clasificacion = clasificacion if clasificacion is not None else _tabla_clasificacion()
+
     def side_effect(nombre_tabla):
         if nombre_tabla == "tramo":
             return tramo
         if nombre_tabla == "persona":
             return persona
+        if nombre_tabla == "clasificacion_de_tiempo":
+            return clasificacion
         return MagicMock()
 
     fake_client = MagicMock()
@@ -162,9 +172,11 @@ def _pedir_tramos(**params):
     return client.get("/api/tramos", params=params, headers={"Authorization": "Bearer fake-token"})
 
 
-def _preparar_gate_y_servicio(tabla_tramo=None, tabla_persona=None):
+def _preparar_gate_y_servicio(tabla_tramo=None, tabla_persona=None, tabla_clasificacion=None):
     fake_caller = _fake_caller_client_secuencia(_entradas_gate())
-    fake_service = _fake_service_client(tramo=tabla_tramo, persona=tabla_persona)
+    fake_service = _fake_service_client(
+        tramo=tabla_tramo, persona=tabla_persona, clasificacion=tabla_clasificacion
+    )
     app.dependency_overrides[get_caller_client] = lambda: fake_caller
     app.dependency_overrides[get_service_client] = lambda: fake_service
     _override_identidad()
@@ -193,6 +205,34 @@ def test_listar_tramos_devuelve_pagina_con_nombre_persona_resuelto_y_campos_apla
     assert tramo["persona_nombre"] == "Ana Pérez"
     assert tramo["dia_estado"] == "cerrado"
     assert "dia" not in tramo
+
+
+def test_listar_tramos_con_clasificacion_expone_el_tipo_tal_cual():
+    tabla_tramo = _tabla_tramo([_fila_tramo()], total=1)
+    tabla_persona = _tabla_persona(nombres=[])
+    tabla_clasificacion = _tabla_clasificacion([{"tramo_id": 4, "tipo": "reposicion"}])
+    _preparar_gate_y_servicio(tabla_tramo, tabla_persona, tabla_clasificacion)
+
+    response = _pedir_tramos()
+
+    _limpiar()
+    assert response.status_code == 200, response.text
+    assert response.json()["tramos"][0]["tipo"] == "reposicion"
+
+
+def test_listar_tramos_sin_clasificacion_tipo_es_none():
+    """Tramo sin fila en tiempo.clasificacion_de_tiempo -- típicamente el tramo 'en curso', que
+    todavía no pasó por el batch de corte quincenal (SCJ-PRO-13)."""
+    fila_abierta = _fila_tramo(dia_estado="abierto", fin=None, minutos_trabajados=None)
+    tabla_tramo = _tabla_tramo([fila_abierta], total=1)
+    tabla_persona = _tabla_persona(nombres=[])
+    _preparar_gate_y_servicio(tabla_tramo, tabla_persona)
+
+    response = _pedir_tramos()
+
+    _limpiar()
+    assert response.status_code == 200, response.text
+    assert response.json()["tramos"][0]["tipo"] is None
 
 
 def test_listar_tramos_tramo_abierto_fin_y_minutos_nulos_sobreviven():

@@ -13,6 +13,7 @@ class TramoListaItem(BaseModel):
     inicio: datetime
     fin: datetime | None
     minutos_trabajados: float | None
+    tipo: Literal["ordinario", "reposicion", "extra"] | None = None
 
 
 class TramoListaOut(BaseModel):
