@@ -28,12 +28,14 @@ type Marca = {
   terminal_id: string;
   secuencia_local: number | null;
   momento_dispositivo: string;
+  momento_efectivo: string;
   desfase_local: string;
   momento_recepcion: string;
   estado_reloj: "sincronizado" | "deriva" | "sin_sincronizar";
   origen: "terminal" | "captura_manual";
   version_software: string;
   requiere_revision: boolean;
+  estado_revision: "sin_revision" | "pendiente" | "resuelta";
   motivos_revision: string[];
   excepcion_pendiente_id: number | null;
 };
@@ -57,6 +59,19 @@ const VARIANTE_ESTADO_RELOJ: Record<Marca["estado_reloj"], "exito" | "aviso" | "
   sincronizado: "exito",
   deriva: "aviso",
   sin_sincronizar: "peligro",
+};
+
+// "resuelta" reusa la variante "exito" — mismo criterio que "Vigente" en ParametrosSistemaPage:
+// no es un mensaje de éxito de una acción, es un estado cerrado/sin pendiente, la lectura visual
+// que ya tiene esa variante en el proyecto.
+const ETIQUETA_ESTADO_REVISION: Record<"pendiente" | "resuelta", string> = {
+  pendiente: "Requiere revisión",
+  resuelta: "Revisión resuelta",
+};
+
+const VARIANTE_ESTADO_REVISION: Record<"pendiente" | "resuelta", "aviso" | "exito"> = {
+  pendiente: "aviso",
+  resuelta: "exito",
 };
 
 function formatearFechaHora(fecha: string): string {
@@ -246,21 +261,28 @@ export function RegistroMarcasPage() {
                         </Badge>
                       </td>
                       <td>
-                        {formatearFechaHora(marca.momento_dispositivo)} ({marca.desfase_local})
+                        {formatearFechaHora(marca.momento_efectivo)} ({marca.desfase_local})
+                        {marca.momento_efectivo !== marca.momento_dispositivo && (
+                          <div className="ayuda-campo">
+                            Original: {formatearFechaHora(marca.momento_dispositivo)}
+                          </div>
+                        )}
                       </td>
                       <td>{formatearFechaHora(marca.momento_recepcion)}</td>
                       <td>
-                        {marca.requiere_revision ? (
+                        {marca.estado_revision === "sin_revision" ? (
+                          "—"
+                        ) : (
                           <>
-                            <Badge variante="aviso">Requiere revisión</Badge>
+                            <Badge variante={VARIANTE_ESTADO_REVISION[marca.estado_revision]}>
+                              {ETIQUETA_ESTADO_REVISION[marca.estado_revision]}
+                            </Badge>
                             {marca.motivos_revision.length > 0 && (
                               <div className="ayuda-campo">
                                 {marca.motivos_revision.map((motivo) => etiquetaMotivo(motivo)).join(", ")}
                               </div>
                             )}
                           </>
-                        ) : (
-                          "—"
                         )}
                       </td>
                       <td>

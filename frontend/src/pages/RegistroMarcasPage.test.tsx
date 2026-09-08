@@ -28,12 +28,14 @@ const MARCA_1 = {
   terminal_id: "rh-captura-01",
   secuencia_local: null,
   momento_dispositivo: "2026-09-07T12:00:00Z",
+  momento_efectivo: "2026-09-07T12:00:00Z",
   desfase_local: "-06:00",
   momento_recepcion: "2026-09-07T12:00:00Z",
   estado_reloj: "sincronizado",
   origen: "captura_manual",
   version_software: "1.0.0",
   requiere_revision: false,
+  estado_revision: "sin_revision",
   motivos_revision: [],
   excepcion_pendiente_id: null,
 };
@@ -140,10 +142,11 @@ describe("RegistroMarcasPage", () => {
     expect(llamadas.length).toBeGreaterThanOrEqual(2);
   });
 
-  it("columna Ocurrió muestra momento_dispositivo + desfase_local, distinto de Recibida", async () => {
+  it("columna Ocurrió muestra momento_efectivo + desfase_local, distinto de Recibida", async () => {
     const marca = {
       ...MARCA_1,
       momento_dispositivo: "2026-09-07T08:00:00Z",
+      momento_efectivo: "2026-09-07T08:00:00Z",
       desfase_local: "-06:00",
       momento_recepcion: "2026-09-07T14:00:00Z",
     };
@@ -159,10 +162,28 @@ describe("RegistroMarcasPage", () => {
     expect(celdaOcurrio.textContent).not.toBe(celdaRecibida.textContent);
   });
 
-  it("motivos_revision etiquetados aparecen bajo el badge de revisión", async () => {
+  it("momento_efectivo distinto de momento_dispositivo muestra el valor corregido y el original", async () => {
+    const marca = {
+      ...MARCA_1,
+      momento_dispositivo: "2026-09-07T08:00:00Z",
+      momento_efectivo: "2026-09-07T09:00:00Z",
+    };
+    mockApiFetch({ marcas: new Response(JSON.stringify({ total: 1, marcas: [marca] })) });
+
+    render(<RegistroMarcasPage />);
+
+    const fila = await waitFor(() => screen.getByRole("row", { name: /persona ficticia uno/i }));
+    const celdaOcurrio = within(fila).getAllByRole("cell")[4];
+    expect(celdaOcurrio).toHaveTextContent("03:00:00");
+    expect(celdaOcurrio).toHaveTextContent(/original/i);
+    expect(celdaOcurrio).toHaveTextContent("02:00:00");
+  });
+
+  it("motivos_revision etiquetados aparecen bajo el badge de revisión pendiente", async () => {
     const marca = {
       ...MARCA_1,
       requiere_revision: true,
+      estado_revision: "pendiente",
       motivos_revision: ["persona_inactiva", "dia_cerrado"],
     };
     mockApiFetch({ marcas: new Response(JSON.stringify({ total: 1, marcas: [marca] })) });
@@ -173,8 +194,29 @@ describe("RegistroMarcasPage", () => {
     expect(screen.getByText(/persona inactiva, día ya cerrado/i)).toBeInTheDocument();
   });
 
+  it("estado_revision resuelta muestra el badge de resuelta, no el de pendiente", async () => {
+    const marca = {
+      ...MARCA_1,
+      requiere_revision: true,
+      estado_revision: "resuelta",
+      motivos_revision: ["persona_inactiva"],
+    };
+    mockApiFetch({ marcas: new Response(JSON.stringify({ total: 1, marcas: [marca] })) });
+
+    render(<RegistroMarcasPage />);
+
+    await waitFor(() => expect(screen.getByText(/revisión resuelta/i)).toBeInTheDocument());
+    expect(screen.queryByText(/^requiere revisión$/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/persona inactiva/i)).toBeInTheDocument();
+  });
+
   it("excepcion_pendiente_id no nulo muestra el link Corregir con el href correcto", async () => {
-    const marca = { ...MARCA_1, requiere_revision: true, excepcion_pendiente_id: 42 };
+    const marca = {
+      ...MARCA_1,
+      requiere_revision: true,
+      estado_revision: "pendiente",
+      excepcion_pendiente_id: 42,
+    };
     mockApiFetch({ marcas: new Response(JSON.stringify({ total: 1, marcas: [marca] })) });
 
     render(<RegistroMarcasPage />);
@@ -184,7 +226,12 @@ describe("RegistroMarcasPage", () => {
   });
 
   it("requiere_revision true con excepcion_pendiente_id null no muestra el botón Corregir", async () => {
-    const marca = { ...MARCA_1, requiere_revision: true, excepcion_pendiente_id: null };
+    const marca = {
+      ...MARCA_1,
+      requiere_revision: true,
+      estado_revision: "pendiente",
+      excepcion_pendiente_id: null,
+    };
     mockApiFetch({ marcas: new Response(JSON.stringify({ total: 1, marcas: [marca] })) });
 
     render(<RegistroMarcasPage />);
