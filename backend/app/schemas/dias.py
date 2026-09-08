@@ -33,6 +33,11 @@ class DiaRevisarRequest(BaseModel):
     horas_totales: float = Field(ge=0, le=24)
 
 
+class DiaPrevisualizacionOut(BaseModel):
+    horas_calculadas: float
+    tiene_huerfana_sin_pareja: bool
+
+
 class DiaRevisadoOut(BaseModel):
     id: int
     persona_id: str

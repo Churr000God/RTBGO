@@ -25,7 +25,7 @@ from supabase import Client
 from app import alertas_horario
 from app.deps import get_caller_client, get_service_client
 from app.permisos import requiere_permiso, requiere_todos_los_permisos
-from app.schemas.dias import DiaListaOut, DiaRevisadoOut, DiaRevisarRequest
+from app.schemas.dias import DiaListaOut, DiaPrevisualizacionOut, DiaRevisadoOut, DiaRevisarRequest
 
 router = APIRouter(prefix="/api/dias", tags=["dias"])
 
@@ -35,12 +35,20 @@ LIMITE_MAXIMO = 200
 CODIGO_DIA_NO_ENCONTRADO = "SCJ06"
 CODIGO_DIA_NO_BLOQUEADO = "SCJ07"
 CODIGO_HORAS_INVALIDAS = "SCJ08"
+CODIGO_HUERFANA_SIN_PAREJA = "SCJ09"
 
 MENSAJE_DIA_NO_ENCONTRADO = "El día no existe."
 MENSAJE_DIA_NO_BLOQUEADO = (
     "Este día ya no está bloqueado -- alguien más se te adelantó, o nunca lo estuvo."
 )
 MENSAJE_HORAS_INVALIDAS = "Horas trabajadas inválidas -- debe estar entre 0 y 24."
+MENSAJE_HUERFANA_SIN_PAREJA = (
+    "Este día tiene una marca sin pareja -- corregí la marca faltante o usá captura manual antes "
+    "de revisar."
+)
+
+ACCIONES_TRAMO_CON_HORAS = ("cerrar_existente", "nuevo")
+ACCION_HUERFANA_SIN_PAREJA = "huerfana_sin_pareja"
 
 SELECT_DIA = "id, persona_id, fecha, estado, horas_totales, origen"
 
@@ -237,6 +245,33 @@ def listar_dias(
     return {"total": resultado.count, "dias": dias}
 
 
+@router.get("/{dia_id}/previsualizar-tramos", response_model=DiaPrevisualizacionOut)
+def previsualizar_tramos(
+    dia_id: int,
+    db: Client = Depends(get_caller_client),
+    _permiso: None = Depends(requiere_permiso("dia_revision_edicion")),
+) -> dict:
+    """Sólo lectura -- tiempo.fn_dia_calcular_armado_tramos no escribe nada, simula cómo
+    quedarían los tramos si se revisara el día ahora mismo (db/ddl/65_*.sql). Mismo gate que
+    revisar_dia: si no podés revisar, tampoco tiene sentido que veas la previsualización."""
+    resultado = (
+        db.postgrest.schema("tiempo")
+        .rpc("fn_dia_calcular_armado_tramos", {"p_dia_id": dia_id})
+        .execute()
+    )
+    filas = resultado.data
+    minutos_calculados = sum(
+        fila["minutos_trabajados"]
+        for fila in filas
+        if fila["accion"] in ACCIONES_TRAMO_CON_HORAS
+    )
+    tiene_huerfana = any(fila["accion"] == ACCION_HUERFANA_SIN_PAREJA for fila in filas)
+    return {
+        "horas_calculadas": minutos_calculados / 60.0,
+        "tiene_huerfana_sin_pareja": tiene_huerfana,
+    }
+
+
 @router.post("/{dia_id}/revisar", response_model=DiaRevisadoOut)
 def revisar_dia(
     dia_id: int,
@@ -265,6 +300,8 @@ def revisar_dia(
             raise HTTPException(status.HTTP_409_CONFLICT, MENSAJE_DIA_NO_BLOQUEADO) from error
         if error.code == CODIGO_HORAS_INVALIDAS:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, MENSAJE_HORAS_INVALIDAS) from error
+        if error.code == CODIGO_HUERFANA_SIN_PAREJA:
+            raise HTTPException(status.HTTP_409_CONFLICT, MENSAJE_HUERFANA_SIN_PAREJA) from error
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, error.message) from error
 
     fila = resultado.data

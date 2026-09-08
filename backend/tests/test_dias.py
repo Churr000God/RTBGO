@@ -543,6 +543,82 @@ def test_listar_dias_excepciones_resueltas_no_cuentan():
 
 
 # ---------------------------------------------------------------------------
+# GET /api/dias/{dia_id}/previsualizar-tramos
+# ---------------------------------------------------------------------------
+
+
+def _fila_armado(accion, minutos=None, **overrides):
+    fila = {
+        "accion": accion,
+        "tramo_id": None,
+        "marca_apertura_id": 1,
+        "marca_cierre_id": 2,
+        "inicio": "2026-09-08T14:00:00+00:00",
+        "fin": "2026-09-08T23:00:00+00:00",
+        "minutos_trabajados": minutos,
+    }
+    fila.update(overrides)
+    return fila
+
+
+def _pedir_previsualizar(dia_id=DIA_ID):
+    client = TestClient(app)
+    return client.get(
+        f"/api/dias/{dia_id}/previsualizar-tramos", headers={"Authorization": "Bearer fake-token"}
+    )
+
+
+def test_previsualizar_tramos_cerrarian_calcula_horas_sin_huerfana():
+    fake_client = _fake_caller_client_secuencia(_entradas_gate_or())
+    fake_client.postgrest.schema.return_value.rpc.return_value.execute.return_value.data = [
+        _fila_armado("cerrar_existente", minutos=480.0),
+        _fila_armado("nuevo", minutos=60.0),
+    ]
+    app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
+
+    response = _pedir_previsualizar()
+
+    _limpiar()
+    assert response.status_code == 200, response.text
+    cuerpo = response.json()
+    assert cuerpo["horas_calculadas"] == 9.0
+    assert cuerpo["tiene_huerfana_sin_pareja"] is False
+    fake_client.postgrest.schema.return_value.rpc.assert_called_once_with(
+        "fn_dia_calcular_armado_tramos", {"p_dia_id": DIA_ID}
+    )
+
+
+def test_previsualizar_tramos_con_huerfana_sobrante():
+    fake_client = _fake_caller_client_secuencia(_entradas_gate_or())
+    fake_client.postgrest.schema.return_value.rpc.return_value.execute.return_value.data = [
+        _fila_armado("cerrar_existente", minutos=480.0),
+        _fila_armado("huerfana_sin_pareja", minutos=None, fin=None),
+    ]
+    app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
+
+    response = _pedir_previsualizar()
+
+    _limpiar()
+    assert response.status_code == 200, response.text
+    cuerpo = response.json()
+    assert cuerpo["horas_calculadas"] == 8.0
+    assert cuerpo["tiene_huerfana_sin_pareja"] is True
+
+
+def test_previsualizar_tramos_sin_permiso_devuelve_403():
+    fake_client = _fake_caller_client_con_permisos(set())
+    app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
+
+    response = _pedir_previsualizar()
+
+    _limpiar()
+    assert response.status_code == 403
+
+
+# ---------------------------------------------------------------------------
 # POST /api/dias/{dia_id}/revisar
 # ---------------------------------------------------------------------------
 
@@ -647,6 +723,21 @@ def test_revisar_dia_no_bloqueado_devuelve_409():
 
     _limpiar()
     assert response.status_code == 409
+
+
+def test_revisar_dia_huerfana_sin_pareja_devuelve_409_con_mensaje():
+    fake_client = _fake_caller_client_secuencia(_entradas_gate_or())
+    fake_client.postgrest.schema.return_value.rpc.return_value.execute.side_effect = APIError(
+        {"code": "SCJ09", "message": "marca huerfana sin pareja"}
+    )
+    app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
+
+    response = _pedir_revisar()
+
+    _limpiar()
+    assert response.status_code == 409
+    assert "sin pareja" in response.json()["detail"]
 
 
 def test_revisar_dia_sin_permiso_devuelve_403():
