@@ -50,7 +50,7 @@ backend y un frontend que lo exponen. Ver `README.md` y `docs/00-contexto/SCJ-CT
   `--no-dev` (sin pytest) y el frontend prod es nginx sirviendo el bundle (sin npm/node); el script
   corta con un mensaje explícito en vez de fallar con un error de `docker exec`. Las pruebas
   siempre corren con `dev pruebas`.
-- **Tests:** backend `uv run pytest` (278 casos), frontend `npm test` (396 casos, 58 archivos).
+- **Tests:** backend `uv run pytest` (343 casos), frontend `npm test` (443 casos, 60 archivos).
   Ambos corren igual dentro de los contenedores (`./scripts/desplegar.sh <entorno> pruebas`).
   Cobertura instrumentada desde el 4 de septiembre de 2026: `uv run pytest --cov=app
   --cov-report=term-missing` (backend) y `npm run test:coverage` / `npm test -- --coverage`
@@ -192,6 +192,53 @@ backend y un frontend que lo exponen. Ver `README.md` y `docs/00-contexto/SCJ-CT
   `app/catalogo_motivos_revision.py`, espejado en frontend por `lib/motivosRevision.ts` (que
   separa el sufijo que `fn_ausencia_resuelve_excepcion` concatena al resolver una excepción). Ver
   `bitacora/2026-09-07_registro_marcas_hora_dispositivo.md`.
+- **Módulo Tramos y Días, primera escritura humana sobre `tiempo.tramo`/`tiempo.dia` (8 de
+  septiembre de 2026):** ninguna de las dos tablas tenía pantalla propia. `GET /api/tramos` +
+  `TramosPage.tsx` primero (búsqueda/filtros/orden/paginación, embed `dia:dia_id!inner(...)` para
+  fecha/persona/estado sin segunda consulta). Después, en cortes sucesivos guiados por el usuario
+  probando en vivo: botón "Corregir" en Registro de marcas gateado por `excepcion_pendiente_id`
+  (no por `requiere_revision`, que es una bandera de una sola vía); `momento_efectivo`/
+  `estado_revision` en `GET /api/marcas` para que "Ocurrió" y el badge reflejen la corrección real.
+  **Pantalla Días** (`db/ddl/62_*.sql`): primer permiso de *acción* `dia_revision_edicion`
+  (heredable, RH/Gerente General/TI) + policy asimétrica + RPC `fn_dia_revisar` — la única
+  transición manual que permite `SCJ-DEC-06` (`bloqueado → revisado`), con columnas de auditoría
+  nuevas `revisado_por`/`revisado_en`. `GET /api/dias` suma primera/última marca efectiva y dos
+  alertas de horario direccionales e independientes (`backend/app/alertas_horario.py`, módulo
+  nuevo — corrige 3 gaps reales de `alertas_de_retardo.py` sin tocar esa pantalla). Horas al
+  revisar: **RH las escribe a mano** (`db/ddl/63_*.sql`, `p_horas_totales`), nunca auto-calculadas
+  a ciegas, con un botón "Calcular tiempo total" que sugiere el valor antes de confirmar
+  (`db/ddl/65_*.sql`, `fn_dia_calcular_armado_tramos` de sólo lectura, reusada por el RPC real).
+  `db/ddl/64_*.sql` abrió el primer camino de escritura humana sobre `tiempo.tramo` (hasta entonces
+  cero policies de escritura): al revisar, arma los tramos que quedaron con marcas huérfanas
+  (llegadas después del bloqueo) — si quedaría una marca sin pareja, bloquea todo el revisar
+  (`ERRCODE SCJ09`) en vez de inventar un cierre. `db/ddl/` llega hasta `67_*.sql`. Ver
+  `bitacora/2026-09-08_modulo_tramos_y_dias.md`.
+- **Descuento de pausa unificado + rediseño de Ausencias (8 de septiembre de 2026, mismo día, 2
+  cortes):** `tiempo.parametro.descuento_pausa_no_registrada_min` (sembrado hace semanas sin
+  consumidor) gana su primer uso real: `cierre_dia.py` lo resta de `horas_totales` cuando un día
+  resulta en un solo tramo (sin pausa marcada), sin importar tipo de jornada.
+  `fn_ausencia_resuelve_excepcion` (`db/ddl/66_*.sql`) deja de restar `patron_semanal.minutos_comida`
+  y pasa a restar el mismo parámetro global — un solo concepto de "descuento por pausa" en todo el
+  sistema. Excepción deliberada a `SCJ-PRO-14` ("de confianza siempre `NULL`"): cualquier ausencia
+  resuelta de una persona `de_confianza`, incluso rechazada, pone la jornada completa neta, nunca
+  `0` — documentada en el propio proceso, ver gotcha de `CREATE OR REPLACE FUNCTION` abajo.
+  **Ausencias** pasa de tarjetas-sólo-pendientes a tabla completa (`GET /api/ausencias` nuevo, con
+  columna "Aprobado por" resuelta desde `tiempo.aprobacion_ausencia`) con leyenda de los 5 tipos —
+  el schema que el usuario propuso en 2 diagramas ER ya existía casi exacto en la base real, sólo
+  se construyó pantalla y listado. `corte_quincenal.py` sigue sin ver este descuento (divergencia
+  conocida y aceptada, no se toca cálculo de nómina sin pedido aparte). Ver
+  `bitacora/2026-09-08_rediseno_ausencias_y_descuento_pausa.md`.
+- **Jornada Asignada: fila expandible + bug real de vigencias solapadas (8 de septiembre de 2026,
+  mismo día, corte final):** rediseño de `AsignarJornadaPage.tsx` (3 mockups interactivos, usuario
+  eligió fila expandible con el patrón semanal — `DetalleJornadaAsignada.tsx` nuevo, compartido con
+  `FichaPersonaPage.tsx`; formulario colapsable). Sin backend nuevo. El usuario, probando en vivo,
+  encontró un bug real: renovar la jornada dos veces el mismo día dejaba `vigente_hasta` **antes**
+  del propio `vigente_desde` de esa fila (`fn_jornada_asignar_renovar` calcula `vigente_hasta =
+  nueva.vigente_desde - 1`, sin contemplar vigencias que empiezan el mismo día). Cazado con logging
+  temporal real (retirado después) tras descartar RLS/doble-submit/payload obsoleto de escritorio.
+  Fix en `db/ddl/67_*.sql`: `ERRCODE SCJ02` nuevo rechaza el caso antes de escribir, más
+  `CHECK ck_jornada_asignada_vigencia` como red de seguridad a nivel base. Ver
+  `bitacora/2026-09-08_jornada_asignada_rediseno_y_bug_vigencia.md`.
 
 ## Arquitectura y módulos
 
@@ -236,7 +283,7 @@ Cada una vive en su propio documento de decisión — no se duplican aquí, sól
   `http://localhost:5173` fijo a mano — esa configuración no vive en este repositorio. Al pasar a
   producción (`docker compose … prod`, frontend en `:8080`) hay que actualizarla ahí también, o
   los links de invitación/recuperación de contraseña no aterrizan en la app.
-- El DDL corre hasta `db/ddl/61_*.sql`. `personas.permiso`
+- El DDL corre hasta `db/ddl/67_*.sql`. `personas.permiso`
   es la única tabla del proyecto con clave natural (`codigo varchar PRIMARY KEY`) en vez de `uuid`
   — decisión deliberada, fiel a la redacción literal de `SCJ-PRO-05`, no un descuido a corregir.
 - Las tablas de bitácora inmutables (`bitacora_movimiento_persona`,
@@ -316,7 +363,30 @@ Cada una vive en su propio documento de decisión — no se duplican aquí, sól
   de Postgres/TLS nunca completa, tanto desde el sandbox de una sesión como desde la shell real del
   usuario (7 de septiembre de 2026, aplicando `61_*.sql`). No es un problema de la migración ni de
   credenciales. **Lección:** no reintentar `psql` más de 2-3 veces — pegar el archivo directo en el
-  SQL Editor del dashboard de Supabase.
+  SQL Editor del dashboard de Supabase. Desde el 8 de septiembre `psql` sí volvió a funcionar sin
+  colgarse (`62_*.sql` a `67_*.sql` se aplicaron todos por esa vía) — el gotcha sigue vigente como
+  posibilidad, no asumir que "ya se solucionó para siempre".
+- **`CREATE OR REPLACE FUNCTION` no hereda `SECURITY DEFINER`/`SET search_path` de un `ALTER
+  FUNCTION` anterior — los resetea a los valores por defecto si no se repiten explícitos.**
+  Encontrado el 8 de septiembre de 2026 al modificar `fn_ausencia_resuelve_excepcion` (que había
+  ganado `SECURITY DEFINER SET search_path = tiempo, pg_temp` vía `51_*.sql`, no en su
+  `CREATE FUNCTION` original): reescribirla con un `CREATE OR REPLACE FUNCTION ... $$ LANGUAGE
+  plpgsql;` literal habría reintroducido en silencio el mismo bug de RLS sobre `tiempo.dia` que
+  `51_*.sql` corrigió. **Lección:** antes de tocar con `CREATE OR REPLACE` cualquier función que
+  alguna vez recibió un `ALTER FUNCTION` posterior a su creación (buscar el nombre de la función en
+  todo `db/ddl/*.sql`), repetir esas cláusulas explícitas en el nuevo `CREATE OR REPLACE` — no
+  asumir que se heredan.
+- **Ninguna vigencia debe poder quedar con `vigente_hasta` anterior a su propio `vigente_desde` —
+  y ningún `CHECK` lo impedía en `tiempo.jornada_asignada` hasta que pasó de verdad.** Renovar una
+  jornada dos veces el mismo día (`db/ddl/67_*.sql`, 8 de septiembre de 2026): el RPC calculaba
+  `vigente_hasta = nueva.vigente_desde - 1` asumiendo que la nueva siempre empieza *después* de que
+  empezó la anterior — con el mismo `vigente_desde` en las dos, eso da un intervalo invertido,
+  guardado en silencio. Cazado con logging temporal real tras descartar RLS/doble-submit/payload
+  obsoleto de escritorio como hipótesis de escritorio, ninguna correcta. **Lección:** toda tabla
+  con `vigente_desde`/`vigente_hasta` (`jornada_asignada`, `tope_legal`, `parametro`, `asignacion`)
+  debería tener su propio `CHECK (vigente_hasta IS NULL OR vigente_hasta >= vigente_desde)` — sólo
+  `jornada_asignada` lo tiene por ahora, agregado recién tras encontrar el bug, no por diseño desde
+  el principio. Revisar las demás si se vuelve a tocar alguna.
 
 ## Historial de decisiones
 
