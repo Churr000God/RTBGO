@@ -62,7 +62,8 @@ def resolver_marcas_efectivas(
 
     Devuelve, por (persona_id, fecha), el instante efectivo (UTC aware, tal cual se muestra en la
     pantalla) y la hora local (para comparar contra el patrón semanal) de la primera y última
-    marca de ese día."""
+    marca de ese día, más `marca_ids` -- TODAS las marcas del día, no sólo la primera/última,
+    necesario para contar excepciones pendientes ligadas a esas marcas (routers/dias.py)."""
     if not persona_ids:
         return {}
 
@@ -96,7 +97,7 @@ def resolver_marcas_efectivas(
         if actual is None or correccion["creado_en"] > actual["creado_en"]:
             ultima_correccion_por_marca[correccion["marca_id"]] = correccion
 
-    candidatas: dict[tuple[str, date], list[tuple[datetime, datetime]]] = {}
+    candidatas: dict[tuple[str, date], list[tuple[datetime, datetime, int]]] = {}
     for marca in marcas:
         correccion = ultima_correccion_por_marca.get(marca["id"])
         efectivo_iso = correccion["valor_corregido"] if correccion else marca["momento_dispositivo"]
@@ -106,18 +107,19 @@ def resolver_marcas_efectivas(
             continue  # fuera de la página pedida -- sólo se amplió la ventana para no perderla
         efectivo = datetime.fromisoformat(efectivo_iso)
         clave = (marca["persona_id"], fecha_local)
-        candidatas.setdefault(clave, []).append((efectivo, local))
+        candidatas.setdefault(clave, []).append((efectivo, local, marca["id"]))
 
     resultado: dict[tuple[str, date], dict] = {}
-    for clave, pares in candidatas.items():
-        pares.sort(key=lambda par: par[0])
-        primera_efectivo, primera_local = pares[0]
-        ultima_efectivo, ultima_local = pares[-1]
+    for clave, tercias in candidatas.items():
+        tercias.sort(key=lambda tercia: tercia[0])
+        primera_efectivo, primera_local, _ = tercias[0]
+        ultima_efectivo, ultima_local, _ = tercias[-1]
         resultado[clave] = {
             "primera": primera_efectivo,
             "ultima": ultima_efectivo,
             "primera_local": primera_local.time(),
             "ultima_local": ultima_local.time(),
+            "marca_ids": [tercia[2] for tercia in tercias],
         }
     return resultado
 

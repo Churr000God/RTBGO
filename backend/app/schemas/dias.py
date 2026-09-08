@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 EstadoDia = Literal["abierto", "cerrado", "bloqueado", "revisado"]
 OrigenDia = Literal["automatico_confianza", "ausencia_autorizada"]
@@ -21,11 +21,16 @@ class DiaListaItem(BaseModel):
     ultima_marca: datetime | None
     alerta_entrada: AlertaEntrada | None = None
     alerta_salida: AlertaSalida | None = None
+    excepciones_pendientes: int = 0
 
 
 class DiaListaOut(BaseModel):
     total: int
     dias: list[DiaListaItem]
+
+
+class DiaRevisarRequest(BaseModel):
+    horas_totales: float = Field(ge=0, le=24)
 
 
 class DiaRevisadoOut(BaseModel):

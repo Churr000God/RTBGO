@@ -25,7 +25,7 @@ from supabase import Client
 from app import alertas_horario
 from app.deps import get_caller_client, get_service_client
 from app.permisos import requiere_permiso, requiere_todos_los_permisos
-from app.schemas.dias import DiaListaOut, DiaRevisadoOut
+from app.schemas.dias import DiaListaOut, DiaRevisadoOut, DiaRevisarRequest
 
 router = APIRouter(prefix="/api/dias", tags=["dias"])
 
@@ -34,11 +34,13 @@ LIMITE_MAXIMO = 200
 
 CODIGO_DIA_NO_ENCONTRADO = "SCJ06"
 CODIGO_DIA_NO_BLOQUEADO = "SCJ07"
+CODIGO_HORAS_INVALIDAS = "SCJ08"
 
 MENSAJE_DIA_NO_ENCONTRADO = "El día no existe."
 MENSAJE_DIA_NO_BLOQUEADO = (
     "Este día ya no está bloqueado -- alguien más se te adelantó, o nunca lo estuvo."
 )
+MENSAJE_HORAS_INVALIDAS = "Horas trabajadas inválidas -- debe estar entre 0 y 24."
 
 SELECT_DIA = "id, persona_id, fecha, estado, horas_totales, origen"
 
@@ -79,6 +81,52 @@ def _resolver_nombres_persona(db: Client, persona_ids: list[str]) -> dict[str, s
     return {fila["id"]: f"{fila['primer_nombre']} {fila['apellido_paterno']}" for fila in filas}
 
 
+def _resolver_excepciones_pendientes(
+    db_servicio: Client, marcas_por_dia: dict[tuple[str, date], dict], dia_ids: list[int]
+) -> tuple[dict[tuple[str, date], int], dict[int, int]]:
+    """Guía sin bloquear nada (SCJ-PRO-08/10/11 siguen su curso normal, revisar un día no exige
+    resolverlas primero) -- dos consultas batch a tiempo.excepcion, mutuamente excluyentes por
+    diseño (ck_excepcion_marca_o_dia): las que cuelgan de una marca (persona_inactiva,
+    dia_cerrado, fuera_de_horario, ...) y las que cuelgan del día directo (paridad_impar, sin
+    marca_id, SCJ-PRO-08). Se cuentan por separado acá; el llamador suma las dos por fila."""
+    todos_los_marca_ids = sorted(
+        {marca_id for bucket in marcas_por_dia.values() for marca_id in bucket["marca_ids"]}
+    )
+    por_marca: dict[int, int] = {}
+    if todos_los_marca_ids:
+        filas = (
+            db_servicio.postgrest.schema("tiempo")
+            .table("excepcion")
+            .select("marca_id")
+            .in_("marca_id", todos_los_marca_ids)
+            .eq("estado", "pendiente")
+            .execute()
+            .data
+        )
+        for fila in filas:
+            por_marca[fila["marca_id"]] = por_marca.get(fila["marca_id"], 0) + 1
+
+    por_dia_directo: dict[int, int] = {}
+    if dia_ids:
+        filas = (
+            db_servicio.postgrest.schema("tiempo")
+            .table("excepcion")
+            .select("dia_id")
+            .in_("dia_id", dia_ids)
+            .eq("estado", "pendiente")
+            .execute()
+            .data
+        )
+        for fila in filas:
+            por_dia_directo[fila["dia_id"]] = por_dia_directo.get(fila["dia_id"], 0) + 1
+
+    por_clave = {
+        clave: sum(por_marca.get(marca_id, 0) for marca_id in bucket["marca_ids"])
+        for clave, bucket in marcas_por_dia.items()
+    }
+    return por_clave, por_dia_directo
+
+
 def _enriquecer_pagina(db_servicio: Client, filas: list[dict]) -> list[dict]:
     """Ventana min(fecha)..max(fecha) de la página YA paginada (nota de rendimiento: con orden
     por fecha -- el default -- la ventana es mínima; con orden por horas y sin filtro de fecha
@@ -96,6 +144,9 @@ def _enriquecer_pagina(db_servicio: Client, filas: list[dict]) -> list[dict]:
     jornada_ids = sorted({j["id"] for jornadas in jornadas_por_persona.values() for j in jornadas})
     patrones = alertas_horario.resolver_patrones(db_servicio, jornada_ids)
     tolerancias = alertas_horario.resolver_tolerancias(db_servicio, hasta)
+    excepciones_por_clave, excepciones_por_dia_id = _resolver_excepciones_pendientes(
+        db_servicio, marcas, [fila["id"] for fila in filas]
+    )
 
     resultado: list[dict] = []
     for fila in filas:
@@ -122,6 +173,10 @@ def _enriquecer_pagina(db_servicio: Client, filas: list[dict]) -> list[dict]:
                         tolerancia,
                     )
 
+        excepciones_pendientes = excepciones_por_clave.get(
+            clave_marca, 0
+        ) + excepciones_por_dia_id.get(fila["id"], 0)
+
         resultado.append(
             {
                 **fila,
@@ -129,6 +184,7 @@ def _enriquecer_pagina(db_servicio: Client, filas: list[dict]) -> list[dict]:
                 "ultima_marca": marca_del_dia["ultima"] if marca_del_dia else None,
                 "alerta_entrada": alerta_entrada,
                 "alerta_salida": alerta_salida,
+                "excepciones_pendientes": excepciones_pendientes,
             }
         )
     return resultado
@@ -184,17 +240,22 @@ def listar_dias(
 @router.post("/{dia_id}/revisar", response_model=DiaRevisadoOut)
 def revisar_dia(
     dia_id: int,
+    datos: DiaRevisarRequest,
     db: Client = Depends(get_caller_client),
     _permiso: None = Depends(requiere_permiso("dia_revision_edicion")),
 ) -> dict:
-    """SCJ-DEC-06: bloqueado -> revisado, un clic sin motivo/comentario. Actor y momento se
+    """SCJ-DEC-06: bloqueado -> revisado. horas_totales las escribe RH a mano -- un día bloqueado
+    es, por definición, un caso que el sistema no puede calcular solo. Actor y momento se
     resuelven dentro de fn_dia_revisar (auth.uid()/now()), no se mandan desde acá -- mismo patrón
     que fn_ausencia_resolver. dia_update_revision (RLS) es la autorización real; este endpoint
     sólo traduce los ERRCODE del RPC a HTTP legible."""
     try:
         resultado = (
             db.postgrest.schema("tiempo")
-            .rpc("fn_dia_revisar", {"p_dia_id": dia_id})
+            .rpc(
+                "fn_dia_revisar",
+                {"p_dia_id": dia_id, "p_horas_totales": datos.horas_totales},
+            )
             .execute()
         )
     except APIError as error:
@@ -202,6 +263,8 @@ def revisar_dia(
             raise HTTPException(status.HTTP_404_NOT_FOUND, MENSAJE_DIA_NO_ENCONTRADO) from error
         if error.code == CODIGO_DIA_NO_BLOQUEADO:
             raise HTTPException(status.HTTP_409_CONFLICT, MENSAJE_DIA_NO_BLOQUEADO) from error
+        if error.code == CODIGO_HORAS_INVALIDAS:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, MENSAJE_HORAS_INVALIDAS) from error
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, error.message) from error
 
     fila = resultado.data

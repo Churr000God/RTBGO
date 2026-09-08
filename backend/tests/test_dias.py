@@ -148,6 +148,24 @@ def _tabla_persona_in(datos):
     return tabla
 
 
+def _tabla_excepcion(pendientes_por_marca=None, pendientes_por_dia=None):
+    """_resolver_excepciones_pendientes hace dos consultas contra la misma tabla, distintas sólo
+    por la columna pedida en select() -- 'marca_id' o 'dia_id'. Se distinguen por eso."""
+    tabla = MagicMock()
+
+    def select_side_effect(columna):
+        siguiente = MagicMock()
+        if columna == "marca_id":
+            datos = [{"marca_id": marca_id} for marca_id in (pendientes_por_marca or [])]
+        else:
+            datos = [{"dia_id": dia_id} for dia_id in (pendientes_por_dia or [])]
+        siguiente.in_.return_value.eq.return_value.execute.return_value.data = datos
+        return siguiente
+
+    tabla.select.side_effect = select_side_effect
+    return tabla
+
+
 def _fake_service_client(**tablas):
     defaults = {
         "dia": _tabla_encadenada([], total=0),
@@ -157,6 +175,7 @@ def _fake_service_client(**tablas):
         "jornada_asignada": _tabla_encadenada([]),
         "patron_semanal": _tabla_encadenada([]),
         "parametro": _tabla_encadenada([]),
+        "excepcion": _tabla_excepcion(),
     }
     defaults.update({nombre: tabla for nombre, tabla in tablas.items() if tabla is not None})
 
@@ -478,6 +497,51 @@ def test_listar_dias_estado_revisado_no_suprime_alertas():
     assert dia["alerta_entrada"] == "retardo"
 
 
+def test_listar_dias_excepciones_pendientes_suma_marca_y_dia():
+    """2 pendientes vía marca (marcas 1 y 2, ambas del mismo día) + 1 pendiente vía dia_id directo
+    (ej. paridad_impar, SCJ-PRO-08) -> 3 en total."""
+    tabla_dia = _tabla_encadenada([_fila_dia()], total=1)
+    tabla_marca = _tabla_encadenada(
+        [
+            _fila_marca(1, "2026-09-08T14:00:00+00:00"),
+            _fila_marca(2, "2026-09-08T23:00:00+00:00"),
+        ]
+    )
+    tabla_excepcion = _tabla_excepcion(pendientes_por_marca=[1, 2], pendientes_por_dia=[DIA_ID])
+    _preparar(tabla_dia=tabla_dia, marca=tabla_marca, excepcion=tabla_excepcion)
+
+    response = _pedir_dias()
+
+    _limpiar()
+    assert response.status_code == 200, response.text
+    assert response.json()["dias"][0]["excepciones_pendientes"] == 3
+
+
+def test_listar_dias_sin_excepciones_pendientes_es_cero():
+    tabla_dia = _tabla_encadenada([_fila_dia()], total=1)
+    _preparar(tabla_dia=tabla_dia)
+
+    response = _pedir_dias()
+
+    _limpiar()
+    assert response.json()["dias"][0]["excepciones_pendientes"] == 0
+
+
+def test_listar_dias_excepciones_resueltas_no_cuentan():
+    """La consulta real filtra .eq('estado', 'pendiente') -- una excepción resuelto nunca llega
+    acá, mismo criterio que el resto de las consultas de este router."""
+    tabla_dia = _tabla_encadenada([_fila_dia()], total=1)
+    tabla_marca = _tabla_encadenada([_fila_marca(1, "2026-09-08T14:00:00+00:00")])
+    # marca 1 tiene una excepción, pero resuelto -- no aparece en la respuesta filtrada.
+    tabla_excepcion = _tabla_excepcion(pendientes_por_marca=[], pendientes_por_dia=[])
+    _preparar(tabla_dia=tabla_dia, marca=tabla_marca, excepcion=tabla_excepcion)
+
+    response = _pedir_dias()
+
+    _limpiar()
+    assert response.json()["dias"][0]["excepciones_pendientes"] == 0
+
+
 # ---------------------------------------------------------------------------
 # POST /api/dias/{dia_id}/revisar
 # ---------------------------------------------------------------------------
@@ -498,19 +562,55 @@ def _fila_dia_revisada(**overrides):
     return fila
 
 
-def _pedir_revisar(dia_id=DIA_ID):
+def _pedir_revisar(dia_id=DIA_ID, horas_totales=8.0):
     client = TestClient(app)
     return client.post(
-        f"/api/dias/{dia_id}/revisar", headers={"Authorization": "Bearer fake-token"}
+        f"/api/dias/{dia_id}/revisar",
+        json={"horas_totales": horas_totales},
+        headers={"Authorization": "Bearer fake-token"},
     )
 
 
-def test_revisar_dia_exito_llama_rpc_una_vez():
+def test_revisar_dia_exito_llama_rpc_una_vez_con_horas():
     fake_client = _fake_caller_client_secuencia(
         _entradas_gate_or() + [("persona", _tabla_persona_in([{"id": PERSONA_1, "primer_nombre": "Ana", "apellido_paterno": "Pérez"}]))]
     )
     fake_client.postgrest.schema.return_value.rpc.return_value.execute.return_value.data = (
-        _fila_dia_revisada()
+        _fila_dia_revisada(horas_totales=7.5)
+    )
+    app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
+
+    response = _pedir_revisar(horas_totales=7.5)
+
+    _limpiar()
+    assert response.status_code == 200, response.text
+    cuerpo = response.json()
+    assert cuerpo["estado"] == "revisado"
+    assert cuerpo["horas_totales"] == 7.5
+    assert cuerpo["persona_nombre"] == "Ana Pérez"
+    fake_client.postgrest.schema.return_value.rpc.assert_called_once_with(
+        "fn_dia_revisar", {"p_dia_id": DIA_ID, "p_horas_totales": 7.5}
+    )
+
+
+def test_revisar_dia_horas_fuera_de_rango_devuelve_422_sin_llegar_al_rpc():
+    fake_client = _fake_caller_client_secuencia(_entradas_gate_or())
+    app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
+
+    response = _pedir_revisar(horas_totales=25)
+
+    _limpiar()
+    assert response.status_code == 422
+    fake_client.postgrest.schema.return_value.rpc.assert_not_called()
+
+
+def test_revisar_dia_horas_invalidas_rechazadas_por_el_rpc_devuelve_422():
+    """SCJ08 -- por si el RPC lo rechaza por otra razón que Pydantic no cubre."""
+    fake_client = _fake_caller_client_secuencia(_entradas_gate_or())
+    fake_client.postgrest.schema.return_value.rpc.return_value.execute.side_effect = APIError(
+        {"code": "SCJ08", "message": "horas invalidas"}
     )
     app.dependency_overrides[get_caller_client] = lambda: fake_client
     _override_identidad()
@@ -518,13 +618,7 @@ def test_revisar_dia_exito_llama_rpc_una_vez():
     response = _pedir_revisar()
 
     _limpiar()
-    assert response.status_code == 200, response.text
-    cuerpo = response.json()
-    assert cuerpo["estado"] == "revisado"
-    assert cuerpo["persona_nombre"] == "Ana Pérez"
-    fake_client.postgrest.schema.return_value.rpc.assert_called_once_with(
-        "fn_dia_revisar", {"p_dia_id": DIA_ID}
-    )
+    assert response.status_code == 422
 
 
 def test_revisar_dia_no_encontrado_devuelve_404():
