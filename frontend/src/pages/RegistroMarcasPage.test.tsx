@@ -35,6 +35,7 @@ const MARCA_1 = {
   version_software: "1.0.0",
   requiere_revision: false,
   motivos_revision: [],
+  excepcion_pendiente_id: null,
 };
 
 function mockApiFetch(opciones: { marcas?: Response } = {}) {
@@ -170,5 +171,25 @@ describe("RegistroMarcasPage", () => {
 
     await waitFor(() => expect(screen.getByText(/requiere revisión/i)).toBeInTheDocument());
     expect(screen.getByText(/persona inactiva, día ya cerrado/i)).toBeInTheDocument();
+  });
+
+  it("excepcion_pendiente_id no nulo muestra el link Corregir con el href correcto", async () => {
+    const marca = { ...MARCA_1, requiere_revision: true, excepcion_pendiente_id: 42 };
+    mockApiFetch({ marcas: new Response(JSON.stringify({ total: 1, marcas: [marca] })) });
+
+    render(<RegistroMarcasPage />);
+
+    const enlace = await waitFor(() => screen.getByRole("link", { name: /corregir/i }));
+    expect(enlace).toHaveAttribute("href", "/tiempo/excepciones/42/corregir");
+  });
+
+  it("requiere_revision true con excepcion_pendiente_id null no muestra el botón Corregir", async () => {
+    const marca = { ...MARCA_1, requiere_revision: true, excepcion_pendiente_id: null };
+    mockApiFetch({ marcas: new Response(JSON.stringify({ total: 1, marcas: [marca] })) });
+
+    render(<RegistroMarcasPage />);
+
+    await waitFor(() => expect(screen.getByText(/requiere revisión/i)).toBeInTheDocument());
+    expect(screen.queryByRole("link", { name: /corregir/i })).not.toBeInTheDocument();
   });
 });

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, Loader2, RadioTower, Search } from "lucide-react";
+import { AlertCircle, Loader2, RadioTower, Search, Wrench } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { etiquetaMotivo } from "../lib/motivosRevision";
@@ -35,6 +35,7 @@ type Marca = {
   version_software: string;
   requiere_revision: boolean;
   motivos_revision: string[];
+  excepcion_pendiente_id: number | null;
 };
 
 type RespuestaMarcas = { total: number; marcas: Marca[] };
@@ -230,6 +231,7 @@ export function RegistroMarcasPage() {
                     <th>Ocurrió</th>
                     <th>Recibida</th>
                     <th>Revisión</th>
+                    <th>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -257,6 +259,19 @@ export function RegistroMarcasPage() {
                               </div>
                             )}
                           </>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td>
+                        {marca.excepcion_pendiente_id !== null ? (
+                          <a
+                            href={`/tiempo/excepciones/${marca.excepcion_pendiente_id}/corregir`}
+                            className="boton-con-icono"
+                          >
+                            <Wrench size={14} aria-hidden="true" />
+                            Corregir
+                          </a>
                         ) : (
                           "—"
                         )}
