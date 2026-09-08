@@ -31,11 +31,15 @@ router = APIRouter(prefix="/api/jornadas-asignadas", tags=["jornadas-asignadas"]
 router_persona = APIRouter(prefix="/api/personas/{persona_id}", tags=["jornadas-asignadas"])
 
 CODIGO_VIGENCIA_ACTIVA_SIN_CONFIRMAR = "SCJ01"
+CODIGO_VIGENCIA_DESDE_INVALIDA = "SCJ02"
 
 MENSAJE_PERSONA_INVALIDA = "La persona no existe."
 MENSAJE_SIN_JORNADA_VIGENTE = "La persona no tiene jornada vigente."
 MENSAJE_VIGENCIA_ACTIVA_SIN_CONFIRMAR = (
     "Esta persona ya tiene una jornada vigente. Confirmá para cerrarla y asignar la nueva."
+)
+MENSAJE_VIGENCIA_DESDE_INVALIDA = (
+    "La nueva vigencia debe comenzar después de que empezó la jornada actual."
 )
 MENSAJE_TOPE_LEGAL_EXCEDIDO = (
     "La suma de horas semanales del patrón ({suma} h) se pasa del tope legal vigente ({maximo} h)."
@@ -151,6 +155,10 @@ def asignar_jornada(
         if error.code == CODIGO_VIGENCIA_ACTIVA_SIN_CONFIRMAR:
             raise HTTPException(
                 status.HTTP_409_CONFLICT, MENSAJE_VIGENCIA_ACTIVA_SIN_CONFIRMAR
+            ) from error
+        if error.code == CODIGO_VIGENCIA_DESDE_INVALIDA:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY, MENSAJE_VIGENCIA_DESDE_INVALIDA
             ) from error
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, error.message) from error
 

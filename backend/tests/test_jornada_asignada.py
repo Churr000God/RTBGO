@@ -211,6 +211,38 @@ def test_asignar_jornada_vigencia_activa_sin_confirmar_devuelve_409():
     assert response.status_code == 409
 
 
+def test_asignar_jornada_vigencia_desde_invalida_devuelve_422():
+    """El RPC revienta con ERRCODE 'SCJ02' cuando la nueva vigencia empieza el mismo día o antes
+    que la jornada vigente actual (renovar 2 veces el mismo día calcularía vigente_hasta =
+    vigente_desde - 1, quedando ANTES del propio vigente_desde de esa fila) -- el router lo
+    traduce a 422 con mensaje legible."""
+    fake_client = _fake_client_secuencia(
+        _entradas_gate()
+        + [
+            ("persona", _tabla_select_simple([{"id": PERSONA_ID}])),
+            ("tope_legal", _tabla_tope_legal([{"maximo_semanal": "48.00", "vigente_hasta": None}])),
+        ]
+    )
+    fake_client.postgrest.schema.return_value.rpc.return_value.execute.side_effect = APIError(
+        {"code": "SCJ02", "message": "la nueva vigencia no puede empezar antes de la actual"}
+    )
+    app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
+
+    client = TestClient(app)
+    response = client.post(
+        "/api/jornadas-asignadas",
+        json=_payload(confirma_cierre_vigente=True),
+        headers={"Authorization": "Bearer fake-token"},
+    )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 422, response.text
+    assert response.json()["detail"] == (
+        "La nueva vigencia debe comenzar después de que empezó la jornada actual."
+    )
+
+
 def test_asignar_jornada_vigencia_activa_confirmada_cierra_anterior():
     """Con confirma_cierre_vigente=True, el RPC cierra la vigencia anterior y abre la nueva en
     una sola transacción -- el router sólo reenvía el flag, no arma el cierre él mismo."""
