@@ -73,6 +73,13 @@ flowchart TD
 - **`horas_totales = NULL`, nunca `0`.** No hay marca ni patrón real que contar — `NULL` significa
   "sin dato que registrar", no "trabajó cero horas". Evita que un reporte futuro confunda "de
   confianza" con "faltó".
+  **Excepción deliberada (8 sep 2026, `db/ddl/66_tiempo_ausencia_descuento_pausa_y_confianza.sql`):**
+  cuando una ausencia se resuelve para una persona `de_confianza` (cualquier tipo, incluso
+  rechazada — "su horario no marca faltas"), `fn_ausencia_resuelve_excepcion` SÍ le pone la
+  jornada completa pactada (menos el descuento de pausa no registrada), nunca `0`. Sólo cae a
+  `NULL` si no hay patrón cargado ese día de semana — ahí sí sigue vigente esta regla, como
+  último recurso, no como caso general. Esta es la única vía que le pone un número a un día
+  `de_confianza`; el batch rutinario de este documento sigue poniendo siempre `NULL`.
 - **Nunca se genera `marca` ni `tramo` sintéticos** — decisión ya tomada, contaminarían `marca`
   como evidencia legal de jornada (`SCJ-ESP-01 §VI.3`).
 - **Sin cambios de esquema** — `tiempo.dia.origen` ya incluía `'automatico_confianza'`,
