@@ -36,6 +36,14 @@ type EstadoCarga = "cargando" | "listo" | "error";
 
 type Orden = "fecha_desc" | "fecha_asc" | "horas_desc" | "horas_asc";
 
+// Flujo de la fila de confirmación de "Marcar como revisado": arranca en "calcular" (sólo el
+// botón "Calcular tiempo total"), pasa a "bloqueada" si el día tiene una marca huérfana (nada de
+// input ni Confirmar — hay que corregir esa marca primero) o a "editable" si no (el input de
+// horas aparece precargado con el cálculo, pero sigue siendo editable).
+type FaseConfirmacion = "calcular" | "calculando" | "bloqueada" | "editable";
+
+type Previsualizacion = { horas_calculadas: number; tiene_huerfana_sin_pareja: boolean };
+
 function formatearFecha(fecha: string): string {
   const valor = new Date(`${fecha}T00:00:00`);
   if (Number.isNaN(valor.getTime())) return "—";
@@ -120,6 +128,7 @@ export function DiasPage() {
   const [errorRevisar, setErrorRevisar] = useState<string | null>(null);
   const [revisando, setRevisando] = useState(false);
   const [valorHoras, setValorHoras] = useState("");
+  const [faseConfirmacion, setFaseConfirmacion] = useState<FaseConfirmacion>("calcular");
 
   useEffect(() => {
     const id = setTimeout(() => {
@@ -176,12 +185,38 @@ export function DiasPage() {
     setPendienteRevisarId(id);
     setErrorRevisar(null);
     setValorHoras("");
+    setFaseConfirmacion("calcular");
   }
 
   function cancelarRevisar() {
     setPendienteRevisarId(null);
     setErrorRevisar(null);
     setValorHoras("");
+    setFaseConfirmacion("calcular");
+  }
+
+  async function calcularTiempo() {
+    if (pendienteRevisarId === null) return;
+    setFaseConfirmacion("calculando");
+    setErrorRevisar(null);
+    try {
+      const respuesta = await apiFetch(`/api/dias/${pendienteRevisarId}/previsualizar-tramos`);
+      if (!respuesta.ok) {
+        setErrorRevisar(await mensajeDeError(respuesta, "No se pudo calcular el tiempo total."));
+        setFaseConfirmacion("calcular");
+        return;
+      }
+      const datos: Previsualizacion = await respuesta.json();
+      if (datos.tiene_huerfana_sin_pareja) {
+        setFaseConfirmacion("bloqueada");
+        return;
+      }
+      setValorHoras(datos.horas_calculadas.toFixed(2));
+      setFaseConfirmacion("editable");
+    } catch {
+      setErrorRevisar("No se pudo calcular el tiempo total. Revisa tu conexión e intenta de nuevo.");
+      setFaseConfirmacion("calcular");
+    }
   }
 
   const horasNumero = Number(valorHoras);
@@ -197,15 +232,17 @@ export function DiasPage() {
         body: JSON.stringify({ horas_totales: horasNumero }),
       });
       if (!respuesta.ok) {
-        // 404 (día ya no existe) / 409 (ya no está bloqueado) / 422 (horas fuera de rango que el
-        // form no atrapó) — la fila pudo envejecer entre la carga y el click. Se muestra el
-        // motivo sin cerrar la confirmación, mismo criterio que DiasFestivosPage al eliminar:
-        // cerrarla en silencio dejaría a la persona sin saber por qué no se marcó como revisado.
+        // 404 (día ya no existe) / 409 (ya no está bloqueado, o SCJ09 -- alguien agregó una
+        // marca entre calcular y confirmar) / 422 (horas fuera de rango que el form no atrapó) —
+        // la fila pudo envejecer entre la carga y el click. Se muestra el motivo sin cerrar la
+        // confirmación, mismo criterio que DiasFestivosPage al eliminar: cerrarla en silencio
+        // dejaría a la persona sin saber por qué no se marcó como revisado.
         setErrorRevisar(await mensajeDeError(respuesta, "No se pudo marcar el día como revisado."));
         return;
       }
       setPendienteRevisarId(null);
       setValorHoras("");
+      setFaseConfirmacion("calcular");
       cargar();
     } catch {
       setErrorRevisar("No se pudo marcar el día como revisado. Revisa tu conexión e intenta de nuevo.");
@@ -410,32 +447,52 @@ export function DiasPage() {
                               ¿Marcar como revisado el día de <strong>{dia.persona_nombre ?? "—"}</strong>{" "}
                               ({formatearFecha(dia.fecha)})?
                             </p>
-                            <Input
-                              id={`horas-revisar-${dia.id}`}
-                              label="Horas trabajadas"
-                              type="number"
-                              min={0}
-                              max={24}
-                              step={0.25}
-                              required
-                              value={valorHoras}
-                              onChange={(evento) => setValorHoras(evento.target.value)}
-                            />
+                            {faseConfirmacion === "bloqueada" && (
+                              <p role="alert">
+                                Este día tiene una marca sin pareja — corregí la marca faltante o
+                                usá captura manual antes de poder revisar.
+                              </p>
+                            )}
+                            {faseConfirmacion === "editable" && (
+                              <Input
+                                id={`horas-revisar-${dia.id}`}
+                                label="Horas trabajadas"
+                                type="number"
+                                min={0}
+                                max={24}
+                                step={0.25}
+                                required
+                                value={valorHoras}
+                                onChange={(evento) => setValorHoras(evento.target.value)}
+                              />
+                            )}
                             {errorRevisar && <p role="alert">{errorRevisar}</p>}
                             <div className="botonera">
                               <Button type="button" onClick={cancelarRevisar}>
                                 Cancelar
                               </Button>
-                              <Button
-                                type="button"
-                                variante="primario"
-                                cargando={revisando}
-                                textoCargando="Confirmando…"
-                                disabled={!horasValidas}
-                                onClick={confirmarRevisar}
-                              >
-                                Confirmar
-                              </Button>
+                              {(faseConfirmacion === "calcular" || faseConfirmacion === "calculando") && (
+                                <Button
+                                  type="button"
+                                  cargando={faseConfirmacion === "calculando"}
+                                  textoCargando="Calculando…"
+                                  onClick={calcularTiempo}
+                                >
+                                  Calcular tiempo total
+                                </Button>
+                              )}
+                              {faseConfirmacion === "editable" && (
+                                <Button
+                                  type="button"
+                                  variante="primario"
+                                  cargando={revisando}
+                                  textoCargando="Confirmando…"
+                                  disabled={!horasValidas}
+                                  onClick={confirmarRevisar}
+                                >
+                                  Confirmar
+                                </Button>
+                              )}
                             </div>
                           </td>
                         </tr>

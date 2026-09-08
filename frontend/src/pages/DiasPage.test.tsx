@@ -54,7 +54,9 @@ const DIA_REVISADO = {
   alerta_salida: "salida_anticipada",
 };
 
-function mockApiFetch(opciones: { dias?: Response; revisar?: Response } = {}) {
+function mockApiFetch(
+  opciones: { dias?: Response; revisar?: Response; previsualizar?: Response } = {},
+) {
   vi.mocked(apiFetch).mockImplementation((path: string, init?: RequestInit) => {
     if (path === "/api/sesion") {
       return Promise.resolve(
@@ -66,6 +68,12 @@ function mockApiFetch(opciones: { dias?: Response; revisar?: Response } = {}) {
         opciones.dias ?? new Response(JSON.stringify({ total: 1, dias: [DIA_BLOQUEADO] })),
       );
     }
+    if (path.endsWith("/previsualizar-tramos")) {
+      return Promise.resolve(
+        opciones.previsualizar ??
+          new Response(JSON.stringify({ horas_calculadas: 7.5, tiene_huerfana_sin_pareja: false })),
+      );
+    }
     if (path.endsWith("/revisar") && init?.method === "POST") {
       return Promise.resolve(
         opciones.revisar ?? new Response(JSON.stringify({ ...DIA_BLOQUEADO, estado: "revisado" })),
@@ -73,6 +81,12 @@ function mockApiFetch(opciones: { dias?: Response; revisar?: Response } = {}) {
     }
     return Promise.reject(new Error(`ruta no mockeada: ${path}`));
   });
+}
+
+async function abrirYCalcular() {
+  await userEvent.click(screen.getByRole("button", { name: /marcar como revisado/i }));
+  await userEvent.click(screen.getByRole("button", { name: /calcular tiempo total/i }));
+  await waitFor(() => expect(screen.getByLabelText(/horas trabajadas/i)).toBeInTheDocument());
 }
 
 describe("DiasPage", () => {
@@ -133,7 +147,7 @@ describe("DiasPage", () => {
     expect(within(filaAbierto).queryByRole("button", { name: /marcar como revisado/i })).not.toBeInTheDocument();
   });
 
-  it("click en Marcar como revisado abre la confirmación sin disparar POST", async () => {
+  it("click en Marcar como revisado abre la confirmación sin input de horas todavía, sólo Calcular", async () => {
     mockApiFetch();
 
     render(<DiasPage />);
@@ -142,32 +156,81 @@ describe("DiasPage", () => {
     await userEvent.click(screen.getByRole("button", { name: /marcar como revisado/i }));
 
     expect(screen.getByText(/¿marcar como revisado el día de/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /calcular tiempo total/i })).toBeInTheDocument();
+    expect(screen.queryByLabelText(/horas trabajadas/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^confirmar$/i })).not.toBeInTheDocument();
     expect(
       vi.mocked(apiFetch).mock.calls.some(([path]) => (path as string).endsWith("/revisar")),
     ).toBe(false);
   });
 
-  it("cancelar cierra la confirmación sin disparar POST", async () => {
-    mockApiFetch();
+  it("Calcular con tiene_huerfana_sin_pareja=true bloquea: mensaje, sin input ni Confirmar", async () => {
+    mockApiFetch({
+      previsualizar: new Response(
+        JSON.stringify({ horas_calculadas: 0, tiene_huerfana_sin_pareja: true }),
+      ),
+    });
 
     render(<DiasPage />);
     await waitFor(() => expect(screen.getByText("Persona Ficticia Uno")).toBeInTheDocument());
     await userEvent.click(screen.getByRole("button", { name: /marcar como revisado/i }));
+    await userEvent.click(screen.getByRole("button", { name: /calcular tiempo total/i }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/marca sin pareja/i)).toBeInTheDocument(),
+    );
+    expect(screen.queryByLabelText(/horas trabajadas/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^confirmar$/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /cancelar/i })).toBeInTheDocument();
+  });
+
+  it("Calcular con tiene_huerfana_sin_pareja=false precarga el input con horas_calculadas pero sigue editable", async () => {
+    mockApiFetch({
+      previsualizar: new Response(
+        JSON.stringify({ horas_calculadas: 8.25, tiene_huerfana_sin_pareja: false }),
+      ),
+    });
+
+    render(<DiasPage />);
+    await waitFor(() => expect(screen.getByText("Persona Ficticia Uno")).toBeInTheDocument());
+    await abrirYCalcular();
+
+    const input = screen.getByLabelText(/horas trabajadas/i) as HTMLInputElement;
+    expect(input.value).toBe("8.25");
+    expect(screen.getByRole("button", { name: /^confirmar$/i })).toBeEnabled();
+
+    await userEvent.clear(input);
+    await userEvent.type(input, "6");
+    expect(input.value).toBe("6");
+    expect(screen.getByRole("button", { name: /^confirmar$/i })).toBeEnabled();
+  });
+
+  it("cancelar resetea el estado a calcular (no queda cacheado el cálculo)", async () => {
+    mockApiFetch();
+
+    render(<DiasPage />);
+    await waitFor(() => expect(screen.getByText("Persona Ficticia Uno")).toBeInTheDocument());
+    await abrirYCalcular();
 
     await userEvent.click(screen.getByRole("button", { name: /cancelar/i }));
-
     expect(screen.queryByText(/¿marcar como revisado el día de/i)).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /marcar como revisado/i }));
+    expect(screen.getByRole("button", { name: /calcular tiempo total/i })).toBeInTheDocument();
+    expect(screen.queryByLabelText(/horas trabajadas/i)).not.toBeInTheDocument();
     expect(
       vi.mocked(apiFetch).mock.calls.some(([path]) => (path as string).endsWith("/revisar")),
     ).toBe(false);
   });
 
-  it("confirmar sin escribir horas no dispara POST (botón deshabilitado)", async () => {
+  it("confirmar sin horas válidas no dispara POST (botón deshabilitado)", async () => {
     mockApiFetch();
 
     render(<DiasPage />);
     await waitFor(() => expect(screen.getByText("Persona Ficticia Uno")).toBeInTheDocument());
-    await userEvent.click(screen.getByRole("button", { name: /marcar como revisado/i }));
+    await abrirYCalcular();
+
+    await userEvent.clear(screen.getByLabelText(/horas trabajadas/i));
 
     expect(screen.getByRole("button", { name: /^confirmar$/i })).toBeDisabled();
     expect(
@@ -180,9 +243,11 @@ describe("DiasPage", () => {
 
     render(<DiasPage />);
     await waitFor(() => expect(screen.getByText("Persona Ficticia Uno")).toBeInTheDocument());
-    await userEvent.click(screen.getByRole("button", { name: /marcar como revisado/i }));
+    await abrirYCalcular();
 
-    await userEvent.type(screen.getByLabelText(/horas trabajadas/i), "25");
+    const input = screen.getByLabelText(/horas trabajadas/i);
+    await userEvent.clear(input);
+    await userEvent.type(input, "25");
 
     expect(screen.getByRole("button", { name: /^confirmar$/i })).toBeDisabled();
     expect(
@@ -195,8 +260,10 @@ describe("DiasPage", () => {
 
     render(<DiasPage />);
     await waitFor(() => expect(screen.getByText("Persona Ficticia Uno")).toBeInTheDocument());
-    await userEvent.click(screen.getByRole("button", { name: /marcar como revisado/i }));
-    await userEvent.type(screen.getByLabelText(/horas trabajadas/i), "7.5");
+    await abrirYCalcular();
+    const input = screen.getByLabelText(/horas trabajadas/i);
+    await userEvent.clear(input);
+    await userEvent.type(input, "7.5");
     await userEvent.click(screen.getByRole("button", { name: /^confirmar$/i }));
 
     await waitFor(() =>
@@ -228,8 +295,7 @@ describe("DiasPage", () => {
 
     render(<DiasPage />);
     await waitFor(() => expect(screen.getByText("Persona Ficticia Uno")).toBeInTheDocument());
-    await userEvent.click(screen.getByRole("button", { name: /marcar como revisado/i }));
-    await userEvent.type(screen.getByLabelText(/horas trabajadas/i), "7.5");
+    await abrirYCalcular();
     await userEvent.click(screen.getByRole("button", { name: /^confirmar$/i }));
 
     await waitFor(() =>
@@ -245,8 +311,7 @@ describe("DiasPage", () => {
 
     render(<DiasPage />);
     await waitFor(() => expect(screen.getByText("Persona Ficticia Uno")).toBeInTheDocument());
-    await userEvent.click(screen.getByRole("button", { name: /marcar como revisado/i }));
-    await userEvent.type(screen.getByLabelText(/horas trabajadas/i), "7.5");
+    await abrirYCalcular();
     await userEvent.click(screen.getByRole("button", { name: /^confirmar$/i }));
 
     await waitFor(() => expect(screen.getByText(/el día no existe/i)).toBeInTheDocument());
@@ -263,13 +328,29 @@ describe("DiasPage", () => {
 
     render(<DiasPage />);
     await waitFor(() => expect(screen.getByText("Persona Ficticia Uno")).toBeInTheDocument());
-    await userEvent.click(screen.getByRole("button", { name: /marcar como revisado/i }));
-    await userEvent.type(screen.getByLabelText(/horas trabajadas/i), "24");
+    await abrirYCalcular();
     await userEvent.click(screen.getByRole("button", { name: /^confirmar$/i }));
 
     await waitFor(() =>
       expect(screen.getByText(/horas trabajadas inválidas/i)).toBeInTheDocument(),
     );
+    expect(screen.getByText(/¿marcar como revisado el día de/i)).toBeInTheDocument();
+  });
+
+  it("409 por carrera (SCJ09, marca agregada entre calcular y confirmar) muestra el mensaje sin cerrar", async () => {
+    mockApiFetch({
+      revisar: new Response(
+        JSON.stringify({ detail: "Se agregó una marca nueva -- volvé a calcular." }),
+        { status: 409 },
+      ),
+    });
+
+    render(<DiasPage />);
+    await waitFor(() => expect(screen.getByText("Persona Ficticia Uno")).toBeInTheDocument());
+    await abrirYCalcular();
+    await userEvent.click(screen.getByRole("button", { name: /^confirmar$/i }));
+
+    await waitFor(() => expect(screen.getByText(/volvé a calcular/i)).toBeInTheDocument());
     expect(screen.getByText(/¿marcar como revisado el día de/i)).toBeInTheDocument();
   });
 
