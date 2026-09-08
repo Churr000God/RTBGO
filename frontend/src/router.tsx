@@ -25,6 +25,7 @@ import { CorregirMarcaPage } from "./pages/CorregirMarcaPage";
 import { CompletarInvitacionPage } from "./pages/CompletarInvitacionPage";
 import { Configurar2FAPage } from "./pages/Configurar2FAPage";
 import { CuentaSuspendidaPage } from "./pages/CuentaSuspendidaPage";
+import { DiasPage } from "./pages/DiasPage";
 import { DirectorioAreasPage } from "./pages/DirectorioAreasPage";
 import { DirectorioDepartamentosPage } from "./pages/DirectorioDepartamentosPage";
 import { DirectorioPersonasPage } from "./pages/DirectorioPersonasPage";
@@ -81,6 +82,7 @@ export const router = createBrowserRouter([
   { path: "/tiempo/marcas", element: <RegistroMarcasPage /> },
   { path: "/tiempo/excepciones", element: <ColaExcepcionesPage /> },
   { path: "/tiempo/tramos", element: <TramosPage /> },
+  { path: "/tiempo/dias", element: <DiasPage /> },
   { path: "/tiempo/excepciones/:id/corregir", element: <CorregirMarcaPage /> },
   { path: "/tiempo/ausencias", element: <BandejaAusenciasPage /> },
   { path: "/tiempo/banco-de-horas", element: <BancoDeHorasPage /> },
