@@ -148,25 +148,36 @@ def _resolver_nombres_persona(db: Client, persona_ids: list[str]) -> dict[str, s
     return {fila["id"]: f"{fila['primer_nombre']} {fila['apellido_paterno']}" for fila in filas}
 
 
-def _resolver_motivos_por_marca(db: Client, marca_ids: list[int]) -> dict[int, list[str]]:
+def _resolver_motivos_y_pendiente_por_marca(
+    db: Client, marca_ids: list[int]
+) -> tuple[dict[int, list[str]], dict[int, int]]:
     """Mismo patrón y mismo criterio de "no consultar si no hace falta" que
     _resolver_nombres_persona -- una sola consulta batch, nada si ninguna marca de la página
-    requiere revisión."""
+    requiere revisión.
+
+    tiempo.marca.requiere_revision es de una sola vía (el trigger la pone true, nunca la vuelve
+    a false) -- no sirve para saber si hay algo pendiente AHORA. La señal real es
+    tiempo.excepcion.estado = 'pendiente' (mismo criterio que GET /api/excepciones), por eso esta
+    función también devuelve, por marca, el id de su excepción pendiente más antigua (si la
+    tiene) -- 'Corregir' en el frontend sólo tiene sentido con ese id."""
     if not marca_ids:
-        return {}
+        return {}, {}
     filas = (
         db.postgrest.schema("tiempo")
         .table("excepcion")
-        .select("marca_id, motivo_revision")
+        .select("id, marca_id, motivo_revision, estado")
         .in_("marca_id", marca_ids)
         .order("id")
         .execute()
         .data
     )
     motivos: dict[int, list[str]] = {}
+    pendientes: dict[int, int] = {}
     for fila in filas:
         motivos.setdefault(fila["marca_id"], []).append(fila["motivo_revision"])
-    return motivos
+        if fila["estado"] == "pendiente" and fila["marca_id"] not in pendientes:
+            pendientes[fila["marca_id"]] = fila["id"]
+    return motivos, pendientes
 
 
 @router.get("", response_model=MarcaListaOut)
@@ -210,12 +221,13 @@ def listar_marcas(
     ids_con_revision = sorted(
         {fila["id"] for fila in resultado.data if fila["requiere_revision"]}
     )
-    motivos = _resolver_motivos_por_marca(db, ids_con_revision)
+    motivos, pendientes = _resolver_motivos_y_pendiente_por_marca(db, ids_con_revision)
     marcas = [
         {
             **fila,
             "persona_nombre": nombres.get(fila["persona_id"]),
             "motivos_revision": motivos.get(fila["id"], []),
+            "excepcion_pendiente_id": pendientes.get(fila["id"]),
         }
         for fila in resultado.data
     ]

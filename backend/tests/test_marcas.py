@@ -528,7 +528,14 @@ def test_listar_marcas_con_revision_trae_motivos_desde_excepcion():
             (
                 "excepcion",
                 _tabla_in_order(
-                    [{"marca_id": MARCA_ID, "motivo_revision": "persona_inactiva"}]
+                    [
+                        {
+                            "id": 900,
+                            "marca_id": MARCA_ID,
+                            "motivo_revision": "persona_inactiva",
+                            "estado": "pendiente",
+                        }
+                    ]
                 ),
             ),
         ]
@@ -543,3 +550,71 @@ def test_listar_marcas_con_revision_trae_motivos_desde_excepcion():
     assert response.status_code == 200, response.text
     cuerpo = response.json()
     assert cuerpo["marcas"][0]["motivos_revision"] == ["persona_inactiva"]
+    assert cuerpo["marcas"][0]["excepcion_pendiente_id"] == 900
+
+
+def test_listar_marcas_con_excepcion_ya_resuelta_no_expone_pendiente():
+    """requiere_revision es de una sola vía -- el motivo histórico se sigue mostrando, pero
+    excepcion_pendiente_id debe ser None porque ya no hay nada que corregir."""
+    fake_client = _fake_client_secuencia(
+        _entradas_gate()
+        + [
+            (
+                "marca",
+                _tabla_marca_lista(
+                    [_fila_marca_lista(requiere_revision=True)], total=1
+                ),
+            ),
+            (
+                "persona",
+                _tabla_in([{"id": PERSONA_ID, "primer_nombre": "Ana", "apellido_paterno": "Pérez"}]),
+            ),
+            (
+                "excepcion",
+                _tabla_in_order(
+                    [
+                        {
+                            "id": 901,
+                            "marca_id": MARCA_ID,
+                            "motivo_revision": "persona_inactiva",
+                            "estado": "resuelto",
+                        }
+                    ]
+                ),
+            ),
+        ]
+    )
+    app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
+
+    client = TestClient(app)
+    response = client.get("/api/marcas", headers={"Authorization": "Bearer fake-token"})
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200, response.text
+    cuerpo = response.json()
+    assert cuerpo["marcas"][0]["motivos_revision"] == ["persona_inactiva"]
+    assert cuerpo["marcas"][0]["excepcion_pendiente_id"] is None
+
+
+def test_listar_marcas_sin_excepciones_excepcion_pendiente_id_es_none():
+    fake_client = _fake_client_secuencia(
+        _entradas_gate()
+        + [
+            ("marca", _tabla_marca_lista([_fila_marca_lista()], total=1)),
+            (
+                "persona",
+                _tabla_in([{"id": PERSONA_ID, "primer_nombre": "Ana", "apellido_paterno": "Pérez"}]),
+            ),
+        ]
+    )
+    app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
+
+    client = TestClient(app)
+    response = client.get("/api/marcas", headers={"Authorization": "Bearer fake-token"})
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200, response.text
+    cuerpo = response.json()
+    assert cuerpo["marcas"][0]["excepcion_pendiente_id"] is None

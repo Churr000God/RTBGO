@@ -42,6 +42,7 @@ class MarcaListaItem(BaseModel):
     origen: str
     requiere_revision: bool
     motivos_revision: list[str]
+    excepcion_pendiente_id: int | None = None
 
 
 class MarcaListaOut(BaseModel):
