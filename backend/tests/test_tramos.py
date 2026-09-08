@@ -145,13 +145,13 @@ def _fake_service_client(tramo=None, persona=None):
     return fake_client
 
 
-def _fila_tramo(**overrides):
+def _fila_tramo(dia_estado="cerrado", **overrides):
     fila = {
         "id": 4,
         "inicio": "2026-09-08T15:00:00+00:00",
         "fin": "2026-09-09T00:00:00+00:00",
         "minutos_trabajados": 540.0,
-        "dia": {"fecha": "2026-09-08", "persona_id": PERSONA_1},
+        "dia": {"fecha": "2026-09-08", "persona_id": PERSONA_1, "estado": dia_estado},
     }
     fila.update(overrides)
     return fila
@@ -191,11 +191,12 @@ def test_listar_tramos_devuelve_pagina_con_nombre_persona_resuelto_y_campos_apla
     assert tramo["fecha"] == "2026-09-08"
     assert tramo["persona_id"] == PERSONA_1
     assert tramo["persona_nombre"] == "Ana Pérez"
+    assert tramo["dia_estado"] == "cerrado"
     assert "dia" not in tramo
 
 
 def test_listar_tramos_tramo_abierto_fin_y_minutos_nulos_sobreviven():
-    fila_abierta = _fila_tramo(fin=None, minutos_trabajados=None)
+    fila_abierta = _fila_tramo(dia_estado="abierto", fin=None, minutos_trabajados=None)
     tabla_tramo = _tabla_tramo([fila_abierta], total=1)
     tabla_persona = _tabla_persona(nombres=[])
     _preparar_gate_y_servicio(tabla_tramo, tabla_persona)
@@ -207,6 +208,23 @@ def test_listar_tramos_tramo_abierto_fin_y_minutos_nulos_sobreviven():
     tramo = response.json()["tramos"][0]
     assert tramo["fin"] is None
     assert tramo["minutos_trabajados"] is None
+    assert tramo["dia_estado"] == "abierto"
+
+
+def test_listar_tramos_dia_bloqueado_viaja_tal_cual_desde_el_embed():
+    """Tramo 'en curso' que nunca va a cerrarse porque el día quedó bloqueado (SCJ-DEC-06, no se
+    reabre automáticamente) -- la señal de alerta que pidió el usuario."""
+    fila_bloqueada = _fila_tramo(dia_estado="bloqueado", fin=None, minutos_trabajados=None)
+    tabla_tramo = _tabla_tramo([fila_bloqueada], total=1)
+    tabla_persona = _tabla_persona(nombres=[])
+    _preparar_gate_y_servicio(tabla_tramo, tabla_persona)
+
+    response = _pedir_tramos()
+
+    _limpiar()
+    assert response.status_code == 200, response.text
+    tramo = response.json()["tramos"][0]
+    assert tramo["dia_estado"] == "bloqueado"
 
 
 def test_listar_tramos_acepta_filtros_y_paginacion():

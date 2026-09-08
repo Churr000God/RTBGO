@@ -27,7 +27,7 @@ router = APIRouter(prefix="/api/tramos", tags=["tramos"])
 LIMITE_DEFECTO = 50
 LIMITE_MAXIMO = 200
 
-SELECT_CON_DIA = "id, inicio, fin, minutos_trabajados, dia:dia_id!inner(fecha, persona_id)"
+SELECT_CON_DIA = "id, inicio, fin, minutos_trabajados, dia:dia_id!inner(fecha, persona_id, estado)"
 
 ORDEN_A_COLUMNA: dict[str, tuple[str, bool]] = {
     "inicio_desc": ("inicio", True),
@@ -38,10 +38,15 @@ ORDEN_A_COLUMNA: dict[str, tuple[str, bool]] = {
 
 
 def _aplanar_fila(fila: dict) -> dict:
-    """Sube dia.fecha -> fecha y dia.persona_id -> persona_id (mismo criterio que
-    asignaciones.py::_aplanar_fila)."""
+    """Sube dia.fecha -> fecha, dia.persona_id -> persona_id y dia.estado -> dia_estado (mismo
+    criterio que asignaciones.py::_aplanar_fila)."""
     dia = fila.pop("dia")
-    return {**fila, "fecha": dia["fecha"], "persona_id": dia["persona_id"]}
+    return {
+        **fila,
+        "fecha": dia["fecha"],
+        "persona_id": dia["persona_id"],
+        "dia_estado": dia["estado"],
+    }
 
 
 def _resolver_ids_por_busqueda(db: Client, busqueda: str) -> list[str]:
