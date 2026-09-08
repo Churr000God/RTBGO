@@ -28,6 +28,7 @@ const PERSONAS_ACTIVAS = [
 function mockApiFetch(opciones: {
   sesion?: Response;
   post?: Response | Response[];
+  jornadaVigente?: Response;
 }) {
   let llamadaPost = 0;
   vi.mocked(apiFetch).mockImplementation((path: string, init?: RequestInit) => {
@@ -39,6 +40,9 @@ function mockApiFetch(opciones: {
     }
     if (path === "/api/personas") {
       return Promise.resolve(new Response(JSON.stringify(PERSONAS_ACTIVAS)));
+    }
+    if (path.startsWith("/api/personas/") && path.endsWith("/jornada-vigente")) {
+      return Promise.resolve(opciones.jornadaVigente ?? new Response(null, { status: 404 }));
     }
     if (path === "/api/jornadas-asignadas" && init?.method === "POST") {
       if (Array.isArray(opciones.post)) {
@@ -52,8 +56,15 @@ function mockApiFetch(opciones: {
   });
 }
 
+async function abrirFormulario() {
+  await userEvent.click(
+    await screen.findByRole("button", { name: /asignar o renovar jornada/i }),
+  );
+}
+
 async function llenarFormularioBasico() {
-  await userEvent.selectOptions(await screen.findByLabelText(/^persona$/i), "persona-ficticia-1");
+  await abrirFormulario();
+  await userEvent.selectOptions(screen.getByLabelText(/^persona$/i), "persona-ficticia-1");
   await userEvent.type(screen.getByLabelText(/vigente desde/i), "2026-01-01");
   await userEvent.click(screen.getByRole("checkbox", { name: /lunes/i }));
   await userEvent.type(screen.getByLabelText(/hora de entrada/i), "09:00");
@@ -173,7 +184,9 @@ describe("AsignarJornadaPage", () => {
 
     render(<AsignarJornadaPage />);
 
-    await waitFor(() => expect(screen.getByLabelText(/^persona$/i)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /asignar o renovar jornada/i })).toBeInTheDocument(),
+    );
     expect(screen.queryByText(/^jornadas$/i)).not.toBeInTheDocument();
   });
 
@@ -220,6 +233,105 @@ describe("AsignarJornadaPage", () => {
         .mock.calls.filter(([path]) => path === "/api/personas");
       expect(llamadasPersonas.length).toBeGreaterThanOrEqual(2);
     });
+  });
+
+  it("el formulario arranca cerrado y el botón lo abre", async () => {
+    mockApiFetch({});
+
+    render(<AsignarJornadaPage />);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /asignar o renovar jornada/i })).toBeInTheDocument(),
+    );
+    expect(screen.queryByLabelText(/^persona$/i)).not.toBeInTheDocument();
+
+    await abrirFormulario();
+    expect(screen.getByLabelText(/^persona$/i)).toBeInTheDocument();
+  });
+
+  it("click en Asignar/Renovar de una fila abre el formulario si estaba cerrado", async () => {
+    const personas = [
+      { id: "persona-1", primer_nombre: "Ana", apellido_paterno: "Con Jornada", estado: "activo", tiene_jornada_vigente: true },
+    ];
+    vi.mocked(apiFetch).mockImplementation((path: string) => {
+      if (path === "/api/sesion") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ acceso_permitido: true, motivo_bloqueo: null })),
+        );
+      }
+      if (path === "/api/personas") {
+        return Promise.resolve(new Response(JSON.stringify(personas)));
+      }
+      return Promise.reject(new Error(`ruta no mockeada: ${path}`));
+    });
+
+    render(<AsignarJornadaPage />);
+    const tabla = await screen.findByRole("table");
+    expect(screen.queryByLabelText(/^persona$/i)).not.toBeInTheDocument();
+
+    await userEvent.click(within(tabla).getByRole("button", { name: /renovar/i }));
+
+    expect(screen.getByLabelText(/^persona$/i)).toHaveValue("persona-1");
+  });
+
+  it("expandir una fila muestra el detalle del patrón semanal, colapsar lo oculta", async () => {
+    const personas = [
+      { id: "persona-1", primer_nombre: "Ana", apellido_paterno: "Con Jornada", estado: "activo", tiene_jornada_vigente: true },
+    ];
+    const jornada = {
+      tipo_jornada: "normal",
+      vigente_desde: "2026-01-01",
+      horas_semanales_calculadas: 45,
+      patron_semanal: [
+        { dia_semana: "lunes", hora_entrada: "09:00:00", hora_salida: "18:00:00", minutos_comida: 60 },
+      ],
+    };
+    let llamadasJornada = 0;
+    vi.mocked(apiFetch).mockImplementation((path: string) => {
+      if (path === "/api/sesion") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ acceso_permitido: true, motivo_bloqueo: null })),
+        );
+      }
+      if (path === "/api/personas") {
+        return Promise.resolve(new Response(JSON.stringify(personas)));
+      }
+      if (path === "/api/personas/persona-1/jornada-vigente") {
+        llamadasJornada += 1;
+        return Promise.resolve(new Response(JSON.stringify(jornada)));
+      }
+      return Promise.reject(new Error(`ruta no mockeada: ${path}`));
+    });
+
+    render(<AsignarJornadaPage />);
+    const tabla = await screen.findByRole("table");
+    const fila = within(tabla).getByText("Ana Con Jornada").closest("tr")!;
+
+    await userEvent.click(fila);
+    await waitFor(() => expect(screen.getByText(/vigente desde/i)).toBeInTheDocument());
+    expect(screen.getByText(/45\.0 h\/semana/)).toBeInTheDocument();
+
+    // colapsar la oculta
+    await userEvent.click(fila);
+    expect(screen.queryByText(/vigente desde/i)).not.toBeInTheDocument();
+
+    // reabrir no refetchea (cacheada)
+    await userEvent.click(fila);
+    await waitFor(() => expect(screen.getByText(/vigente desde/i)).toBeInTheDocument());
+    expect(llamadasJornada).toBe(1);
+  });
+
+  it("expandir una fila sin jornada muestra el mensaje de sin jornada asignada", async () => {
+    mockApiFetch({});
+
+    render(<AsignarJornadaPage />);
+    const tabla = await screen.findByRole("table");
+    const fila = within(tabla).getByText("Persona Ficticia Uno").closest("tr")!;
+
+    await userEvent.click(fila);
+
+    await waitFor(() =>
+      expect(screen.getByText(/sin jornada vigente asignada/i)).toBeInTheDocument(),
+    );
   });
 
   it("muestra el grupo Jornadas del sidebar cuando puede_ver_modulo_3 es true", async () => {

@@ -13,6 +13,7 @@ import {
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
+import { DetalleJornadaAsignada, type JornadaVigente } from "../components/DetalleJornadaAsignada";
 import { derivarTransiciones, type Estado, type Movimiento } from "../lib/movimientos";
 
 type PuestoVigente = {
@@ -102,50 +103,6 @@ const DIAS_VENTANA_RESUMEN_ALERTAS = 29;
 function aFechaISO(fecha: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${fecha.getFullYear()}-${pad(fecha.getMonth() + 1)}-${pad(fecha.getDate())}`;
-}
-
-type DiaSemana =
-  | "lunes"
-  | "martes"
-  | "miercoles"
-  | "jueves"
-  | "viernes"
-  | "sabado"
-  | "domingo";
-
-const DIAS_SEMANA: { valor: DiaSemana; etiqueta: string }[] = [
-  { valor: "lunes", etiqueta: "Lun" },
-  { valor: "martes", etiqueta: "Mar" },
-  { valor: "miercoles", etiqueta: "Mié" },
-  { valor: "jueves", etiqueta: "Jue" },
-  { valor: "viernes", etiqueta: "Vie" },
-  { valor: "sabado", etiqueta: "Sáb" },
-  { valor: "domingo", etiqueta: "Dom" },
-];
-
-const ETIQUETA_TIPO_JORNADA: Record<string, string> = {
-  normal: "Normal",
-  flexible: "Flexible",
-  de_confianza: "De confianza",
-};
-
-type PatronDia = {
-  dia_semana: DiaSemana;
-  hora_entrada: string;
-  hora_salida: string;
-  minutos_comida: number;
-};
-
-type JornadaVigente = {
-  tipo_jornada: string;
-  vigente_desde: string;
-  horas_semanales_calculadas: number | null;
-  patron_semanal: PatronDia[];
-};
-
-function formatearHora(hora: string): string {
-  // hora_entrada/hora_salida llegan "HH:MM:SS" (time de Postgres) — sólo interesa HH:MM.
-  return hora.slice(0, 5);
 }
 
 export function FichaPersonaPage() {
@@ -455,45 +412,7 @@ export function FichaPersonaPage() {
                 {jornadaVigente ? "Renovar jornada" : "Asignar jornada"}
               </a>
             </div>
-            {estadoJornada === "sin_jornada" || !jornadaVigente ? (
-              <p>Sin jornada vigente asignada.</p>
-            ) : (
-              <>
-                <p className="meta-ficha">
-                  <span className="insignia insignia--neutra">
-                    {ETIQUETA_TIPO_JORNADA[jornadaVigente.tipo_jornada] ?? jornadaVigente.tipo_jornada}
-                  </span>{" "}
-                  vigente desde {formatearFecha(jornadaVigente.vigente_desde)}
-                  {jornadaVigente.horas_semanales_calculadas != null &&
-                    ` · ${jornadaVigente.horas_semanales_calculadas.toFixed(1)} h/semana`}
-                </p>
-                <div className="calendario-semanal">
-                  {DIAS_SEMANA.map(({ valor, etiqueta }) => {
-                    const dia = jornadaVigente.patron_semanal.find((p) => p.dia_semana === valor);
-                    return (
-                      <div
-                        key={valor}
-                        className={`dia-calendario ${dia ? "dia-calendario--trabaja" : "dia-calendario--libre"}`}
-                      >
-                        <span className="nombre-dia">{etiqueta}</span>
-                        {dia ? (
-                          <>
-                            <span className="horario-dia">
-                              {formatearHora(dia.hora_entrada)}–{formatearHora(dia.hora_salida)}
-                            </span>
-                            {dia.minutos_comida > 0 && (
-                              <span className="comida-dia">{dia.minutos_comida} min comida</span>
-                            )}
-                          </>
-                        ) : (
-                          <span className="horario-dia">Libre</span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-            )}
+            <DetalleJornadaAsignada estado={estadoJornada} jornada={jornadaVigente} />
           </div>
         )}
 

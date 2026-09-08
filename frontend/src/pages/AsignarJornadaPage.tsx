@@ -1,8 +1,13 @@
-import { type FormEvent, useEffect, useMemo, useState } from "react";
-import { ArrowRight, CalendarClock, CheckCircle2, Clock, Search } from "lucide-react";
+import { Fragment, type FormEvent, useEffect, useMemo, useState } from "react";
+import { ArrowRight, CalendarClock, CheckCircle2, ChevronDown, ChevronRight, Clock, Search } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
+import {
+  DetalleJornadaAsignada,
+  type EstadoJornadaVigente,
+  type JornadaVigente,
+} from "../components/DetalleJornadaAsignada";
 import { Badge } from "../components/Badge";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
@@ -88,6 +93,17 @@ export function AsignarJornadaPage() {
   const [exito, setExito] = useState<{ nombrePersona: string } | null>(null);
   const [formKey, setFormKey] = useState(0);
   const [busquedaCobertura, setBusquedaCobertura] = useState("");
+  // El formulario arranca cerrado (SCJ-PRA-01, mockup B elegido) — un clic en "Asignar"/"Renovar"
+  // de una fila, o en la cabecera, lo abre. Mismo patrón crudo de AppShell.tsx (aria-expanded +
+  // Chevron), sin componente Accordion dedicado.
+  const [formAbierto, setFormAbierto] = useState(false);
+  // Fila expandida de la tabla de cobertura: sólo una a la vez (menos estado que un Set, sin
+  // pedido explícito de varias simultáneas). jornadaCache evita refetchear si se colapsa y se
+  // vuelve a abrir la misma persona.
+  const [filaExpandidaId, setFilaExpandidaId] = useState<string | null>(null);
+  const [jornadaCache, setJornadaCache] = useState<
+    Record<string, { estado: EstadoJornadaVigente; jornada: JornadaVigente | null }>
+  >({});
 
   function cargarPersonas() {
     apiFetch("/api/personas")
@@ -218,6 +234,36 @@ export function AsignarJornadaPage() {
   function seleccionarParaAsignar(id: string) {
     setPersonaId(id);
     setExito(null);
+    setFormAbierto(true);
+  }
+
+  async function cargarJornadaDePersona(id: string) {
+    setJornadaCache((anterior) => ({ ...anterior, [id]: { estado: "cargando", jornada: null } }));
+    let resultado: { estado: EstadoJornadaVigente; jornada: JornadaVigente | null };
+    try {
+      const r = await apiFetch(`/api/personas/${id}/jornada-vigente`);
+      if (r.status === 404) {
+        resultado = { estado: "sin_jornada", jornada: null };
+      } else if (!r.ok) {
+        throw new Error(`status ${r.status}`);
+      } else {
+        const datos: JornadaVigente = await r.json();
+        resultado = { estado: "listo", jornada: datos };
+      }
+    } catch {
+      resultado = { estado: "sin_permiso", jornada: null };
+    }
+    setJornadaCache((anterior) => ({ ...anterior, [id]: resultado }));
+  }
+
+  function alternarFila(id: string) {
+    if (filaExpandidaId === id) {
+      setFilaExpandidaId(null);
+      return;
+    }
+    setFilaExpandidaId(id);
+    if (jornadaCache[id]) return; // ya cacheada -- no refetch al reabrir la misma persona
+    cargarJornadaDePersona(id);
   }
 
   return (
@@ -273,41 +319,79 @@ export function AsignarJornadaPage() {
                 </tr>
               </thead>
               <tbody>
-                {coberturaFiltrada.map((p) => (
-                  <tr key={p.id}>
-                    <td>
-                      {p.primer_nombre} {p.apellido_paterno}
-                    </td>
-                    <td>
-                      <Badge variante={p.tiene_jornada_vigente ? "exito" : "peligro"}>
-                        {p.tiene_jornada_vigente ? "Con jornada" : "Sin jornada"}
-                      </Badge>
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        className="boton-con-icono"
-                        onClick={() => seleccionarParaAsignar(p.id)}
-                      >
-                        {p.tiene_jornada_vigente ? "Renovar" : "Asignar"}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {coberturaFiltrada.map((p) => {
+                  const expandida = filaExpandidaId === p.id;
+                  const cache = jornadaCache[p.id];
+                  return (
+                    <Fragment key={p.id}>
+                      <tr className="seleccionable" onClick={() => alternarFila(p.id)}>
+                        <td>
+                          <span className="boton-con-icono" style={{ justifyContent: "flex-start" }}>
+                            {expandida ? (
+                              <ChevronDown size={16} aria-hidden="true" />
+                            ) : (
+                              <ChevronRight size={16} aria-hidden="true" />
+                            )}
+                            {p.primer_nombre} {p.apellido_paterno}
+                          </span>
+                        </td>
+                        <td>
+                          <Badge variante={p.tiene_jornada_vigente ? "exito" : "peligro"}>
+                            {p.tiene_jornada_vigente ? "Con jornada" : "Sin jornada"}
+                          </Badge>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="boton-con-icono"
+                            onClick={(evento) => {
+                              evento.stopPropagation();
+                              seleccionarParaAsignar(p.id);
+                            }}
+                          >
+                            {p.tiene_jornada_vigente ? "Renovar" : "Asignar"}
+                          </button>
+                        </td>
+                      </tr>
+                      {expandida && (
+                        <tr>
+                          <td colSpan={3}>
+                            <DetalleJornadaAsignada
+                              estado={cache?.estado ?? "cargando"}
+                              jornada={cache?.jornada ?? null}
+                            />
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </div>
       )}
 
-      <form key={formKey} onSubmit={handleSubmit} className="contenedor-pagina">
+      <div className="contenedor-pagina">
         <nav className="migas">
           <strong>Asignación de jornada</strong>
         </nav>
-        <h1>Asignar jornada</h1>
-        <p className="subtitulo-pagina">
-          Da de alta o renueva la jornada y el patrón semanal de una persona.
-        </p>
+        <div className="encabezado-pagina">
+          <div>
+            <h1>Asignar jornada</h1>
+            <p className="subtitulo-pagina">
+              Da de alta o renueva la jornada y el patrón semanal de una persona.
+            </p>
+          </div>
+          <Button
+            type="button"
+            icono={formAbierto ? ChevronDown : ChevronRight}
+            aria-expanded={formAbierto}
+            onClick={() => setFormAbierto((anterior) => !anterior)}
+          >
+            {formAbierto ? "Ocultar formulario" : "Asignar o renovar jornada"}
+          </Button>
+        </div>
 
         {exito && (
           <div className="tarjeta-info">
@@ -319,6 +403,8 @@ export function AsignarJornadaPage() {
           </div>
         )}
 
+      {formAbierto && (
+      <form key={formKey} onSubmit={handleSubmit}>
         <fieldset className="fieldset-formulario">
           <legend className="encabezado-fieldset">
             <span className="icono-seccion">
@@ -490,6 +576,8 @@ export function AsignarJornadaPage() {
           </Button>
         </div>
       </form>
+      )}
+      </div>
     </AppShell>
   );
 }

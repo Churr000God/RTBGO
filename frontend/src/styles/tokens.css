@@ -140,6 +140,13 @@ tbody tr:hover {
   background: var(--superficie);
 }
 
+/* Fila de tabla clickeable (ej. cobertura de jornadas, fila expandible) -- tbody tr:hover de
+   arriba ya resalta el fondo de CUALQUIER fila, clickeable o no, así que por sí solo no avisa
+   que hay algo para hacer clic. Sólo el cursor distingue la interactiva de una fila normal. */
+.seleccionable {
+  cursor: pointer;
+}
+
 th {
   color: var(--navy-medio);
   font-size: 0.8rem;
