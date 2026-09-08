@@ -24,6 +24,7 @@ const TRAMO_1 = {
   fin: "2026-09-07T17:00:00Z",
   minutos_trabajados: 450,
   dia_estado: "cerrado",
+  tipo: "ordinario",
 };
 
 const TRAMO_ABIERTO = {
@@ -35,6 +36,7 @@ const TRAMO_ABIERTO = {
   fin: null,
   minutos_trabajados: null,
   dia_estado: "abierto",
+  tipo: null,
 };
 
 function mockApiFetch(opciones: { tramos?: Response } = {}) {
@@ -104,6 +106,37 @@ describe("TramosPage", () => {
     const fila = await waitFor(() => screen.getByRole("row", { name: /otra persona/i }));
     const celdaEstadoDia = within(fila).getAllByRole("cell")[6];
     expect(celdaEstadoDia).toHaveTextContent("—");
+  });
+
+  it("tipo ordinario/reposicion/extra muestran su badge correspondiente", async () => {
+    const tramoOrdinario = { ...TRAMO_1, tipo: "ordinario" };
+    mockApiFetch({ tramos: new Response(JSON.stringify({ total: 1, tramos: [tramoOrdinario] })) });
+    const { unmount: unmount1 } = render(<TramosPage />);
+    let fila = await waitFor(() => screen.getByRole("row", { name: /persona ficticia uno/i }));
+    expect(within(fila).getByText("Ordinario")).toBeInTheDocument();
+    unmount1();
+
+    const tramoReposicion = { ...TRAMO_1, tipo: "reposicion" };
+    mockApiFetch({ tramos: new Response(JSON.stringify({ total: 1, tramos: [tramoReposicion] })) });
+    const { unmount: unmount2 } = render(<TramosPage />);
+    fila = await waitFor(() => screen.getByRole("row", { name: /persona ficticia uno/i }));
+    expect(within(fila).getByText("Reposición")).toBeInTheDocument();
+    unmount2();
+
+    const tramoExtra = { ...TRAMO_1, tipo: "extra" };
+    mockApiFetch({ tramos: new Response(JSON.stringify({ total: 1, tramos: [tramoExtra] })) });
+    render(<TramosPage />);
+    fila = await waitFor(() => screen.getByRole("row", { name: /persona ficticia uno/i }));
+    expect(within(fila).getByText("Extra")).toBeInTheDocument();
+  });
+
+  it("tipo null muestra Sin clasificar sin badge", async () => {
+    mockApiFetch({ tramos: new Response(JSON.stringify({ total: 1, tramos: [TRAMO_ABIERTO] })) });
+
+    render(<TramosPage />);
+
+    const fila = await waitFor(() => screen.getByRole("row", { name: /otra persona/i }));
+    expect(within(fila).getByText("Sin clasificar")).toBeInTheDocument();
   });
 
   it("escribir en el buscador manda busqueda_persona en la query tras el debounce", async () => {

@@ -22,6 +22,7 @@ type Tramo = {
   fin: string | null;
   minutos_trabajados: number | null;
   dia_estado: "abierto" | "cerrado" | "bloqueado" | "revisado";
+  tipo: "ordinario" | "reposicion" | "extra" | null;
 };
 
 type RespuestaTramos = { total: number; tramos: Tramo[] };
@@ -61,6 +62,20 @@ const ETIQUETA_DIA_ESTADO: Partial<Record<Tramo["dia_estado"], string>> = {
 const VARIANTE_DIA_ESTADO: Partial<Record<Tramo["dia_estado"], "peligro" | "exito">> = {
   bloqueado: "peligro",
   revisado: "exito",
+};
+
+// null = todavía no corrió el corte quincenal (SCJ-PRO-13) sobre este tramo -- normal en uno
+// reciente o "en curso", no es una alerta, por eso va en texto plano sin badge.
+const ETIQUETA_TIPO: Record<Exclude<Tramo["tipo"], null>, string> = {
+  ordinario: "Ordinario",
+  reposicion: "Reposición",
+  extra: "Extra",
+};
+
+const VARIANTE_TIPO: Record<Exclude<Tramo["tipo"], null>, "neutra" | "aviso" | "exito"> = {
+  ordinario: "neutra",
+  reposicion: "aviso",
+  extra: "exito",
 };
 
 export function TramosPage() {
@@ -238,6 +253,7 @@ export function TramosPage() {
                     <th>Fin</th>
                     <th>Minutos trabajados</th>
                     <th>Estado del día</th>
+                    <th>Tipo</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -264,6 +280,13 @@ export function TramosPage() {
                             "—"
                           );
                         })()}
+                      </td>
+                      <td>
+                        {tramo.tipo === null ? (
+                          "Sin clasificar"
+                        ) : (
+                          <Badge variante={VARIANTE_TIPO[tramo.tipo]}>{ETIQUETA_TIPO[tramo.tipo]}</Badge>
+                        )}
                       </td>
                     </tr>
                   ))}
