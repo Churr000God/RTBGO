@@ -38,7 +38,7 @@ type ParametroHistorialItem = {
   nombre_registrado_por: string | null;
 };
 
-// Las 8 claves reales del catálogo -- 3 con impacta_logica=true, 5 con false, 1 con nota.
+// Las 8 claves reales del catálogo -- 4 con impacta_logica=true, 4 con false, 1 con nota.
 // "Ventana del banco de horas" no aparece en HISTORIAL_FIJO -- sirve de marca de carga sin
 // ambigüedad entre las dos tablas de la página.
 const VIGENTES_FIJOS: ParametroVigente[] = [
@@ -105,7 +105,7 @@ const VIGENTES_FIJOS: ParametroVigente[] = [
     descripcion: "Descuento fijo cuando la pausa no se marca.",
     tipo: "entero",
     unidad: "min",
-    impacta_logica: false,
+    impacta_logica: true,
     nota: null,
   },
   {
@@ -402,14 +402,14 @@ describe("ParametrosSistemaPage", () => {
     });
   });
 
-  it("el badge de 'sin efecto' aparece en las 5 claves decorativas y no en las 3 reales", async () => {
+  it("el badge de 'sin efecto' aparece en las 4 claves decorativas y no en las 4 reales", async () => {
     mockApiFetch();
     render(<ParametrosSistemaPage />);
     await esperarCarga();
 
     const tabla = tablaVigentes();
     const insigniasSinEfecto = within(tabla).getAllByText("Sin efecto en la lógica actual");
-    expect(insigniasSinEfecto).toHaveLength(5);
+    expect(insigniasSinEfecto).toHaveLength(4);
 
     const filaTolerancia = within(tabla).getByText("Tolerancia de retardo").closest("tr")!;
     expect(within(filaTolerancia).queryByText("Sin efecto en la lógica actual")).toBeNull();
@@ -421,6 +421,10 @@ describe("ParametrosSistemaPage", () => {
       .getByText("Hora de corrida de cierre de día")
       .closest("tr")!;
     expect(within(filaCierreDia).queryByText("Sin efecto en la lógica actual")).toBeNull();
+    const filaDescuentoPausa = within(tabla)
+      .getByText("Descuento por pausa no registrada")
+      .closest("tr")!;
+    expect(within(filaDescuentoPausa).queryByText("Sin efecto en la lógica actual")).toBeNull();
 
     expect(within(filaCierreDia).getByText(/requiere reiniciar el backend/i)).toBeInTheDocument();
     expect(within(filaTolerancia).queryByText(/requiere reiniciar el backend/i)).toBeNull();
