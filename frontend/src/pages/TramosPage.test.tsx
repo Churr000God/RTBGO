@@ -88,6 +88,27 @@ describe("TramosPage", () => {
     expect(celdas[5]).toHaveTextContent("—");
   });
 
+  it("fin=null con dia_estado bloqueado muestra Sin cierre (día bloqueado), no En curso", async () => {
+    const tramo = { ...TRAMO_ABIERTO, dia_estado: "bloqueado" };
+    mockApiFetch({ tramos: new Response(JSON.stringify({ total: 1, tramos: [tramo] })) });
+
+    render(<TramosPage />);
+
+    const fila = await waitFor(() => screen.getByRole("row", { name: /otra persona/i }));
+    expect(within(fila).getByText("Sin cierre (día bloqueado)")).toBeInTheDocument();
+    expect(within(fila).queryByText("En curso")).not.toBeInTheDocument();
+  });
+
+  it("fin=null con dia_estado revisado muestra Sin cierre (día revisado)", async () => {
+    const tramo = { ...TRAMO_ABIERTO, dia_estado: "revisado" };
+    mockApiFetch({ tramos: new Response(JSON.stringify({ total: 1, tramos: [tramo] })) });
+
+    render(<TramosPage />);
+
+    const fila = await waitFor(() => screen.getByRole("row", { name: /otra persona/i }));
+    expect(within(fila).getByText("Sin cierre (día revisado)")).toBeInTheDocument();
+  });
+
   it("dia_estado bloqueado muestra el badge de alerta", async () => {
     const tramo = { ...TRAMO_1, dia_estado: "bloqueado" };
     mockApiFetch({ tramos: new Response(JSON.stringify({ total: 1, tramos: [tramo] })) });

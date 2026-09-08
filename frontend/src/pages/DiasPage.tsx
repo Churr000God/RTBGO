@@ -11,7 +11,7 @@ import { Input } from "../components/Input";
 // precedente de "dispara al toque".
 const DEBOUNCE_BUSQUEDA_MS = 300;
 const LIMITE = 20;
-const COLUMNAS = 11;
+const COLUMNAS = 12;
 
 type EstadoDia = "abierto" | "cerrado" | "bloqueado" | "revisado";
 
@@ -27,6 +27,7 @@ type Dia = {
   ultima_marca: string | null;
   alerta_entrada: "retardo" | "entrada_anticipada" | null;
   alerta_salida: "salida_anticipada" | "salida_tardia" | null;
+  excepciones_pendientes: number;
 };
 
 type RespuestaDias = { total: number; dias: Dia[] };
@@ -118,6 +119,7 @@ export function DiasPage() {
   const [pendienteRevisarId, setPendienteRevisarId] = useState<number | null>(null);
   const [errorRevisar, setErrorRevisar] = useState<string | null>(null);
   const [revisando, setRevisando] = useState(false);
+  const [valorHoras, setValorHoras] = useState("");
 
   useEffect(() => {
     const id = setTimeout(() => {
@@ -173,30 +175,37 @@ export function DiasPage() {
   function solicitarRevisar(id: number) {
     setPendienteRevisarId(id);
     setErrorRevisar(null);
+    setValorHoras("");
   }
 
   function cancelarRevisar() {
     setPendienteRevisarId(null);
     setErrorRevisar(null);
+    setValorHoras("");
   }
 
+  const horasNumero = Number(valorHoras);
+  const horasValidas = valorHoras !== "" && !Number.isNaN(horasNumero) && horasNumero >= 0 && horasNumero <= 24;
+
   async function confirmarRevisar() {
-    if (pendienteRevisarId === null) return;
+    if (pendienteRevisarId === null || !horasValidas) return;
     setRevisando(true);
     setErrorRevisar(null);
     try {
       const respuesta = await apiFetch(`/api/dias/${pendienteRevisarId}/revisar`, {
         method: "POST",
+        body: JSON.stringify({ horas_totales: horasNumero }),
       });
       if (!respuesta.ok) {
-        // 404 (día ya no existe) / 409 (ya no está bloqueado) — la fila pudo envejecer entre la
-        // carga y el click. Se muestra el motivo sin cerrar la confirmación, mismo criterio que
-        // DiasFestivosPage al eliminar: cerrarla en silencio dejaría a la persona sin saber por
-        // qué no se marcó como revisado.
+        // 404 (día ya no existe) / 409 (ya no está bloqueado) / 422 (horas fuera de rango que el
+        // form no atrapó) — la fila pudo envejecer entre la carga y el click. Se muestra el
+        // motivo sin cerrar la confirmación, mismo criterio que DiasFestivosPage al eliminar:
+        // cerrarla en silencio dejaría a la persona sin saber por qué no se marcó como revisado.
         setErrorRevisar(await mensajeDeError(respuesta, "No se pudo marcar el día como revisado."));
         return;
       }
       setPendienteRevisarId(null);
+      setValorHoras("");
       cargar();
     } catch {
       setErrorRevisar("No se pudo marcar el día como revisado. Revisa tu conexión e intenta de nuevo.");
@@ -336,6 +345,7 @@ export function DiasPage() {
                     <th>Última marca</th>
                     <th>Alerta entrada</th>
                     <th>Alerta salida</th>
+                    <th>Excepciones</th>
                     <th>Acción</th>
                   </tr>
                 </thead>
@@ -375,6 +385,13 @@ export function DiasPage() {
                           )}
                         </td>
                         <td>
+                          {dia.excepciones_pendientes > 0 ? (
+                            <Badge variante="aviso">{dia.excepciones_pendientes} pendiente(s)</Badge>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        <td>
                           {dia.estado === "bloqueado" && (
                             <Button
                               type="button"
@@ -393,6 +410,17 @@ export function DiasPage() {
                               ¿Marcar como revisado el día de <strong>{dia.persona_nombre ?? "—"}</strong>{" "}
                               ({formatearFecha(dia.fecha)})?
                             </p>
+                            <Input
+                              id={`horas-revisar-${dia.id}`}
+                              label="Horas trabajadas"
+                              type="number"
+                              min={0}
+                              max={24}
+                              step={0.25}
+                              required
+                              value={valorHoras}
+                              onChange={(evento) => setValorHoras(evento.target.value)}
+                            />
                             {errorRevisar && <p role="alert">{errorRevisar}</p>}
                             <div className="botonera">
                               <Button type="button" onClick={cancelarRevisar}>
@@ -403,6 +431,7 @@ export function DiasPage() {
                                 variante="primario"
                                 cargando={revisando}
                                 textoCargando="Confirmando…"
+                                disabled={!horasValidas}
                                 onClick={confirmarRevisar}
                               >
                                 Confirmar

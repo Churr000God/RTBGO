@@ -27,6 +27,7 @@ const DIA_BLOQUEADO = {
   ultima_marca: "2026-09-07T17:00:00Z",
   alerta_entrada: "retardo",
   alerta_salida: "salida_tardia",
+  excepciones_pendientes: 0,
 };
 
 const DIA_ABIERTO = {
@@ -41,6 +42,7 @@ const DIA_ABIERTO = {
   ultima_marca: null,
   alerta_entrada: null,
   alerta_salida: null,
+  excepciones_pendientes: 0,
 };
 
 const DIA_REVISADO = {
@@ -160,12 +162,41 @@ describe("DiasPage", () => {
     ).toBe(false);
   });
 
-  it("confirmar dispara el POST y recarga el listado", async () => {
+  it("confirmar sin escribir horas no dispara POST (botón deshabilitado)", async () => {
     mockApiFetch();
 
     render(<DiasPage />);
     await waitFor(() => expect(screen.getByText("Persona Ficticia Uno")).toBeInTheDocument());
     await userEvent.click(screen.getByRole("button", { name: /marcar como revisado/i }));
+
+    expect(screen.getByRole("button", { name: /^confirmar$/i })).toBeDisabled();
+    expect(
+      vi.mocked(apiFetch).mock.calls.some(([path]) => (path as string).endsWith("/revisar")),
+    ).toBe(false);
+  });
+
+  it("valor de horas fuera de rango tampoco habilita Confirmar", async () => {
+    mockApiFetch();
+
+    render(<DiasPage />);
+    await waitFor(() => expect(screen.getByText("Persona Ficticia Uno")).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: /marcar como revisado/i }));
+
+    await userEvent.type(screen.getByLabelText(/horas trabajadas/i), "25");
+
+    expect(screen.getByRole("button", { name: /^confirmar$/i })).toBeDisabled();
+    expect(
+      vi.mocked(apiFetch).mock.calls.some(([path]) => (path as string).endsWith("/revisar")),
+    ).toBe(false);
+  });
+
+  it("confirmar con horas válidas dispara el POST con horas_totales y recarga el listado", async () => {
+    mockApiFetch();
+
+    render(<DiasPage />);
+    await waitFor(() => expect(screen.getByText("Persona Ficticia Uno")).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: /marcar como revisado/i }));
+    await userEvent.type(screen.getByLabelText(/horas trabajadas/i), "7.5");
     await userEvent.click(screen.getByRole("button", { name: /^confirmar$/i }));
 
     await waitFor(() =>
@@ -174,6 +205,11 @@ describe("DiasPage", () => {
         expect.objectContaining({ method: "POST" }),
       ),
     );
+    const llamada = vi
+      .mocked(apiFetch)
+      .mock.calls.find(([path]) => path === "/api/dias/10/revisar")!;
+    const cuerpo = JSON.parse(llamada[1]!.body as string);
+    expect(cuerpo.horas_totales).toBe(7.5);
 
     const llamadasListado = vi
       .mocked(apiFetch)
@@ -193,6 +229,7 @@ describe("DiasPage", () => {
     render(<DiasPage />);
     await waitFor(() => expect(screen.getByText("Persona Ficticia Uno")).toBeInTheDocument());
     await userEvent.click(screen.getByRole("button", { name: /marcar como revisado/i }));
+    await userEvent.type(screen.getByLabelText(/horas trabajadas/i), "7.5");
     await userEvent.click(screen.getByRole("button", { name: /^confirmar$/i }));
 
     await waitFor(() =>
@@ -209,10 +246,41 @@ describe("DiasPage", () => {
     render(<DiasPage />);
     await waitFor(() => expect(screen.getByText("Persona Ficticia Uno")).toBeInTheDocument());
     await userEvent.click(screen.getByRole("button", { name: /marcar como revisado/i }));
+    await userEvent.type(screen.getByLabelText(/horas trabajadas/i), "7.5");
     await userEvent.click(screen.getByRole("button", { name: /^confirmar$/i }));
 
     await waitFor(() => expect(screen.getByText(/el día no existe/i)).toBeInTheDocument());
     expect(screen.getByText(/¿marcar como revisado el día de/i)).toBeInTheDocument();
+  });
+
+  it("422 (horas fuera de rango que el backend rechaza) muestra el mensaje y NO cierra la confirmación", async () => {
+    mockApiFetch({
+      revisar: new Response(
+        JSON.stringify({ detail: "Horas trabajadas inválidas: 24.5 (debe estar entre 0 y 24)" }),
+        { status: 422 },
+      ),
+    });
+
+    render(<DiasPage />);
+    await waitFor(() => expect(screen.getByText("Persona Ficticia Uno")).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: /marcar como revisado/i }));
+    await userEvent.type(screen.getByLabelText(/horas trabajadas/i), "24");
+    await userEvent.click(screen.getByRole("button", { name: /^confirmar$/i }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/horas trabajadas inválidas/i)).toBeInTheDocument(),
+    );
+    expect(screen.getByText(/¿marcar como revisado el día de/i)).toBeInTheDocument();
+  });
+
+  it("excepciones_pendientes=2 muestra el badge con el número correcto", async () => {
+    const dia = { ...DIA_BLOQUEADO, excepciones_pendientes: 2 };
+    mockApiFetch({ dias: new Response(JSON.stringify({ total: 1, dias: [dia] })) });
+
+    render(<DiasPage />);
+
+    const fila = await waitFor(() => screen.getByRole("row", { name: /persona ficticia uno/i }));
+    expect(within(fila).getByText("2 pendiente(s)")).toBeInTheDocument();
   });
 
   it("escribir en el buscador manda busqueda_persona en la query tras el debounce", async () => {

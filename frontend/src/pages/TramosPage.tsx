@@ -265,7 +265,11 @@ export function TramosPage() {
                       <td>{formatearHora(tramo.inicio)}</td>
                       <td>
                         {tramo.fin === null ? (
-                          <Badge variante="aviso">En curso</Badge>
+                          tramo.dia_estado === "abierto" ? (
+                            <Badge variante="aviso">En curso</Badge>
+                          ) : (
+                            <Badge variante="peligro">Sin cierre (día {tramo.dia_estado})</Badge>
+                          )
                         ) : (
                           formatearHora(tramo.fin)
                         )}
