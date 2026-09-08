@@ -43,6 +43,25 @@ def _tabla_persona_in(datos):
     return tabla
 
 
+def _tabla_ausencia_lista(datos, total):
+    """select/in_/gte/lte/eq/order/range encadenan sobre el mismo builder (self) -- sólo
+    execute() corta la cadena, así que da igual qué combinación de filtros se haya aplicado."""
+    tabla = MagicMock()
+    for metodo in ("select", "in_", "gte", "lte", "eq", "order", "range", "or_"):
+        getattr(tabla, metodo).return_value = tabla
+    resultado = MagicMock()
+    resultado.data = datos
+    resultado.count = total
+    tabla.execute.return_value = resultado
+    return tabla
+
+
+def _tabla_aprobacion(datos):
+    tabla = MagicMock()
+    tabla.select.return_value.in_.return_value.execute.return_value.data = datos
+    return tabla
+
+
 def _entradas_gate_and():
     """requiere_todos_los_permisos exige AND (ausencia_edicion Y aprobacion_ausencia_edicion) --
     tiene_permiso se llama una vez por código, cada una resuelve puestos vigentes + poseedores
@@ -70,6 +89,42 @@ def _fake_client_secuencia(secuencia):
     return fake_client
 
 
+def _tabla_puesto_permiso_por_codigo(codigos_con_permiso):
+    tabla = MagicMock()
+
+    def eq_codigo(campo, valor):
+        siguiente = MagicMock()
+        tiene = valor in codigos_con_permiso
+        siguiente.eq.return_value.execute.return_value.data = (
+            [{"puesto_id": PUESTO_ID}] if tiene else []
+        )
+        return siguiente
+
+    tabla.select.return_value.eq.side_effect = eq_codigo
+    return tabla
+
+
+def _fake_caller_client_con_permisos(codigos_con_permiso):
+    def side_effect(nombre_tabla):
+        if nombre_tabla == "usuario":
+            return _tabla_select_simple([{"persona_id": PERSONA_ID}])
+        if nombre_tabla == "asignacion":
+            return _tabla_select_eq_is([{"puesto_id": PUESTO_ID}])
+        if nombre_tabla == "puesto_permiso":
+            return _tabla_puesto_permiso_por_codigo(codigos_con_permiso)
+        if nombre_tabla == "permiso":
+            tabla = MagicMock()
+            tabla.select.return_value.eq.return_value.execute.return_value.data = [
+                {"heredable": False}
+            ]
+            return tabla
+        return MagicMock()
+
+    fake_client = MagicMock()
+    fake_client.postgrest.schema.return_value.table.side_effect = side_effect
+    return fake_client
+
+
 def _override_identidad():
     app.dependency_overrides[get_caller_identity] = lambda: CALLER_IDENTITY
 
@@ -92,6 +147,160 @@ def _fila_persona_ausencia(**overrides):
     fila = {"id": PERSONA_ID_AUSENCIA, "primer_nombre": "Ficticia", "apellido_paterno": "Alfa"}
     fila.update(overrides)
     return fila
+
+
+APROBADOR_ID = "aaaaaaaa-0000-0000-0000-000000000009"
+
+
+def _fila_aprobacion(**overrides):
+    fila = {
+        "ausencia_id": AUSENCIA_ID,
+        "numero_paso": 1,
+        "aprobador_id": APROBADOR_ID,
+        "motivo": "vacaciones justificadas",
+        "decidido_en": "2026-01-02T10:00:00+00:00",
+    }
+    fila.update(overrides)
+    return fila
+
+
+def _pedir_ausencias(**params):
+    client = TestClient(app)
+    return client.get(
+        "/api/ausencias", params=params, headers={"Authorization": "Bearer fake-token"}
+    )
+
+
+def test_listar_ausencias_devuelve_pagina_con_nombre_resuelto():
+    fake_client = _fake_client_secuencia(
+        _entradas_gate_and()[:3]
+        + [
+            ("ausencia", _tabla_ausencia_lista([_fila_ausencia()], total=1)),
+            ("persona", _tabla_persona_in([_fila_persona_ausencia()])),
+        ]
+    )
+    app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
+
+    response = _pedir_ausencias()
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200, response.text
+    cuerpo = response.json()
+    assert cuerpo["total"] == 1
+    ausencia = cuerpo["ausencias"][0]
+    assert ausencia["persona_nombre"] == "Ficticia Alfa"
+    assert ausencia["aprobador_nombre"] is None
+    assert ausencia["motivo"] is None
+    assert ausencia["decidido_en"] is None
+
+
+def test_listar_ausencias_acepta_filtros_orden_y_paginacion():
+    tabla_ausencia = _tabla_ausencia_lista([_fila_ausencia()], total=1)
+    fake_client = _fake_client_secuencia(
+        _entradas_gate_and()[:3]
+        + [
+            ("ausencia", tabla_ausencia),
+            ("persona", _tabla_persona_in([_fila_persona_ausencia()])),
+        ]
+    )
+    app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
+
+    response = _pedir_ausencias(
+        desde="2026-01-01",
+        hasta="2026-12-31",
+        tipo="vacaciones",
+        estado="pendiente",
+        orden="fecha_asc",
+        limite=10,
+        desplazamiento=20,
+    )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200, response.text
+    tabla_ausencia.gte.assert_called_once_with("fecha_inicio", "2026-01-01")
+    tabla_ausencia.lte.assert_called_once_with("fecha_inicio", "2026-12-31")
+    tabla_ausencia.eq.assert_any_call("tipo_de_ausencia", "vacaciones")
+    tabla_ausencia.eq.assert_any_call("estado_autorizacion", "pendiente")
+    tabla_ausencia.order.assert_called_once_with("fecha_inicio", desc=False)
+    tabla_ausencia.range.assert_called_once_with(20, 29)
+
+
+def test_listar_ausencias_autorizada_resuelve_aprobador_y_motivo():
+    fake_client = _fake_client_secuencia(
+        _entradas_gate_and()[:3]
+        + [
+            ("ausencia", _tabla_ausencia_lista([_fila_ausencia(estado_autorizacion="autorizada")], total=1)),
+            ("persona", _tabla_persona_in([_fila_persona_ausencia()])),
+            ("aprobacion_ausencia", _tabla_aprobacion([_fila_aprobacion()])),
+            (
+                "persona",
+                _tabla_persona_in(
+                    [{"id": APROBADOR_ID, "primer_nombre": "Gerente", "apellido_paterno": "General"}]
+                ),
+            ),
+        ]
+    )
+    app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
+
+    response = _pedir_ausencias()
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200, response.text
+    ausencia = response.json()["ausencias"][0]
+    assert ausencia["aprobador_id"] == APROBADOR_ID
+    assert ausencia["aprobador_nombre"] == "Gerente General"
+    assert ausencia["motivo"] == "vacaciones justificadas"
+    assert ausencia["decidido_en"] == "2026-01-02T10:00:00Z"
+
+
+def test_listar_ausencias_pendiente_no_consulta_aprobacion():
+    fake_client = _fake_client_secuencia(
+        _entradas_gate_and()[:3]
+        + [
+            ("ausencia", _tabla_ausencia_lista([_fila_ausencia()], total=1)),
+            ("persona", _tabla_persona_in([_fila_persona_ausencia()])),
+        ]
+    )
+    app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
+
+    response = _pedir_ausencias()
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200, response.text
+    tablas_pedidas = {
+        llamada.args[0]
+        for llamada in fake_client.postgrest.schema.return_value.table.call_args_list
+    }
+    assert "aprobacion_ausencia" not in tablas_pedidas
+
+
+def test_listar_ausencias_busqueda_sin_coincidencias_no_consulta_ausencia():
+    fake_client = _fake_client_secuencia(
+        _entradas_gate_and()[:3] + [("persona", _tabla_persona_in([]))]
+    )
+    app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
+
+    response = _pedir_ausencias(busqueda_persona="nadie-existe")
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200, response.text
+    assert response.json() == {"total": 0, "ausencias": []}
+
+
+def test_listar_ausencias_sin_permiso_devuelve_403():
+    fake_client = _fake_caller_client_con_permisos(set())
+    app.dependency_overrides[get_caller_client] = lambda: fake_client
+    _override_identidad()
+
+    response = _pedir_ausencias()
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 403
 
 
 def test_listar_ausencias_pendientes():

@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 
 from pydantic import BaseModel, field_validator, model_validator
 
@@ -20,6 +20,26 @@ class AusenciaOut(BaseModel):
     fecha_fin: date
     estado_autorizacion: str
     documento_ref: str | None
+
+
+class AusenciaListaItem(BaseModel):
+    id: int
+    persona_id: str
+    persona_nombre: str | None = None
+    tipo_de_ausencia: str
+    fecha_inicio: date
+    fecha_fin: date
+    estado_autorizacion: str
+    documento_ref: str | None
+    aprobador_id: str | None = None
+    aprobador_nombre: str | None = None
+    motivo: str | None = None
+    decidido_en: datetime | None = None
+
+
+class AusenciaListaOut(BaseModel):
+    total: int
+    ausencias: list[AusenciaListaItem]
 
 
 class ResolverAusenciaCreate(BaseModel):
