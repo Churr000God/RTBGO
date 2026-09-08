@@ -47,6 +47,7 @@ from app.deps import get_service_client
 TIPO_BATCH = "cierre_dia"
 DOMINGO = 6  # date.weekday(): lunes=0 ... domingo=6
 UNIQUE_VIOLATION = "23505"
+DESCUENTO_PAUSA_POR_DEFECTO_MIN = 60  # mismo valor de ejemplo que db/ddl/03_parametros_ejemplo.sql
 
 logger = logging.getLogger(__name__)
 
@@ -224,6 +225,27 @@ def _crear_tramo(db: Client, dia_id: int, apertura: dict, cierre: dict | None) -
     return minutos
 
 
+def _resolver_descuento_pausa_no_registrada(db: Client, fecha_iso: str) -> int:
+    """Molde exacto de dias_habiles.py::_dias_habiles_limite -- resolución de una sola fecha
+    (el batch corre fecha por fecha, no hace falta la variante batch de alertas_horario.py).
+    Fail-open no aplica acá (no envuelto en try/except): db ya es el service_role del batch, no
+    una llamada de red aparte -- si Supabase no responde, el batch entero ya está fallando."""
+    filas = (
+        db.postgrest.schema("tiempo")
+        .table("parametro")
+        .select("valor")
+        .eq("clave", "descuento_pausa_no_registrada_min")
+        .lte("vigente_desde", fecha_iso)
+        .order("vigente_desde", desc=True)
+        .limit(1)
+        .execute()
+        .data
+    )
+    if not filas:
+        return DESCUENTO_PAUSA_POR_DEFECTO_MIN
+    return int(filas[0]["valor"])
+
+
 def _armar_dia_par(db: Client, persona_id: str, fecha_iso: str, marcas: list[dict]) -> None:
     dia = (
         db.postgrest.schema("tiempo")
@@ -236,6 +258,13 @@ def _armar_dia_par(db: Client, persona_id: str, fecha_iso: str, marcas: list[dic
     total_minutos = 0.0
     for apertura, cierre in zip(marcas[0::2], marcas[1::2]):
         total_minutos += _crear_tramo(db, dia["id"], apertura, cierre)
+
+    if len(marcas) == 2:
+        # Un solo tramo: entró una vez, salió una vez, nunca marcó la pausa -- se asume que
+        # ocurrió sin registrarse y se descuenta un fijo. Con 2+ tramos no hace falta (la pausa
+        # sí quedó registrada, es el hueco entre tramos) -- ni siquiera se dispara la consulta.
+        descuento_min = _resolver_descuento_pausa_no_registrada(db, fecha_iso)
+        total_minutos = max(0.0, total_minutos - descuento_min)
 
     db.postgrest.schema("tiempo").table("dia").update({"horas_totales": total_minutos / 60.0}).eq(
         "id", dia["id"]

@@ -104,6 +104,17 @@ def _tabla_dia_update():
     return MagicMock()
 
 
+def _tabla_parametro(datos):
+    """_resolver_descuento_pausa_no_registrada: select().eq(clave).lte(vigente_desde)
+    .order(vigente_desde, desc=True).limit(1).execute()."""
+    tabla = MagicMock()
+    (
+        tabla.select.return_value.eq.return_value.lte.return_value.order.return_value.limit
+        .return_value.execute.return_value.data
+    ) = datos
+    return tabla
+
+
 def _tabla_tramo_insert():
     return MagicMock()
 
@@ -160,6 +171,7 @@ def test_paridad_par_arma_tramo_y_cierra_el_dia():
             ("correccion", _tabla_correccion([])),
             ("dia", _tabla_dia_insert()),
             ("tramo", _tabla_tramo_insert()),
+            ("parametro", _tabla_parametro([])),
             ("dia", _tabla_dia_update()),
         ]
         + _entrada_cierre_corrida()
@@ -339,6 +351,7 @@ def test_correccion_aplicada_usa_el_valor_efectivo_no_el_crudo():
             ),
             ("dia", _tabla_dia_insert()),
             ("tramo", tabla_tramo),
+            ("parametro", _tabla_parametro([])),
             ("dia", _tabla_dia_update()),
         ]
         + _entrada_cierre_corrida()
@@ -374,6 +387,7 @@ def test_fecha_local_no_la_utc_cruda_decide_a_que_dia_pertenece_la_marca():
             ("correccion", _tabla_correccion([])),
             ("dia", _tabla_dia_insert()),
             ("tramo", tabla_tramo),
+            ("parametro", _tabla_parametro([])),
             ("dia", _tabla_dia_update()),
         ]
         + _entrada_cierre_corrida()
@@ -446,6 +460,7 @@ def test_correccion_que_cruza_medianoche_reubica_la_marca_al_dia_efectivo():
             ),
             ("dia", _tabla_dia_insert()),
             ("tramo", tabla_tramo),
+            ("parametro", _tabla_parametro([])),
             ("dia", _tabla_dia_update()),
         ]
         + _entrada_cierre_corrida()
@@ -458,6 +473,122 @@ def test_correccion_que_cruza_medianoche_reubica_la_marca_al_dia_efectivo():
     assert payload_tramo["marca_apertura_id"] == 301
     assert payload_tramo["marca_cierre_id"] == 302
     assert payload_tramo["inicio"] == f"{FECHA_ISO}T00:10:00+00:00"
+
+
+def test_un_solo_tramo_descuenta_pausa_no_registrada_con_parametro_configurado():
+    """09:00 a 18:00 = 540 min, descuento configurado de 90 -> 450 min = 7.5h."""
+    marcas = [_marca(101, "09:00:00"), _marca(102, "18:00:00")]
+    tabla_dia_update = _tabla_dia_update()
+    fake_db = _fake_db(
+        _entrada_arranque_corrida_primera_vez()
+        + [
+            ("dia_festivo", _tabla_dia_festivo([])),
+            ("jornada_asignada", _tabla_jornada_vigentes([PERSONA_1])),
+            ("dia", _tabla_dia_estado([])),
+            ("marca", _tabla_marca(marcas)),
+            ("correccion", _tabla_correccion([])),
+            ("dia", _tabla_dia_insert()),
+            ("tramo", _tabla_tramo_insert()),
+            ("parametro", _tabla_parametro([{"valor": "90", "vigente_desde": "2026-01-01"}])),
+            ("dia", tabla_dia_update),
+        ]
+        + _entrada_cierre_corrida()
+    )
+
+    resultado = ejecutar_cierre_dia(FECHA, fake_db)
+
+    assert resultado["estado"] == "exitosa"
+    payload_dia = tabla_dia_update.update.call_args[0][0]
+    assert payload_dia["horas_totales"] == pytest.approx(7.5)
+
+
+def test_un_solo_tramo_sin_parametro_usa_el_default():
+    """Sin fila de parámetro para esa fecha -> default de 60 min. 540 - 60 = 480 min = 8h."""
+    marcas = [_marca(101, "09:00:00"), _marca(102, "18:00:00")]
+    tabla_dia_update = _tabla_dia_update()
+    fake_db = _fake_db(
+        _entrada_arranque_corrida_primera_vez()
+        + [
+            ("dia_festivo", _tabla_dia_festivo([])),
+            ("jornada_asignada", _tabla_jornada_vigentes([PERSONA_1])),
+            ("dia", _tabla_dia_estado([])),
+            ("marca", _tabla_marca(marcas)),
+            ("correccion", _tabla_correccion([])),
+            ("dia", _tabla_dia_insert()),
+            ("tramo", _tabla_tramo_insert()),
+            ("parametro", _tabla_parametro([])),
+            ("dia", tabla_dia_update),
+        ]
+        + _entrada_cierre_corrida()
+    )
+
+    resultado = ejecutar_cierre_dia(FECHA, fake_db)
+
+    assert resultado["estado"] == "exitosa"
+    payload_dia = tabla_dia_update.update.call_args[0][0]
+    assert payload_dia["horas_totales"] == pytest.approx(8.0)
+
+
+def test_dos_tramos_no_descuenta_ni_consulta_parametro():
+    """2+ tramos: la pausa sí quedó registrada (el hueco entre tramos) -- sin descuento, y la
+    consulta a tiempo.parametro ni siquiera se dispara (si el código la llamara igual, la
+    secuencia estricta de _fake_db fallaría por tabla inesperada)."""
+    marcas = [
+        _marca(101, "09:00:00"),
+        _marca(102, "13:00:00"),
+        _marca(103, "14:00:00"),
+        _marca(104, "18:00:00"),
+    ]
+    tabla_dia_update = _tabla_dia_update()
+    fake_db = _fake_db(
+        _entrada_arranque_corrida_primera_vez()
+        + [
+            ("dia_festivo", _tabla_dia_festivo([])),
+            ("jornada_asignada", _tabla_jornada_vigentes([PERSONA_1])),
+            ("dia", _tabla_dia_estado([])),
+            ("marca", _tabla_marca(marcas)),
+            ("correccion", _tabla_correccion([])),
+            ("dia", _tabla_dia_insert()),
+            ("tramo", _tabla_tramo_insert()),
+            ("tramo", _tabla_tramo_insert()),
+            ("dia", tabla_dia_update),
+        ]
+        + _entrada_cierre_corrida()
+    )
+
+    resultado = ejecutar_cierre_dia(FECHA, fake_db)
+
+    assert resultado["estado"] == "exitosa"
+    payload_dia = tabla_dia_update.update.call_args[0][0]
+    # (13-9) + (18-14) = 4h + 4h = 8h, sin descuento.
+    assert payload_dia["horas_totales"] == pytest.approx(8.0)
+
+
+def test_un_solo_tramo_descuento_mayor_a_las_horas_trabajadas_no_queda_negativo():
+    """Tramo de 30 min, descuento de 60 -> nunca negativo, queda en 0."""
+    marcas = [_marca(101, "09:00:00"), _marca(102, "09:30:00")]
+    tabla_dia_update = _tabla_dia_update()
+    fake_db = _fake_db(
+        _entrada_arranque_corrida_primera_vez()
+        + [
+            ("dia_festivo", _tabla_dia_festivo([])),
+            ("jornada_asignada", _tabla_jornada_vigentes([PERSONA_1])),
+            ("dia", _tabla_dia_estado([])),
+            ("marca", _tabla_marca(marcas)),
+            ("correccion", _tabla_correccion([])),
+            ("dia", _tabla_dia_insert()),
+            ("tramo", _tabla_tramo_insert()),
+            ("parametro", _tabla_parametro([{"valor": "60", "vigente_desde": "2026-01-01"}])),
+            ("dia", tabla_dia_update),
+        ]
+        + _entrada_cierre_corrida()
+    )
+
+    resultado = ejecutar_cierre_dia(FECHA, fake_db)
+
+    assert resultado["estado"] == "exitosa"
+    payload_dia = tabla_dia_update.update.call_args[0][0]
+    assert payload_dia["horas_totales"] == 0.0
 
 
 def test_ausencia_carrera_no_revienta_y_queda_pendiente():
