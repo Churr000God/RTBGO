@@ -23,6 +23,7 @@ const TRAMO_1 = {
   inicio: "2026-09-07T08:00:00Z",
   fin: "2026-09-07T17:00:00Z",
   minutos_trabajados: 450,
+  dia_estado: "cerrado",
 };
 
 const TRAMO_ABIERTO = {
@@ -33,6 +34,7 @@ const TRAMO_ABIERTO = {
   inicio: "2026-09-07T08:00:00Z",
   fin: null,
   minutos_trabajados: null,
+  dia_estado: "abierto",
 };
 
 function mockApiFetch(opciones: { tramos?: Response } = {}) {
@@ -82,6 +84,26 @@ describe("TramosPage", () => {
     expect(within(fila).getByText("En curso")).toBeInTheDocument();
     const celdas = within(fila).getAllByRole("cell");
     expect(celdas[5]).toHaveTextContent("—");
+  });
+
+  it("dia_estado bloqueado muestra el badge de alerta", async () => {
+    const tramo = { ...TRAMO_1, dia_estado: "bloqueado" };
+    mockApiFetch({ tramos: new Response(JSON.stringify({ total: 1, tramos: [tramo] })) });
+
+    render(<TramosPage />);
+
+    const fila = await waitFor(() => screen.getByRole("row", { name: /persona ficticia uno/i }));
+    expect(within(fila).getByText(/bloqueado.*necesita revisión/i)).toBeInTheDocument();
+  });
+
+  it("dia_estado abierto no muestra badge de estado del día", async () => {
+    mockApiFetch({ tramos: new Response(JSON.stringify({ total: 1, tramos: [TRAMO_ABIERTO] })) });
+
+    render(<TramosPage />);
+
+    const fila = await waitFor(() => screen.getByRole("row", { name: /otra persona/i }));
+    const celdaEstadoDia = within(fila).getAllByRole("cell")[6];
+    expect(celdaEstadoDia).toHaveTextContent("—");
   });
 
   it("escribir en el buscador manda busqueda_persona en la query tras el debounce", async () => {

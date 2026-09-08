@@ -21,6 +21,7 @@ type Tramo = {
   inicio: string;
   fin: string | null;
   minutos_trabajados: number | null;
+  dia_estado: "abierto" | "cerrado" | "bloqueado" | "revisado";
 };
 
 type RespuestaTramos = { total: number; tramos: Tramo[] };
@@ -48,6 +49,19 @@ function formatearMinutos(minutos: number | null): string {
   const resto = Math.round(minutos % 60);
   return `${horas}h ${resto}m`;
 }
+
+// "abierto"/"cerrado" son los estados normales del ciclo de vida del día -- no llevan badge.
+// Sólo "bloqueado" (SCJ-DEC-06: paridad impar al cierre, no se reabre solo) y "revisado" son
+// desvíos que valen aviso visual en esta pantalla de sólo lectura.
+const ETIQUETA_DIA_ESTADO: Partial<Record<Tramo["dia_estado"], string>> = {
+  bloqueado: "Bloqueado — necesita revisión",
+  revisado: "Revisado",
+};
+
+const VARIANTE_DIA_ESTADO: Partial<Record<Tramo["dia_estado"], "peligro" | "exito">> = {
+  bloqueado: "peligro",
+  revisado: "exito",
+};
 
 export function TramosPage() {
   const [tramos, setTramos] = useState<Tramo[]>([]);
@@ -223,6 +237,7 @@ export function TramosPage() {
                     <th>Inicio</th>
                     <th>Fin</th>
                     <th>Minutos trabajados</th>
+                    <th>Estado del día</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -240,6 +255,16 @@ export function TramosPage() {
                         )}
                       </td>
                       <td>{formatearMinutos(tramo.minutos_trabajados)}</td>
+                      <td>
+                        {(() => {
+                          const variante = VARIANTE_DIA_ESTADO[tramo.dia_estado];
+                          return variante ? (
+                            <Badge variante={variante}>{ETIQUETA_DIA_ESTADO[tramo.dia_estado]}</Badge>
+                          ) : (
+                            "—"
+                          );
+                        })()}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
