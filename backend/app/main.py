@@ -41,6 +41,7 @@ from app.routers import tope_legal  # noqa: E402
 from app.routers import dias_festivos  # noqa: E402
 from app.routers import parametros  # noqa: E402
 from app.routers import tramos  # noqa: E402
+from app.routers import dias  # noqa: E402
 
 app.include_router(personas.router)
 app.include_router(usuarios.router)
@@ -64,6 +65,7 @@ app.include_router(tope_legal.router)
 app.include_router(dias_festivos.router)
 app.include_router(parametros.router)
 app.include_router(tramos.router)
+app.include_router(dias.router)
 
 
 @app.get("/salud")
