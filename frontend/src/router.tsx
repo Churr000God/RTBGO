@@ -41,6 +41,7 @@ import { PermisosPage } from "./pages/PermisosPage";
 import { RestablecerContrasenaPage } from "./pages/RestablecerContrasenaPage";
 import { RevocarPermisoPage } from "./pages/RevocarPermisoPage";
 import { TerminarAsignacionPage } from "./pages/TerminarAsignacionPage";
+import { TramosPage } from "./pages/TramosPage";
 import { VerificarTotpRoute } from "./pages/VerificarTotpRoute";
 
 export const router = createBrowserRouter([
@@ -79,6 +80,7 @@ export const router = createBrowserRouter([
   { path: "/tiempo/captura-manual", element: <CapturaManualMarcaPage /> },
   { path: "/tiempo/marcas", element: <RegistroMarcasPage /> },
   { path: "/tiempo/excepciones", element: <ColaExcepcionesPage /> },
+  { path: "/tiempo/tramos", element: <TramosPage /> },
   { path: "/tiempo/excepciones/:id/corregir", element: <CorregirMarcaPage /> },
   { path: "/tiempo/ausencias", element: <BandejaAusenciasPage /> },
   { path: "/tiempo/banco-de-horas", element: <BancoDeHorasPage /> },

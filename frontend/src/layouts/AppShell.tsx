@@ -68,6 +68,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Registro de marcas", href: "/tiempo/marcas", disponible: true },
       { label: "Captura manual de marca", href: "/tiempo/captura-manual", disponible: true },
       { label: "Excepciones pendientes", href: "/tiempo/excepciones", disponible: true },
+      { label: "Tramos", href: "/tiempo/tramos", disponible: true },
     ],
   },
   {
