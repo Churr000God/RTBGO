@@ -50,7 +50,7 @@ backend y un frontend que lo exponen. Ver `README.md` y `docs/00-contexto/SCJ-CT
   `--no-dev` (sin pytest) y el frontend prod es nginx sirviendo el bundle (sin npm/node); el script
   corta con un mensaje explícito en vez de fallar con un error de `docker exec`. Las pruebas
   siempre corren con `dev pruebas`.
-- **Tests:** backend `uv run pytest` (363 casos), frontend `npm test` (448 casos, 60 archivos).
+- **Tests:** backend `uv run pytest` (384 casos), frontend `npm test` (453 casos, 60 archivos).
   Ambos corren igual dentro de los contenedores (`./scripts/desplegar.sh <entorno> pruebas`).
   Cobertura instrumentada desde el 4 de septiembre de 2026: `uv run pytest --cov=app
   --cov-report=term-missing` (backend) y `npm run test:coverage` / `npm test -- --coverage`
@@ -259,6 +259,26 @@ backend y un frontend que lo exponen. Ver `README.md` y `docs/00-contexto/SCJ-CT
   completo de la persona. Métricas y gráfica "Top en deuda" de la pantalla se conservaron, ahora
   alimentadas por el `resumen` del backend en vez de un `useMemo` local (corrige de paso que antes
   no reaccionaban a la búsqueda).
+- **Alertas preventivas de corte quincenal en Días y Banco de Horas (8 de septiembre de 2026,
+  corte posterior, sin DDL):** el usuario preguntó por qué "Encargado de Sistemas" no tenía fila en
+  Banco de Horas — investigando eso se encontró que ningún código del proyecto escribe nunca
+  `tiempo.dia` con `estado='abierto'` (grep exhaustivo: `cierre_dia.py`/`de_confianza.py`/
+  `fn_ausencia_resuelve_excepcion` siempre escriben `cerrado`/`bloqueado` explícito; `'abierto'` es
+  sólo el `DEFAULT` de la columna sin escritor real). En la práctica, lo que bloquea el corte
+  quincenal (`_procesar_persona`, `PENDIENTE_DIA_ABIERTO`) casi siempre es una **fila ausente**
+  (persona con cero marcas ese día) — el hueco ya anotado a propósito como pendiente en
+  `SCJ-PRA-01 #14` ("relleno de día bloqueado"). Esto invalidó el primer diseño ("badge en la fila")
+  para la alerta de Días — no hay fila que marcar en el caso real — así que pasó a ser un **banner
+  resumen** con persona + fecha(s) faltantes del periodo en curso. Nuevo módulo compartido
+  `backend/app/prevision_corte_quincenal.py` reusa `_procesar_persona` de `corte_quincenal.py` (kwarg
+  nuevo `solo_simular=True`, sin tocar su comportamiento por defecto — los 2 call-sites de
+  `_aplicar_persona` quedan detrás de `if not solo_simular`) en vez de reimplementar la
+  elegibilidad de periodo/jornada/festivos — mismo criterio que evitó una tercera reconstrucción de
+  "hora local" al crear `alertas_horario.py`. `GET /api/dias/pendientes-corte-quincenal` (nuevo)
+  para el banner de Días; `GET /api/banco-de-horas` suma `corte_pendiente` por persona para el
+  **último periodo ya vencido**, con fila sintética (`monto=0`) para quien nunca tuvo fila real en
+  `tiempo.banco_de_horas` — antes esas personas eran invisibles en la pantalla. Es diagnóstico, no
+  arregla nada: no crea días ni dispara ningún corte, el hueco de `SCJ-PRA-01 #14` sigue abierto.
 
 ## Arquitectura y módulos
 
