@@ -36,7 +36,8 @@ actualizado_en=None) -- así RH las ve en la pantalla aunque el trigger nunca la
 from datetime import date, datetime, timezone
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from postgrest.exceptions import APIError
 from supabase import Client
 
 from app.banco_antiguedad import (
@@ -46,10 +47,14 @@ from app.banco_antiguedad import (
     resolver_ventana_meses,
 )
 from app.batches.corte_quincenal import _festivos_del_periodo, resolver_ultimo_periodo_vencido
-from app.deps import get_service_client
+from app.deps import get_caller_client, get_service_client
 from app.permisos import requiere_permiso
 from app.prevision_corte_quincenal import resolver_personas_con_corte_pendiente
-from app.schemas.banco_de_horas import BancoDeHorasListaOut, MovimientoSaldoListaOut
+from app.schemas.banco_de_horas import (
+    BancoDeHorasListaOut,
+    MovimientoSaldoCrear,
+    MovimientoSaldoListaOut,
+)
 
 router = APIRouter(prefix="/api/banco-de-horas", tags=["banco-de-horas"])
 
@@ -57,6 +62,17 @@ LIMITE_DEFECTO = 50
 LIMITE_MAXIMO = 200
 
 TOP_EN_DEUDA_CANTIDAD = 8
+
+CODIGO_TIPO_NO_PERMITIDO = "SCJ01"
+CODIGO_MONTO_INVALIDO = "SCJ02"
+CODIGO_PERSONA_SIN_BANCO = "SCJ03"
+CODIGO_MONTO_EXCEDE_SALDO = "SCJ04"
+
+MENSAJE_PERSONA_SIN_BANCO = "Esta persona no tiene banco de horas."
+MENSAJE_MONTO_EXCEDE_SALDO = "El monto excede el saldo total de esta persona."
+MENSAJE_MONTO_EXCEDE_FUERA_VENTANA = (
+    "El monto excede la porción de deuda con 6+ meses de antigüedad de esta persona ({horas} h)."
+)
 
 ORDEN_A_CLAVE = {
     "monto_desc": (lambda item: item["monto"], True),
@@ -273,20 +289,15 @@ def listar_banco_de_horas(
     return {"total": total, "resumen": resumen, "saldos": saldos}
 
 
-@router.get("/{persona_id}/movimientos", response_model=MovimientoSaldoListaOut)
-def listar_movimientos_de_persona(
-    persona_id: str,
-    db_servicio: Client = Depends(get_service_client),
-    _permiso_banco: None = Depends(requiere_permiso("banco_de_horas_lectura")),
-    _permiso_ledger: None = Depends(
-        requiere_permiso("movimiento_de_saldo_lectura", "movimiento_de_saldo_edicion")
-    ),
-) -> dict:
+def _armar_ledger_de_persona(db: Client, persona_id: str) -> dict:
     """Ledger completo de una persona -- más reciente primero (mismo criterio que marcas.py).
     saldo_corrido es el acumulado hasta ese movimiento (incluido). vivo indica si ese movimiento
-    todavía tiene lote sin consumir (reusa calcular_lotes, no una cuenta aparte)."""
+    todavía tiene lote sin consumir (reusa calcular_lotes, no una cuenta aparte). Compartido por
+    GET /{persona_id}/movimientos y POST /{persona_id}/movimientos -- después de insertar, el
+    POST vuelve a armar el ledger completo así el frontend reemplaza su caché sin un segundo
+    fetch."""
     banco = (
-        db_servicio.postgrest.schema("tiempo")
+        db.postgrest.schema("tiempo")
         .table("banco_de_horas")
         .select("id")
         .eq("persona_id", persona_id)
@@ -298,7 +309,7 @@ def listar_movimientos_de_persona(
 
     banco_id = banco[0]["id"]
     filas = (
-        db_servicio.postgrest.schema("tiempo")
+        db.postgrest.schema("tiempo")
         .table("movimiento_de_saldo")
         .select("id, tipo, monto, motivo, autor_id, creado_en")
         .eq("banco_de_horas_id", banco_id)
@@ -319,7 +330,7 @@ def listar_movimientos_de_persona(
         saldo_por_id[fila["id"]] = saldo_corrido
 
     autor_ids = sorted({fila["autor_id"] for fila in filas if fila["autor_id"] is not None})
-    nombres_autor = _resolver_nombres_persona(db_servicio, autor_ids)
+    nombres_autor = _resolver_nombres_persona(db, autor_ids)
 
     movimientos = [
         {
@@ -335,3 +346,107 @@ def listar_movimientos_de_persona(
         for fila in sorted(filas, key=lambda fila: fila["creado_en"], reverse=True)
     ]
     return {"total": len(movimientos), "movimientos": movimientos}
+
+
+@router.get("/{persona_id}/movimientos", response_model=MovimientoSaldoListaOut)
+def listar_movimientos_de_persona(
+    persona_id: str,
+    db_servicio: Client = Depends(get_service_client),
+    _permiso_banco: None = Depends(requiere_permiso("banco_de_horas_lectura")),
+    _permiso_ledger: None = Depends(
+        requiere_permiso("movimiento_de_saldo_lectura", "movimiento_de_saldo_edicion")
+    ),
+) -> dict:
+    return _armar_ledger_de_persona(db_servicio, persona_id)
+
+
+@router.post("/{persona_id}/movimientos", response_model=MovimientoSaldoListaOut)
+def registrar_movimiento_manual(
+    persona_id: str,
+    datos: MovimientoSaldoCrear,
+    db: Client = Depends(get_caller_client),
+    db_servicio: Client = Depends(get_service_client),
+    _permiso: None = Depends(requiere_permiso("movimiento_de_saldo_edicion")),
+) -> dict:
+    """Alta manual (arrastrar/descontar/condonar, db/ddl/68_*.sql).
+
+    2 clientes distintos, a propósito -- misma separación que las 2 capas de validación del
+    monto: uno para LEER (insumo de esta validación, no autoriza nada) y otro para ESCRIBIR (ahí
+    sí importa quién es, RLS real):
+    - `db_servicio` (service_role) para toda lectura previa (banco_de_horas + movimiento_de_saldo,
+      acá y en la reconstrucción del ledger de la respuesta): la policy de SELECT de
+      `banco_de_horas` exige específicamente `banco_de_horas_lectura` (sin OR con
+      `movimiento_de_saldo_edicion` -- no existe `banco_de_horas_edicion` en el catálogo). Hoy los
+      3 puestos con `movimiento_de_saldo_edicion` también tienen `banco_de_horas_lectura`
+      mapeado, pero el endpoint no debería depender de que seguirán acopladas -- si algún día se
+      desacoplan, con `get_caller_client` esto fallaría con un 404 falso en vez de la validación
+      real (mismo tipo de fragilidad ya corregido una vez en RLS de Estructura Organizacional,
+      ver CLAUDE.md).
+    - `db` (el caller) SÓLO para el RPC `fn_movimiento_de_saldo_manual_registrar` -- la policy
+      `movimiento_de_saldo_insert_manual` (RLS) es la autorización real de la escritura, tiene que
+      correr como quien realmente está haciendo el cambio (exige `autor_id = caller`).
+
+    Validación en 2 capas, a propósito:
+    1. FINA, acá en Python, ANTES de llamar al RPC: recalcula el desglose de antigüedad de la
+       persona ahora mismo (nunca confía en nada cacheado del frontend, mismo FIFO que
+       _armar_saldos_completos vía banco_antiguedad.calcular_antiguedad_saldo) y rechaza si el
+       monto pedido excede la porción con 6+ meses de antigüedad (horas_fuera_ventana) -- el RPC
+       no puede hacer esta cuenta, no tiene el FIFO reconstruido.
+    2. GRUESA, dentro del RPC (ERRCODE SCJ04): backstop contra el saldo TOTAL, por si algo llega
+       a invocar el RPC directo sin pasar por este endpoint. En la práctica la capa 1 debería
+       atajar casi todos los casos antes de llegar acá."""
+    banco = (
+        db_servicio.postgrest.schema("tiempo")
+        .table("banco_de_horas")
+        .select("id, monto, vivo_desde")
+        .eq("persona_id", persona_id)
+        .execute()
+        .data
+    )
+    if not banco:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, MENSAJE_PERSONA_SIN_BANCO)
+
+    fila_banco = banco[0]
+    movimientos = (
+        db_servicio.postgrest.schema("tiempo")
+        .table("movimiento_de_saldo")
+        .select("id, creado_en, monto")
+        .eq("banco_de_horas_id", fila_banco["id"])
+        .execute()
+        .data
+    )
+    ventana_meses = resolver_ventana_meses(db_servicio, date.today().isoformat())
+    vivo_desde = (
+        datetime.fromisoformat(fila_banco["vivo_desde"])
+        if fila_banco["vivo_desde"] is not None
+        else None
+    )
+    resultado = calcular_antiguedad_saldo(
+        movimientos, float(fila_banco["monto"]), vivo_desde, ventana_meses, datetime.now(timezone.utc)
+    )
+    if datos.monto > resultado.horas_fuera_ventana:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            MENSAJE_MONTO_EXCEDE_FUERA_VENTANA.format(horas=resultado.horas_fuera_ventana),
+        )
+
+    try:
+        db.postgrest.schema("tiempo").rpc(
+            "fn_movimiento_de_saldo_manual_registrar",
+            {
+                "p_persona_id": persona_id,
+                "p_tipo": datos.tipo,
+                "p_monto": datos.monto,
+                "p_motivo": datos.motivo,
+            },
+        ).execute()
+    except APIError as error:
+        if error.code in (CODIGO_TIPO_NO_PERMITIDO, CODIGO_MONTO_INVALIDO):
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, error.message) from error
+        if error.code == CODIGO_PERSONA_SIN_BANCO:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, MENSAJE_PERSONA_SIN_BANCO) from error
+        if error.code == CODIGO_MONTO_EXCEDE_SALDO:
+            raise HTTPException(status.HTTP_409_CONFLICT, MENSAJE_MONTO_EXCEDE_SALDO) from error
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, error.message) from error
+
+    return _armar_ledger_de_persona(db_servicio, persona_id)

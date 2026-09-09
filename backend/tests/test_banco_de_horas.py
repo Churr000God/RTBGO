@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
+from postgrest.exceptions import APIError
 
 from app.deps import CallerIdentity, get_caller_client, get_caller_identity, get_service_client
 from app.main import app
@@ -571,3 +572,229 @@ def test_listar_movimientos_persona_sin_banco_de_horas_devuelve_vacio():
     _limpiar()
     assert response.status_code == 200, response.text
     assert response.json() == {"total": 0, "movimientos": []}
+
+
+# ---------------------------------------------------------------------------
+# POST /api/banco-de-horas/{persona_id}/movimientos
+# ---------------------------------------------------------------------------
+#
+# 2 clientes distintos, mockeados por separado -- mismo motivo que el router: la lectura previa
+# (banco_de_horas + movimiento_de_saldo + parametro, dos veces cada una: antes del RPC para la
+# validación fina, después para reconstruir el ledger de la respuesta) va por get_service_client;
+# el gate y el RPC van por get_caller_client. No hay que asumir que quien tiene
+# movimiento_de_saldo_edicion también tiene banco_de_horas_lectura.
+
+
+def _entradas_gate_edicion():
+    """requiere_permiso("movimiento_de_saldo_edicion") -- OR de un solo código."""
+    return [
+        ("usuario", _tabla_select_simple([{"persona_id": GATE_PERSONA_ID}])),
+        ("asignacion", _tabla_select_eq_is([{"puesto_id": GATE_PUESTO_ID}])),
+        ("puesto_permiso", _tabla_select_doble_eq([{"puesto_id": GATE_PUESTO_ID}])),
+    ]
+
+
+def _fake_caller_gate_edicion():
+    return _fake_caller_client_secuencia(_entradas_gate_edicion())
+
+
+def _pedir_registrar(persona_id=PERSONA_1, tipo="arrastrar", monto=3.0, motivo="ajuste"):
+    client = TestClient(app)
+    return client.post(
+        f"/api/banco-de-horas/{persona_id}/movimientos",
+        json={"tipo": tipo, "monto": monto, "motivo": motivo},
+        headers={"Authorization": "Bearer fake-token"},
+    )
+
+
+def test_registrar_movimiento_arrastrar_llama_rpc_y_devuelve_ledger_de_2_filas():
+    """arrastrar inserta 2 filas del lado del RPC (cancela + reabre) -- la respuesta re-arma el
+    ledger completo después, no confía en lo que devuelva el RPC."""
+    fake_caller = _fake_caller_gate_edicion()
+    fake_service = _fake_caller_client_secuencia(
+        [
+            ("banco_de_horas", _tabla_eq([{"id": 1, "monto": "8.00", "vivo_desde": _iso(200)}])),
+            ("movimiento_de_saldo", _tabla_eq([{"id": 1, "creado_en": _iso(200), "monto": "8.00"}])),
+            ("parametro", _tabla_parametro()),
+            ("banco_de_horas", _tabla_eq([{"id": 1}])),
+            (
+                "movimiento_de_saldo",
+                _tabla_eq(
+                    [
+                        {
+                            "id": 10,
+                            "tipo": "arrastrar",
+                            "monto": "-8.00",
+                            "motivo": "renovar antigüedad",
+                            "autor_id": None,
+                            "creado_en": _iso(200),
+                        },
+                        {
+                            "id": 11,
+                            "tipo": "arrastrar",
+                            "monto": "8.00",
+                            "motivo": "renovar antigüedad",
+                            "autor_id": None,
+                            "creado_en": _iso(200),
+                        },
+                    ]
+                ),
+            ),
+        ]
+    )
+    app.dependency_overrides[get_caller_client] = lambda: fake_caller
+    app.dependency_overrides[get_service_client] = lambda: fake_service
+    _override_identidad()
+
+    response = _pedir_registrar(tipo="arrastrar", monto=3.0, motivo="renovar antigüedad")
+
+    _limpiar()
+    assert response.status_code == 200, response.text
+    cuerpo = response.json()
+    assert cuerpo["total"] == 2
+    fake_caller.postgrest.schema.return_value.rpc.assert_called_once_with(
+        "fn_movimiento_de_saldo_manual_registrar",
+        {"p_persona_id": PERSONA_1, "p_tipo": "arrastrar", "p_monto": 3.0, "p_motivo": "renovar antigüedad"},
+    )
+    # las lecturas de validación/ledger fueron con service_role, nunca con el caller.
+    assert "banco_de_horas" not in {
+        llamada.args[0] for llamada in fake_caller.postgrest.schema.return_value.table.call_args_list
+    }
+
+
+def test_registrar_movimiento_descontar_devuelve_ledger_de_1_fila():
+    fake_caller = _fake_caller_gate_edicion()
+    fake_service = _fake_caller_client_secuencia(
+        [
+            ("banco_de_horas", _tabla_eq([{"id": 1, "monto": "8.00", "vivo_desde": _iso(200)}])),
+            ("movimiento_de_saldo", _tabla_eq([{"id": 1, "creado_en": _iso(200), "monto": "8.00"}])),
+            ("parametro", _tabla_parametro()),
+            ("banco_de_horas", _tabla_eq([{"id": 1}])),
+            (
+                "movimiento_de_saldo",
+                _tabla_eq(
+                    [
+                        {
+                            "id": 12,
+                            "tipo": "descontar",
+                            "monto": "-3.00",
+                            "motivo": "descuento admin",
+                            "autor_id": None,
+                            "creado_en": _iso(0),
+                        }
+                    ]
+                ),
+            ),
+        ]
+    )
+    app.dependency_overrides[get_caller_client] = lambda: fake_caller
+    app.dependency_overrides[get_service_client] = lambda: fake_service
+    _override_identidad()
+
+    response = _pedir_registrar(tipo="descontar", monto=3.0, motivo="descuento admin")
+
+    _limpiar()
+    assert response.status_code == 200, response.text
+    assert response.json()["total"] == 1
+
+
+def test_registrar_movimiento_monto_excede_fuera_ventana_devuelve_422_sin_llamar_rpc():
+    """Tope FINO en Python -- el monto pedido supera lo que efectivamente tiene 6+ meses de
+    antigüedad (todo el saldo real, en este caso), aunque no supere el saldo total."""
+    fake_caller = _fake_caller_gate_edicion()
+    fake_service = _fake_caller_client_secuencia(
+        [
+            ("banco_de_horas", _tabla_eq([{"id": 1, "monto": "8.00", "vivo_desde": _iso(200)}])),
+            ("movimiento_de_saldo", _tabla_eq([{"id": 1, "creado_en": _iso(200), "monto": "8.00"}])),
+            ("parametro", _tabla_parametro()),
+        ]
+    )
+    app.dependency_overrides[get_caller_client] = lambda: fake_caller
+    app.dependency_overrides[get_service_client] = lambda: fake_service
+    _override_identidad()
+
+    response = _pedir_registrar(tipo="descontar", monto=10.0)
+
+    _limpiar()
+    assert response.status_code == 422, response.text
+    assert "6+ meses" in response.json()["detail"]
+    fake_caller.postgrest.schema.return_value.rpc.assert_not_called()
+
+
+def _preparar_para_error_rpc(codigo, mensaje):
+    fake_caller = _fake_caller_gate_edicion()
+    fake_service = _fake_caller_client_secuencia(
+        [
+            ("banco_de_horas", _tabla_eq([{"id": 1, "monto": "8.00", "vivo_desde": _iso(200)}])),
+            ("movimiento_de_saldo", _tabla_eq([{"id": 1, "creado_en": _iso(200), "monto": "8.00"}])),
+            ("parametro", _tabla_parametro()),
+        ]
+    )
+    fake_caller.postgrest.schema.return_value.rpc.return_value.execute.side_effect = APIError(
+        {"code": codigo, "message": mensaje}
+    )
+    app.dependency_overrides[get_caller_client] = lambda: fake_caller
+    app.dependency_overrides[get_service_client] = lambda: fake_service
+    _override_identidad()
+    return fake_caller
+
+
+def test_registrar_movimiento_tipo_no_permitido_scj01_devuelve_422():
+    _preparar_para_error_rpc("SCJ01", "tipo no permitido")
+
+    response = _pedir_registrar(monto=3.0)
+
+    _limpiar()
+    assert response.status_code == 422
+
+
+def test_registrar_movimiento_monto_invalido_scj02_devuelve_422():
+    _preparar_para_error_rpc("SCJ02", "monto invalido")
+
+    response = _pedir_registrar(monto=3.0)
+
+    _limpiar()
+    assert response.status_code == 422
+
+
+def test_registrar_movimiento_persona_sin_banco_scj03_devuelve_404():
+    _preparar_para_error_rpc("SCJ03", "persona sin banco de horas")
+
+    response = _pedir_registrar(monto=3.0)
+
+    _limpiar()
+    assert response.status_code == 404
+
+
+def test_registrar_movimiento_excede_saldo_total_scj04_devuelve_409():
+    _preparar_para_error_rpc("SCJ04", "excede el saldo total")
+
+    response = _pedir_registrar(monto=3.0)
+
+    _limpiar()
+    assert response.status_code == 409
+
+
+def test_registrar_movimiento_sin_permiso_devuelve_403():
+    fake_caller = _fake_caller_client_con_permisos(set())
+    app.dependency_overrides[get_caller_client] = lambda: fake_caller
+    app.dependency_overrides[get_service_client] = lambda: MagicMock()
+    _override_identidad()
+
+    response = _pedir_registrar()
+
+    _limpiar()
+    assert response.status_code == 403
+
+
+def test_registrar_movimiento_motivo_vacio_devuelve_422_sin_llegar_al_rpc():
+    """Pydantic (min_length=1) rechaza motivo="" antes de que el router toque la BD."""
+    fake_caller = _fake_caller_gate_edicion()
+    app.dependency_overrides[get_caller_client] = lambda: fake_caller
+    app.dependency_overrides[get_service_client] = lambda: MagicMock()
+    _override_identidad()
+
+    response = _pedir_registrar(motivo="")
+
+    _limpiar()
+    assert response.status_code == 422

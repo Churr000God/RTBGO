@@ -1,6 +1,7 @@
 from datetime import datetime
+from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class BancoDeHorasItem(BaseModel):
@@ -56,3 +57,9 @@ class MovimientoSaldoItem(BaseModel):
 class MovimientoSaldoListaOut(BaseModel):
     total: int
     movimientos: list[MovimientoSaldoItem]
+
+
+class MovimientoSaldoCrear(BaseModel):
+    tipo: Literal["arrastrar", "descontar", "condonar"]
+    monto: float = Field(gt=0)
+    motivo: str = Field(min_length=1)

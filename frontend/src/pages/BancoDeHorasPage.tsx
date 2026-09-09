@@ -11,6 +11,7 @@ import {
 import { Badge } from "../components/Badge";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { Input } from "../components/Input";
 
 // Debounce del buscador de persona: mismo criterio que TramosPage/DiasPage — es el único filtro
 // sin precedente de "dispara al toque".
@@ -75,6 +76,8 @@ type Movimiento = {
   vivo: boolean;
 };
 
+type TipoMovimientoManual = "arrastrar" | "descontar" | "condonar";
+
 type EstadoCarga = "cargando" | "listo" | "error";
 
 type EstadoLedger = { estado: EstadoCarga; movimientos: Movimiento[] };
@@ -93,6 +96,16 @@ function formatearHoras(monto: number): string {
 
 function formatearHorasConSigno(monto: number): string {
   return `${monto > 0 ? "+" : ""}${formatearHoras(monto)}`;
+}
+
+async function mensajeDeError(respuesta: Response, generico: string): Promise<string> {
+  try {
+    const cuerpo = await respuesta.json();
+    if (typeof cuerpo?.detail === "string") return cuerpo.detail;
+  } catch {
+    // cuerpo no era JSON legible — cae al genérico
+  }
+  return generico;
 }
 
 function formatearFechaHora(fecha: string | null): string {
@@ -124,6 +137,14 @@ export function BancoDeHorasPage() {
   // persona_id para no refetchear al reabrir/cerrar la misma persona.
   const [filaExpandidaId, setFilaExpandidaId] = useState<string | null>(null);
   const [ledgerCache, setLedgerCache] = useState<Record<string, EstadoLedger>>({});
+
+  // Movimiento de saldo manual (resolver deuda con ventana_meses+ de antigüedad) -- un solo
+  // formulario, porque sólo puede haber una fila expandida a la vez.
+  const [movTipo, setMovTipo] = useState<TipoMovimientoManual>("arrastrar");
+  const [movMonto, setMovMonto] = useState("");
+  const [movMotivo, setMovMotivo] = useState("");
+  const [movEnviando, setMovEnviando] = useState(false);
+  const [movError, setMovError] = useState<string | null>(null);
 
   useEffect(() => {
     const id = setTimeout(() => {
@@ -186,14 +207,60 @@ export function BancoDeHorasPage() {
     }
   }
 
+  function reiniciarFormularioMovimiento(saldo: SaldoBancoHoras | undefined) {
+    setMovTipo("arrastrar");
+    setMovMonto(saldo && saldo.horas_fuera_ventana > 0 ? saldo.horas_fuera_ventana.toFixed(2) : "");
+    setMovMotivo("");
+    setMovError(null);
+  }
+
   function alternarFila(id: string) {
     if (filaExpandidaId === id) {
       setFilaExpandidaId(null);
       return;
     }
     setFilaExpandidaId(id);
+    reiniciarFormularioMovimiento(datos?.saldos.find((s) => s.persona_id === id));
     if (ledgerCache[id]) return; // ya cacheada -- no refetch al reabrir la misma persona
     cargarLedger(id);
+  }
+
+  const movMontoNumero = Number(movMonto);
+  const movMontoValido = movMonto !== "" && !Number.isNaN(movMontoNumero) && movMontoNumero > 0;
+  const puedeConfirmarMovimiento = movMontoValido && movMotivo.trim() !== "";
+
+  async function confirmarMovimiento(id: string) {
+    if (!puedeConfirmarMovimiento) return;
+    setMovEnviando(true);
+    setMovError(null);
+    try {
+      const respuesta = await apiFetch(`/api/banco-de-horas/${id}/movimientos`, {
+        method: "POST",
+        body: JSON.stringify({ tipo: movTipo, monto: movMontoNumero, motivo: movMotivo.trim() }),
+      });
+      if (!respuesta.ok) {
+        // 422 (monto <= 0 o excede la porción fuera de ventana) / 409 (excede el saldo total,
+        // backstop) / 404 (persona sin banco) — se muestra el motivo sin cerrar el formulario ni
+        // perder lo que la persona ya escribió, mismo criterio que el resto del proyecto.
+        setMovError(await mensajeDeError(respuesta, "No se pudo aplicar el movimiento."));
+        return;
+      }
+      const datosLedger: { total: number; movimientos: Movimiento[] } = await respuesta.json();
+      setLedgerCache((anterior) => ({
+        ...anterior,
+        [id]: { estado: "listo", movimientos: datosLedger.movimientos },
+      }));
+      // El saldo/desglose por antigüedad de esta persona en la tabla principal cambió -- hace
+      // falta refrescar `cargar()`, no sólo el ledger. reiniciarFormularioMovimiento(undefined)
+      // limpia los campos en vez de reusar el máximo viejo (quedaría obsoleto hasta que
+      // `cargar()` resuelva).
+      reiniciarFormularioMovimiento(undefined);
+      cargar();
+    } catch {
+      setMovError("No se pudo aplicar el movimiento. Revisa tu conexión e intenta de nuevo.");
+    } finally {
+      setMovEnviando(false);
+    }
   }
 
   const ventanaMeses = datos?.resumen.ventana_meses ?? VENTANA_MESES_DEFECTO;
@@ -457,6 +524,72 @@ export function BancoDeHorasPage() {
                         {expandida && (
                           <tr>
                             <td colSpan={COLUMNAS}>
+                              {saldo.horas_fuera_ventana > 0 && (
+                                <div className="fieldset-formulario" style={{ marginBottom: "1.25rem" }}>
+                                  <p style={{ margin: 0 }}>
+                                    <strong>
+                                      Resolver deuda con {etiquetaTramoAntiguedad("fuera_ventana", ventanaMeses)}{" "}
+                                      de antigüedad
+                                    </strong>{" "}
+                                    — {formatearHoras(saldo.horas_fuera_ventana)} disponibles.
+                                  </p>
+                                  <div className="rejilla-campos">
+                                    <div className="campo">
+                                      <label htmlFor={`mov-tipo-${saldo.persona_id}`}>Acción</label>
+                                      <select
+                                        id={`mov-tipo-${saldo.persona_id}`}
+                                        value={movTipo}
+                                        onChange={(evento) =>
+                                          setMovTipo(evento.target.value as TipoMovimientoManual)
+                                        }
+                                      >
+                                        <option value="arrastrar">Renovar antigüedad</option>
+                                        <option value="descontar">Descontar (nómina)</option>
+                                        <option value="condonar">Condonar</option>
+                                      </select>
+                                    </div>
+                                    <Input
+                                      id={`mov-monto-${saldo.persona_id}`}
+                                      label="Monto (horas)"
+                                      type="number"
+                                      min={0.01}
+                                      max={saldo.horas_fuera_ventana}
+                                      step={0.25}
+                                      required
+                                      value={movMonto}
+                                      onChange={(evento) => setMovMonto(evento.target.value)}
+                                    />
+                                  </div>
+                                  <div className="campo">
+                                    <label htmlFor={`mov-motivo-${saldo.persona_id}`}>Motivo</label>
+                                    <textarea
+                                      id={`mov-motivo-${saldo.persona_id}`}
+                                      value={movMotivo}
+                                      onChange={(evento) => setMovMotivo(evento.target.value)}
+                                      rows={2}
+                                    />
+                                  </div>
+                                  {movError && <p role="alert">{movError}</p>}
+                                  <div className="botonera">
+                                    <Button
+                                      type="button"
+                                      onClick={() => reiniciarFormularioMovimiento(saldo)}
+                                    >
+                                      Cancelar
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variante="primario"
+                                      cargando={movEnviando}
+                                      textoCargando="Aplicando…"
+                                      disabled={!puedeConfirmarMovimiento}
+                                      onClick={() => confirmarMovimiento(saldo.persona_id)}
+                                    >
+                                      Confirmar
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
                               {ledger?.estado === "cargando" && (
                                 <p className="boton-con-icono">
                                   <Loader2 size={16} className="icono-girando" aria-hidden="true" />

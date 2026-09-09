@@ -94,19 +94,31 @@ const MOVIMIENTOS = [
   },
 ];
 
-function mockApiFetch(opciones: { banco?: Response; movimientos?: Response } = {}) {
-  vi.mocked(apiFetch).mockImplementation((path: string) => {
+function mockApiFetch(
+  opciones: { banco?: Response; movimientos?: Response; movimientoManual?: Response } = {},
+) {
+  vi.mocked(apiFetch).mockImplementation((path: string, init?: RequestInit) => {
     if (path === "/api/sesion") {
       return Promise.resolve(
         new Response(JSON.stringify({ acceso_permitido: true, motivo_bloqueo: null })),
       );
     }
     if (path.startsWith("/api/banco-de-horas?")) {
+      // .clone() -- este test dispara cargar() más de una vez contra el mismo Response fijo
+      // (ej. refetch tras un movimiento manual exitoso), y el body de un Response sólo se puede
+      // leer una vez.
       return Promise.resolve(
-        opciones.banco ??
-          new Response(
-            JSON.stringify({ total: 2, resumen: RESUMEN, saldos: [SALDO_ENDEUDADO, SALDO_AL_CORRIENTE] }),
-          ),
+        opciones.banco
+          ? opciones.banco.clone()
+          : new Response(
+              JSON.stringify({ total: 2, resumen: RESUMEN, saldos: [SALDO_ENDEUDADO, SALDO_AL_CORRIENTE] }),
+            ),
+      );
+    }
+    if (path.endsWith("/movimientos") && init?.method === "POST") {
+      return Promise.resolve(
+        opciones.movimientoManual ??
+          new Response(JSON.stringify({ total: 3, movimientos: MOVIMIENTOS })),
       );
     }
     if (path.endsWith("/movimientos")) {
@@ -353,6 +365,138 @@ describe("BancoDeHorasPage", () => {
     expect(within(fila).getByText("Corte pendiente")).toBeInTheDocument();
     const celdaActualizado = within(fila).getAllByRole("cell")[6];
     expect(celdaActualizado).toHaveTextContent("—");
+  });
+
+  it("formulario de movimiento manual NO aparece si horas_fuera_ventana === 0", async () => {
+    mockApiFetch();
+
+    render(<BancoDeHorasPage />);
+    const tabla = await screen.findByRole("table");
+    const fila = await waitFor(() => within(tabla).getByRole("row", { name: /persona endeudada/i }));
+
+    await userEvent.click(fila);
+
+    await waitFor(() => expect(screen.getByText("cubrió falta")).toBeInTheDocument());
+    expect(screen.queryByLabelText(/^acción$/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/resolver deuda con/i)).not.toBeInTheDocument();
+  });
+
+  it("formulario de movimiento manual aparece si horas_fuera_ventana > 0, con max ligado al valor real", async () => {
+    const conFueraVentana = { ...SALDO_ENDEUDADO, horas_fuera_ventana: 3.5 };
+    mockApiFetch({
+      banco: new Response(
+        JSON.stringify({ total: 1, resumen: RESUMEN, saldos: [conFueraVentana, SALDO_AL_CORRIENTE] }),
+      ),
+    });
+
+    render(<BancoDeHorasPage />);
+    const tabla = await screen.findByRole("table");
+    const fila = await waitFor(() => within(tabla).getByRole("row", { name: /persona endeudada/i }));
+
+    await userEvent.click(fila);
+
+    expect(screen.getByText(/resolver deuda con/i)).toBeInTheDocument();
+    const inputMonto = screen.getByLabelText(/monto \(horas\)/i) as HTMLInputElement;
+    expect(inputMonto.max).toBe("3.5");
+    expect(inputMonto.value).toBe("3.50");
+  });
+
+  it("botón Confirmar del movimiento manual queda deshabilitado sin motivo", async () => {
+    const conFueraVentana = { ...SALDO_ENDEUDADO, horas_fuera_ventana: 3.5 };
+    mockApiFetch({
+      banco: new Response(
+        JSON.stringify({ total: 1, resumen: RESUMEN, saldos: [conFueraVentana, SALDO_AL_CORRIENTE] }),
+      ),
+    });
+
+    render(<BancoDeHorasPage />);
+    const tabla = await screen.findByRole("table");
+    const fila = await waitFor(() => within(tabla).getByRole("row", { name: /persona endeudada/i }));
+    await userEvent.click(fila);
+
+    expect(screen.getByRole("button", { name: /^confirmar$/i })).toBeDisabled();
+
+    await userEvent.type(screen.getByLabelText(/^motivo$/i), "Se perdona por acuerdo con RH.");
+    expect(screen.getByRole("button", { name: /^confirmar$/i })).toBeEnabled();
+  });
+
+  it("POST exitoso actualiza el ledger mostrado y dispara un refetch de la lista principal", async () => {
+    const conFueraVentana = { ...SALDO_ENDEUDADO, horas_fuera_ventana: 8 };
+    const movimientosArrastre = [
+      { id: 11, creado_en: "2026-02-20T12:00:00Z", tipo: "arrastrar", monto: 8.0, motivo: "renovación", autor_nombre: null, saldo_corrido: 0.0, vivo: true },
+      { id: 10, creado_en: "2026-02-20T12:00:00Z", tipo: "arrastrar", monto: -8.0, motivo: "renovación", autor_nombre: null, saldo_corrido: -8.0, vivo: false },
+    ];
+    mockApiFetch({
+      banco: new Response(
+        JSON.stringify({ total: 1, resumen: RESUMEN, saldos: [conFueraVentana, SALDO_AL_CORRIENTE] }),
+      ),
+      movimientoManual: new Response(JSON.stringify({ total: 2, movimientos: movimientosArrastre })),
+    });
+
+    render(<BancoDeHorasPage />);
+    const tabla = await screen.findByRole("table");
+    const fila = await waitFor(() => within(tabla).getByRole("row", { name: /persona endeudada/i }));
+    await userEvent.click(fila);
+    await waitFor(() => expect(screen.getByText("cubrió falta")).toBeInTheDocument());
+
+    await userEvent.type(screen.getByLabelText(/^motivo$/i), "renovación");
+    await userEvent.click(screen.getByRole("button", { name: /^confirmar$/i }));
+
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith(
+        "/api/banco-de-horas/persona-1/movimientos",
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+    const llamada = vi
+      .mocked(apiFetch)
+      .mock.calls.find(
+        ([path, init]) =>
+          path === "/api/banco-de-horas/persona-1/movimientos" &&
+          (init as RequestInit)?.method === "POST",
+      )!;
+    const cuerpo = JSON.parse(llamada[1]!.body as string);
+    expect(cuerpo.tipo).toBe("arrastrar");
+    expect(cuerpo.monto).toBe(8);
+    expect(cuerpo.motivo).toBe("renovación");
+
+    // ledger actualizado con los 2 movimientos nuevos de "renovar"
+    await waitFor(() => expect(screen.getAllByText("Arrastre")).toHaveLength(2));
+    expect(screen.queryByText("cubrió falta")).not.toBeInTheDocument();
+
+    // refetch de la lista principal
+    const llamadasListado = vi
+      .mocked(apiFetch)
+      .mock.calls.filter(([path]) => (path as string).startsWith("/api/banco-de-horas?"));
+    expect(llamadasListado.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("error del servidor al aplicar el movimiento se muestra inline sin cerrar el formulario", async () => {
+    const conFueraVentana = { ...SALDO_ENDEUDADO, horas_fuera_ventana: 3 };
+    mockApiFetch({
+      banco: new Response(
+        JSON.stringify({ total: 1, resumen: RESUMEN, saldos: [conFueraVentana, SALDO_AL_CORRIENTE] }),
+      ),
+      movimientoManual: new Response(
+        JSON.stringify({
+          detail:
+            "El monto excede la porción de deuda con 6+ meses de antigüedad de esta persona (3.00 h).",
+        }),
+        { status: 422 },
+      ),
+    });
+
+    render(<BancoDeHorasPage />);
+    const tabla = await screen.findByRole("table");
+    const fila = await waitFor(() => within(tabla).getByRole("row", { name: /persona endeudada/i }));
+    await userEvent.click(fila);
+
+    await userEvent.type(screen.getByLabelText(/^motivo$/i), "intento inválido");
+    await userEvent.click(screen.getByRole("button", { name: /^confirmar$/i }));
+
+    await waitFor(() => expect(screen.getByText(/excede la porción de deuda/i)).toBeInTheDocument());
+    // el formulario sigue ahí, con lo que la persona ya escribió
+    expect(screen.getByLabelText(/^motivo$/i)).toHaveValue("intento inválido");
   });
 
   it("muestra estado vacío cuando la búsqueda no coincide con nadie", async () => {
