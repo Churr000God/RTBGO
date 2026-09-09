@@ -1,6 +1,6 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { apiFetch } from "../lib/apiClient";
 import { PanelCorridasBatchPage } from "./PanelCorridasBatchPage";
@@ -32,6 +32,7 @@ function mockApiFetch(opciones: {
   listado?: Response;
   disparar?: Response;
   dispararCorteQuincenal?: Response;
+  dispararCierreDia?: Response;
 }) {
   vi.mocked(apiFetch).mockImplementation((path: string, init?: RequestInit) => {
     if (path === "/api/sesion") {
@@ -45,6 +46,23 @@ function mockApiFetch(opciones: {
     if (path === "/api/corridas-batch/de-confianza" && init?.method === "POST") {
       return Promise.resolve(
         opciones.disparar ?? new Response(JSON.stringify({ ...CORRIDAS[0], intentos: 2 })),
+      );
+    }
+    if (path === "/api/corridas-batch/cierre-dia" && init?.method === "POST") {
+      return Promise.resolve(
+        opciones.dispararCierreDia ??
+          new Response(
+            JSON.stringify({
+              id: 3,
+              tipo_batch: "cierre_dia",
+              fecha: "2026-09-08",
+              estado: "exitosa",
+              intentos: 1,
+              iniciado_en: "2026-09-08T10:00:00Z",
+              terminado_en: "2026-09-08T10:00:05Z",
+              detalle: "3 día(s) cerrado(s), 0 con falta.",
+            }),
+          ),
       );
     }
     if (path === "/api/corridas-batch/corte-quincenal" && init?.method === "POST") {
@@ -71,6 +89,10 @@ function mockApiFetch(opciones: {
 describe("PanelCorridasBatchPage", () => {
   beforeEach(() => {
     vi.mocked(apiFetch).mockReset();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("lista las corridas devueltas por GET /api/corridas-batch", async () => {
@@ -181,6 +203,97 @@ describe("PanelCorridasBatchPage", () => {
         "/api/corridas-batch/corte-quincenal",
         expect.objectContaining({ method: "POST" }),
       ),
+    );
+  });
+
+  it("manda la fecha elegida en el body del POST al disparar de_confianza", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date(2026, 8, 9, 12, 0, 0));
+    mockApiFetch({});
+
+    render(<PanelCorridasBatchPage />);
+    await waitFor(() =>
+      expect(within(screen.getByRole("table")).getByText("Jornada de confianza")).toBeInTheDocument(),
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /disparar jornada de confianza/i }));
+
+    await waitFor(() => {
+      const llamada = vi
+        .mocked(apiFetch)
+        .mock.calls.find(
+          ([path, init]) => path === "/api/corridas-batch/de-confianza" && init?.method === "POST",
+        );
+      expect(llamada).toBeDefined();
+      expect(llamada?.[1]?.headers).toMatchObject({ "Content-Type": "application/json" });
+      expect(JSON.parse(llamada?.[1]?.body as string)).toEqual({ fecha: "2026-09-09" });
+    });
+
+    vi.useRealTimers();
+  });
+
+  it("inicializa cierre_dia con ayer y los otros dos batches con hoy", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date(2026, 8, 9, 12, 0, 0));
+    mockApiFetch({});
+
+    render(<PanelCorridasBatchPage />);
+    await waitFor(() =>
+      expect(within(screen.getByRole("table")).getByText("Jornada de confianza")).toBeInTheDocument(),
+    );
+
+    const inputs = screen.getAllByLabelText(/fecha a procesar/i) as HTMLInputElement[];
+    const [deConfianza, cierreDia, corteQuincenal] = inputs;
+    expect(deConfianza.value).toBe("2026-09-09");
+    expect(cierreDia.value).toBe("2026-09-08");
+    expect(corteQuincenal.value).toBe("2026-09-09");
+
+    vi.useRealTimers();
+  });
+
+  it("cambiar la fecha del selector y disparar refleja la fecha nueva en el body del POST", async () => {
+    mockApiFetch({});
+
+    render(<PanelCorridasBatchPage />);
+    await waitFor(() =>
+      expect(within(screen.getByRole("table")).getByText("Jornada de confianza")).toBeInTheDocument(),
+    );
+
+    const inputs = screen.getAllByLabelText(/fecha a procesar/i) as HTMLInputElement[];
+    const inputDeConfianza = inputs[0];
+    fireEvent.change(inputDeConfianza, { target: { value: "2026-08-15" } });
+
+    await userEvent.click(screen.getByRole("button", { name: /disparar jornada de confianza/i }));
+
+    await waitFor(() => {
+      const llamada = vi
+        .mocked(apiFetch)
+        .mock.calls.find(
+          ([path, init]) => path === "/api/corridas-batch/de-confianza" && init?.method === "POST",
+        );
+      expect(JSON.parse(llamada?.[1]?.body as string)).toEqual({ fecha: "2026-08-15" });
+    });
+  });
+
+  it("muestra un 422 del backend (bloqueo horario de cierre_dia) como texto en el alert", async () => {
+    mockApiFetch({
+      dispararCierreDia: new Response(
+        JSON.stringify({ detail: "Todavía no es la hora de correr el cierre de día." }),
+        { status: 422 },
+      ),
+    });
+
+    render(<PanelCorridasBatchPage />);
+    await waitFor(() =>
+      expect(within(screen.getByRole("table")).getByText("Jornada de confianza")).toBeInTheDocument(),
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /disparar cierre de día/i }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("Todavía no es la hora de correr el cierre de día."),
+      ).toBeInTheDocument(),
     );
   });
 });

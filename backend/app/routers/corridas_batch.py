@@ -11,21 +11,28 @@ original de 33_*.sql (pensado originalmente sólo para lectura/edición de tabla
 para "disparar un proceso"); tiempo_persona_edicion no servía como stopgap porque 34_*.sql lo
 deja deliberadamente fuera de RH/Gerente General."""
 
-from datetime import date
+from datetime import date, datetime
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from supabase import Client
 
 from app.batches.cierre_dia import ejecutar_cierre_dia
 from app.batches.corte_quincenal import ejecutar_corte_quincenal
 from app.batches.de_confianza import ejecutar_batch_de_confianza
 from app.deps import get_caller_client, get_service_client
+from app.hora_cierre_dia import resolver_umbral_cierre_dia
 from app.permisos import requiere_permiso
 from app.schemas.corridas_batch import CorridaBatchOut, EjecutarBatchRequest
 
 router = APIRouter(prefix="/api/corridas-batch", tags=["corridas-batch"])
 
 CODIGO_PERMISO_BATCH = "corrida_batch_edicion"
+
+MENSAJE_CIERRE_DIA_FUTURO = "No se puede cerrar un día que todavía no ocurre."
+MENSAJE_CIERRE_DIA_ANTES_DEL_UMBRAL = (
+    "El cierre de día de hoy no se puede correr antes de las {umbral} -- la jornada todavía "
+    "está en curso."
+)
 
 
 @router.get("", response_model=list[CorridaBatchOut])
@@ -67,8 +74,25 @@ def disparar_cierre_dia(
 ) -> dict:
     """SCJ-PRO-12 Z1: botón manual, misma invocación que el job programado -- ejecutar_cierre_dia
     es idempotente por persona (tiempo.dia ya resuelto se salta), repetir la corrida del mismo
-    día es seguro."""
-    fecha_efectiva = datos.fecha or date.today()
+    día es seguro.
+
+    Bloqueo horario (hallazgo real, este corte): sin él, dispararlo sobre HOY a media mañana
+    procesa marcas parciales y le crea falta/día bloqueado a gente que aún no terminó su turno.
+    Una fecha PASADA siempre se permite (la jornada de ese día ya terminó, sin importar la hora
+    actual); una fecha FUTURA nunca ("todavía no ocurre"); HOY sólo después del umbral real
+    (`app/hora_cierre_dia.py`, hora_corte_dia + hora_corrida_cierre_dia -- nunca un "03:00"
+    hardcodeado en el mensaje, misma lección que ventana_banco_meses)."""
+    hoy = date.today()
+    fecha_efectiva = datos.fecha or hoy
+    if fecha_efectiva > hoy:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, MENSAJE_CIERRE_DIA_FUTURO)
+    if fecha_efectiva == hoy:
+        umbral = resolver_umbral_cierre_dia(db_servicio, hoy.isoformat())
+        if datetime.now().time() < umbral:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                MENSAJE_CIERRE_DIA_ANTES_DEL_UMBRAL.format(umbral=umbral.strftime("%H:%M")),
+            )
     return ejecutar_cierre_dia(fecha_efectiva, db_servicio)
 
 

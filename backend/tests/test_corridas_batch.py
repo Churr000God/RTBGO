@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, time, timedelta
 from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
@@ -200,25 +200,30 @@ def test_disparar_cierre_dia_llama_a_la_funcion_y_devuelve_su_resultado():
 
 
 def test_disparar_cierre_dia_sin_body_usa_hoy():
-    """Mismo bug de de_confianza (default faltante) -- se prueba igual acá para no repetirlo."""
+    """Mismo bug de de_confianza (default faltante) -- se prueba igual acá para no repetirlo.
+    Umbral fijado a 00:00 (patch) para que el bloqueo horario nuevo no haga flaky este test según
+    la hora real en que corra la suite -- el bloqueo en sí tiene sus propios tests dedicados."""
     fake_caller_client = _fake_caller_client_secuencia(_entradas_gate())
     app.dependency_overrides[get_caller_client] = lambda: fake_caller_client
     app.dependency_overrides[get_service_client] = lambda: MagicMock()
     _override_identidad()
 
-    with patch(
-        "app.routers.corridas_batch.ejecutar_cierre_dia",
-        return_value={
-            "id": 4,
-            "tipo_batch": "cierre_dia",
-            "fecha": "2026-09-06",
-            "estado": "exitosa",
-            "intentos": 1,
-            "iniciado_en": "2026-09-06T03:00:00+00:00",
-            "terminado_en": "2026-09-06T03:00:05+00:00",
-            "detalle": "0 cerrado(s), 0 bloqueado(s), 0 ausencia(s) creada(s), 0 saltada(s).",
-        },
-    ) as mock_ejecutar:
+    with (
+        patch("app.routers.corridas_batch.resolver_umbral_cierre_dia", return_value=time(0, 0)),
+        patch(
+            "app.routers.corridas_batch.ejecutar_cierre_dia",
+            return_value={
+                "id": 4,
+                "tipo_batch": "cierre_dia",
+                "fecha": "2026-09-06",
+                "estado": "exitosa",
+                "intentos": 1,
+                "iniciado_en": "2026-09-06T03:00:00+00:00",
+                "terminado_en": "2026-09-06T03:00:05+00:00",
+                "detalle": "0 cerrado(s), 0 bloqueado(s), 0 ausencia(s) creada(s), 0 saltada(s).",
+            },
+        ) as mock_ejecutar,
+    ):
         client = TestClient(app)
         response = client.post(
             "/api/corridas-batch/cierre-dia",
@@ -230,6 +235,88 @@ def test_disparar_cierre_dia_sin_body_usa_hoy():
     mock_ejecutar.assert_called_once()
     (fecha_llamada, _db), _ = mock_ejecutar.call_args
     assert fecha_llamada == date.today()
+
+
+def test_disparar_cierre_dia_hoy_antes_del_umbral_devuelve_422_sin_invocar_batch():
+    """Bloqueo horario real (hallazgo de este corte): sin fecha explícita (hoy) y antes del
+    umbral, no se dispara -- procesaría marcas parciales del día en curso. Umbral fijado a 23:59
+    (patch) para no depender de la hora real en que corra la suite; el mensaje interpola ESE
+    umbral, no un "03:00" hardcodeado."""
+    fake_caller_client = _fake_caller_client_secuencia(_entradas_gate())
+    app.dependency_overrides[get_caller_client] = lambda: fake_caller_client
+    app.dependency_overrides[get_service_client] = lambda: MagicMock()
+    _override_identidad()
+
+    with (
+        patch("app.routers.corridas_batch.resolver_umbral_cierre_dia", return_value=time(23, 59)),
+        patch("app.routers.corridas_batch.ejecutar_cierre_dia") as mock_ejecutar,
+    ):
+        client = TestClient(app)
+        response = client.post(
+            "/api/corridas-batch/cierre-dia",
+            headers={"Authorization": "Bearer fake-token"},
+        )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 422, response.text
+    detalle = response.json()["detail"]
+    assert "23:59" in detalle
+    assert "03:00" not in detalle
+    mock_ejecutar.assert_not_called()
+
+
+def test_disparar_cierre_dia_hoy_despues_del_umbral_devuelve_200():
+    fake_caller_client = _fake_caller_client_secuencia(_entradas_gate())
+    app.dependency_overrides[get_caller_client] = lambda: fake_caller_client
+    app.dependency_overrides[get_service_client] = lambda: MagicMock()
+    _override_identidad()
+
+    with (
+        patch("app.routers.corridas_batch.resolver_umbral_cierre_dia", return_value=time(0, 0)),
+        patch(
+            "app.routers.corridas_batch.ejecutar_cierre_dia",
+            return_value={
+                "id": 7,
+                "tipo_batch": "cierre_dia",
+                "fecha": date.today().isoformat(),
+                "estado": "exitosa",
+                "intentos": 1,
+                "iniciado_en": "2026-09-09T03:00:00+00:00",
+                "terminado_en": "2026-09-09T03:00:05+00:00",
+                "detalle": "0 cerrado(s), 0 bloqueado(s), 0 ausencia(s) creada(s), 0 saltada(s).",
+            },
+        ) as mock_ejecutar,
+    ):
+        client = TestClient(app)
+        response = client.post(
+            "/api/corridas-batch/cierre-dia",
+            headers={"Authorization": "Bearer fake-token"},
+        )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200, response.text
+    mock_ejecutar.assert_called_once()
+
+
+def test_disparar_cierre_dia_fecha_futura_devuelve_422_sin_invocar_batch():
+    fake_caller_client = _fake_caller_client_secuencia(_entradas_gate())
+    app.dependency_overrides[get_caller_client] = lambda: fake_caller_client
+    app.dependency_overrides[get_service_client] = lambda: MagicMock()
+    _override_identidad()
+
+    fecha_futura = date.today() + timedelta(days=1)
+
+    with patch("app.routers.corridas_batch.ejecutar_cierre_dia") as mock_ejecutar:
+        client = TestClient(app)
+        response = client.post(
+            "/api/corridas-batch/cierre-dia",
+            json={"fecha": fecha_futura.isoformat()},
+            headers={"Authorization": "Bearer fake-token"},
+        )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 422, response.text
+    mock_ejecutar.assert_not_called()
 
 
 def test_disparar_corte_quincenal_llama_a_la_funcion_y_devuelve_su_resultado():

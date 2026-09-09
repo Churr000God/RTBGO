@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
+import { aFechaISO } from "../lib/calendario";
 import { AppShell } from "../layouts/AppShell";
 import { Badge } from "../components/Badge";
 import { Button } from "../components/Button";
@@ -41,6 +42,7 @@ const TIPOS_BATCH_DISPARABLES: {
   etiqueta: string;
   descripcion: string;
   icono: LucideIcon;
+  fechaInicial: "hoy" | "ayer";
 }[] = [
   {
     codigo: "de_confianza",
@@ -48,13 +50,15 @@ const TIPOS_BATCH_DISPARABLES: {
     etiqueta: "Jornada de confianza",
     descripcion: "Cierra el día de quienes tienen jornada de confianza — sin marca que validar.",
     icono: ShieldCheck,
+    fechaInicial: "hoy",
   },
   {
     codigo: "cierre_dia",
     ruta: "cierre-dia",
     etiqueta: "Cierre de día",
-    descripcion: "Calcula horas trabajadas y detecta faltas del día anterior, por persona.",
+    descripcion: "Calcula horas trabajadas y detecta faltas del día elegido, por persona.",
     icono: CalendarCheck2,
+    fechaInicial: "ayer",
   },
   {
     codigo: "corte_quincenal",
@@ -62,8 +66,28 @@ const TIPOS_BATCH_DISPARABLES: {
     etiqueta: "Corte quincenal",
     descripcion: "Aplica el saldo del periodo al banco de horas de cada persona.",
     icono: Landmark,
+    fechaInicial: "hoy",
   },
 ];
+
+function fechaHoyISO(): string {
+  return aFechaISO(new Date());
+}
+
+function fechaAyerISO(): string {
+  const ayer = new Date();
+  ayer.setDate(ayer.getDate() - 1);
+  return aFechaISO(ayer);
+}
+
+function fechasIniciales(): Record<string, string> {
+  return Object.fromEntries(
+    TIPOS_BATCH_DISPARABLES.map(({ codigo, fechaInicial }) => [
+      codigo,
+      fechaInicial === "ayer" ? fechaAyerISO() : fechaHoyISO(),
+    ]),
+  );
+}
 
 const ETIQUETA_TIPO_BATCH: Record<string, string> = {
   de_confianza: "Jornada de confianza",
@@ -111,6 +135,7 @@ export function PanelCorridasBatchPage() {
   const [estadoCarga, setEstadoCarga] = useState<EstadoCarga>("cargando");
   const [disparando, setDisparando] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [fechas, setFechas] = useState<Record<string, string>>(fechasIniciales);
 
   function cargar() {
     setEstadoCarga("cargando");
@@ -136,6 +161,8 @@ export function PanelCorridasBatchPage() {
     try {
       const respuesta = await apiFetch(`/api/corridas-batch/${ruta}`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fecha: fechas[codigo] }),
       });
       if (!respuesta.ok) {
         setError(await mensajeDeError(respuesta, "No se pudo disparar la corrida."));
@@ -214,6 +241,16 @@ export function PanelCorridasBatchPage() {
               </span>
               <strong>{etiqueta}</strong>
               <p>{descripcion}</p>
+              <label>
+                Fecha a procesar
+                <input
+                  type="date"
+                  value={fechas[codigo]}
+                  onChange={(evento) =>
+                    setFechas((anteriores) => ({ ...anteriores, [codigo]: evento.target.value }))
+                  }
+                />
+              </label>
               <Button
                 type="button"
                 variante="primario"
