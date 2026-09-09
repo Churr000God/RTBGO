@@ -96,6 +96,15 @@ export function AlertasDeRetardoPage() {
   }, []);
 
   function cargar() {
+    // desde/hasta son requeridos sin default en el backend (a diferencia de TramosPage/DiasPage) --
+    // si el usuario borra cualquiera de los 2 inputs, no hay nada válido que pedir: cortamos antes
+    // del fetch en vez de mandar un 422 y caer al estado de error genérico.
+    if (!desde || !hasta) {
+      setAlertas([]);
+      setError(null);
+      setEstadoCarga("listo");
+      return;
+    }
     setEstadoCarga("cargando");
     setError(null);
     const params = new URLSearchParams({ desde, hasta });
@@ -126,6 +135,8 @@ export function AlertasDeRetardoPage() {
     () => personas.map((p) => ({ id: p.id, nombre: `${p.primer_nombre} ${p.apellido_paterno}` })),
     [personas],
   );
+
+  const rangoIncompleto = !desde || !hasta;
 
   return (
     <AppShell>
@@ -196,7 +207,11 @@ export function AlertasDeRetardoPage() {
         {estadoCarga === "listo" && alertas.length === 0 && (
           <div className="estado-vacio">
             <AlertTriangle size={28} aria-hidden="true" />
-            <p>Sin alertas de retardo en el rango seleccionado.</p>
+            <p>
+              {rangoIncompleto
+                ? "Selecciona un rango de fechas (Desde y Hasta) para ver alertas."
+                : "Sin alertas de retardo en el rango seleccionado."}
+            </p>
           </div>
         )}
 

@@ -109,4 +109,44 @@ describe("AlertasDeRetardoPage", () => {
       expect(screen.getByText("El rango no puede superar 62 días.")).toBeInTheDocument(),
     );
   });
+
+  it("borrar el filtro Desde no dispara fetch y muestra el mensaje de rango incompleto, no el de error", async () => {
+    mockApiFetch();
+
+    render(<AlertasDeRetardoPage />);
+    await screen.findByRole("table");
+    const llamadasAntes = vi
+      .mocked(apiFetch)
+      .mock.calls.filter(([path]) => (path as string).startsWith("/api/alertas-de-retardo")).length;
+
+    await userEvent.clear(screen.getByLabelText(/^desde$/i));
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/selecciona un rango de fechas \(desde y hasta\) para ver alertas/i),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.queryByText(/no se pudo cargar las alertas de retardo/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+
+    const llamadasDespues = vi
+      .mocked(apiFetch)
+      .mock.calls.filter(([path]) => (path as string).startsWith("/api/alertas-de-retardo")).length;
+    expect(llamadasDespues).toBe(llamadasAntes);
+  });
+
+  it("borrar el filtro Hasta también muestra el mensaje de rango incompleto", async () => {
+    mockApiFetch();
+
+    render(<AlertasDeRetardoPage />);
+    await screen.findByRole("table");
+
+    await userEvent.clear(screen.getByLabelText(/^hasta$/i));
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/selecciona un rango de fechas \(desde y hasta\) para ver alertas/i),
+      ).toBeInTheDocument(),
+    );
+  });
 });
