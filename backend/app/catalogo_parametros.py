@@ -4,11 +4,12 @@ catálogo lo define el código, no el dato), el campo `tipo` alimenta la validac
 schemas/parametros.py, y columnas nuevas duplicarían lo que ya está documentado en el
 diccionario de datos.
 
-`impacta_logica=True` sólo en las 4 claves que algún router/batch lee hoy (confirmado por grep):
+`impacta_logica=True` sólo en las 5 claves que algún router/batch lee hoy (confirmado por grep):
 tolerancia_retardo_min (alertas_de_retardo.py), dias_habiles_correccion_marca
-(correcciones.py), hora_corrida_cierre_dia (scheduler.py) y descuento_pausa_no_registrada_min
-(batches/cierre_dia.py). Las otras 4 están sembradas pero ningún código las consume -- la
-pantalla lo marca con un badge en vez de esconderlo."""
+(correcciones.py), hora_corrida_cierre_dia (scheduler.py), descuento_pausa_no_registrada_min
+(batches/cierre_dia.py) y ventana_banco_meses (app/banco_antiguedad.py::resolver_ventana_meses).
+Las otras 3 están sembradas pero ningún código las consume -- la pantalla lo marca con un badge
+en vez de esconderlo."""
 
 from dataclasses import dataclass
 from typing import Literal
@@ -44,7 +45,7 @@ CATALOGO: dict[str, EntradaParametro] = {
         descripcion="Duración de la ventana de resolución del banco de horas.",
         tipo="entero",
         unidad="meses",
-        impacta_logica=False,
+        impacta_logica=True,
     ),
     "umbral_aviso_pct": EntradaParametro(
         etiqueta="Umbral de aviso",

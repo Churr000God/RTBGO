@@ -721,6 +721,29 @@ def test_registrar_movimiento_monto_excede_fuera_ventana_devuelve_422_sin_llamar
     fake_caller.postgrest.schema.return_value.rpc.assert_not_called()
 
 
+def test_registrar_movimiento_monto_excede_fuera_ventana_usa_ventana_del_parametro():
+    """El mensaje refleja ventana_banco_meses real, no un "6" hardcodeado -- con el parámetro en
+    4, el detail dice "4+ meses"."""
+    fake_caller = _fake_caller_gate_edicion()
+    fake_service = _fake_caller_client_secuencia(
+        [
+            ("banco_de_horas", _tabla_eq([{"id": 1, "monto": "8.00", "vivo_desde": _iso(200)}])),
+            ("movimiento_de_saldo", _tabla_eq([{"id": 1, "creado_en": _iso(200), "monto": "8.00"}])),
+            ("parametro", _tabla_parametro(valor="4")),
+        ]
+    )
+    app.dependency_overrides[get_caller_client] = lambda: fake_caller
+    app.dependency_overrides[get_service_client] = lambda: fake_service
+    _override_identidad()
+
+    response = _pedir_registrar(tipo="descontar", monto=10.0)
+
+    _limpiar()
+    assert response.status_code == 422, response.text
+    assert "4+ meses" in response.json()["detail"]
+    fake_caller.postgrest.schema.return_value.rpc.assert_not_called()
+
+
 def _preparar_para_error_rpc(codigo, mensaje):
     fake_caller = _fake_caller_gate_edicion()
     fake_service = _fake_caller_client_secuencia(

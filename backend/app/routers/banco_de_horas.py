@@ -3,8 +3,8 @@ monto/vivo_desde de tiempo.banco_de_horas son materializados por trigger
 (fn_movimiento_de_saldo_actualiza_banco), nadie los edita a mano -- este router sigue siendo de
 sólo lectura.
 
-Este corte suma el desglose de antigüedad del saldo (0-3/3-6/6+ meses, derivado de
-ventana_banco_meses) reconstruido en memoria desde el ledger tiempo.movimiento_de_saldo
+Este corte suma el desglose de antigüedad del saldo (0-V/2, V/2-V, V+ meses, V = ventana_banco_meses;
+6 es sólo el valor de ejemplo sembrado) reconstruido en memoria desde el ledger tiempo.movimiento_de_saldo
 (app/banco_antiguedad.py) -- sin migración nueva, vivo_desde no alcanza para distinguir horas
 viejas de horas nuevas dentro de la misma persona.
 
@@ -71,7 +71,7 @@ CODIGO_MONTO_EXCEDE_SALDO = "SCJ04"
 MENSAJE_PERSONA_SIN_BANCO = "Esta persona no tiene banco de horas."
 MENSAJE_MONTO_EXCEDE_SALDO = "El monto excede el saldo total de esta persona."
 MENSAJE_MONTO_EXCEDE_FUERA_VENTANA = (
-    "El monto excede la porción de deuda con 6+ meses de antigüedad de esta persona ({horas} h)."
+    "El monto excede la porción de deuda con {meses}+ meses de antigüedad de esta persona ({horas} h)."
 )
 
 ORDEN_A_CLAVE = {
@@ -390,8 +390,8 @@ def registrar_movimiento_manual(
     1. FINA, acá en Python, ANTES de llamar al RPC: recalcula el desglose de antigüedad de la
        persona ahora mismo (nunca confía en nada cacheado del frontend, mismo FIFO que
        _armar_saldos_completos vía banco_antiguedad.calcular_antiguedad_saldo) y rechaza si el
-       monto pedido excede la porción con 6+ meses de antigüedad (horas_fuera_ventana) -- el RPC
-       no puede hacer esta cuenta, no tiene el FIFO reconstruido.
+       monto pedido excede la porción con ventana_banco_meses+ meses de antigüedad
+       (horas_fuera_ventana) -- el RPC no puede hacer esta cuenta, no tiene el FIFO reconstruido.
     2. GRUESA, dentro del RPC (ERRCODE SCJ04): backstop contra el saldo TOTAL, por si algo llega
        a invocar el RPC directo sin pasar por este endpoint. En la práctica la capa 1 debería
        atajar casi todos los casos antes de llegar acá."""
@@ -427,7 +427,9 @@ def registrar_movimiento_manual(
     if datos.monto > resultado.horas_fuera_ventana:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
-            MENSAJE_MONTO_EXCEDE_FUERA_VENTANA.format(horas=resultado.horas_fuera_ventana),
+            MENSAJE_MONTO_EXCEDE_FUERA_VENTANA.format(
+                meses=ventana_meses, horas=resultado.horas_fuera_ventana
+            ),
         )
 
     try:

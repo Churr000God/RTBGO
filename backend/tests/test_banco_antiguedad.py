@@ -108,6 +108,20 @@ def test_repartir_por_tramo_el_corte_se_mueve_al_cambiar_ventana_meses():
     assert reparto_ventana_2.horas_media == 0.0
 
 
+def test_repartir_por_tramo_ventana_impar_usa_piso_entero_para_el_corte_reciente():
+    """V=5 (impar) -> corte reciente en piso(5/2)=2 meses antes de hoy, NO 2.5 ni redondeado a 3.
+    Con piso=2, el corte reciente cae en 2026-07-08; un lote fechado 2026-06-15 queda ANTES de ese
+    corte (va a "media"). Si el corte usara techo=3 en vez de piso (2026-06-08), ese mismo lote
+    caería en "reciente" -- este caso distingue ambas implementaciones."""
+    lotes = calcular_lotes([_mov(1, "2026-06-15T00:00:00+00:00", 7.0)])
+
+    reparto = repartir_por_tramo(lotes, ventana_meses=5, hoy=HOY)
+
+    assert reparto.horas_reciente == 0.0
+    assert reparto.horas_media == 7.0
+    assert reparto.horas_fuera_ventana == 0.0
+
+
 def test_calcular_antiguedad_saldo_conciliado_usa_los_lotes():
     movimientos = [_mov(1, "2026-09-01T00:00:00+00:00", 5.0)]
     resultado = calcular_antiguedad_saldo(
