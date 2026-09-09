@@ -38,6 +38,18 @@ class DiaPrevisualizacionOut(BaseModel):
     tiene_huerfana_sin_pareja: bool
 
 
+class DiaFaltantePersonaItem(BaseModel):
+    persona_id: str
+    persona_nombre: str | None = None
+    fechas_faltantes: list[date]
+
+
+class DiasFaltantesOut(BaseModel):
+    periodo_desde: date
+    periodo_hasta: date
+    personas: list[DiaFaltantePersonaItem]
+
+
 class DiaRevisadoOut(BaseModel):
     id: int
     persona_id: str

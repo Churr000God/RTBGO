@@ -177,6 +177,64 @@ def test_deficit_de_periodo_todo_ordinario_genera_generado_quincena():
     )
 
 
+def test_solo_simular_deficit_no_llama_aplicar_persona():
+    """Mismo escenario que test_deficit_de_periodo_todo_ordinario_genera_generado_quincena, pero
+    con solo_simular=True -- mismo código de retorno, cero escritura."""
+    fake_db = _fake_db(
+        [
+            ("jornada_asignada", _tabla_jornadas_persona([_jornada()])),
+            ("patron_semanal", _tabla_patron_semanal([_patron("lunes"), _patron("martes")])),
+            ("dia", _tabla_dia_periodo(list(_dias_lunes_martes().values()))),
+            ("tramo", _tabla_tramo_periodo([_tramo(201, 240)])),
+            ("clasificacion_de_tiempo", _tabla_clasificacion_existente([])),
+        ]
+    )
+
+    resultado = _procesar_persona(
+        fake_db,
+        PERSONA_1,
+        PERIODO_DESDE,
+        PERIODO_HASTA,
+        PERIODO_DESDE_ISO,
+        PERIODO_HASTA_ISO,
+        set(),
+        solo_simular=True,
+    )
+
+    assert resultado == PROCESADA_DEFICIT
+    fake_db.postgrest.schema.return_value.rpc.assert_not_called()
+
+
+def test_solo_simular_excedente_no_llama_aplicar_persona():
+    """Mismo escenario que test_excedente_con_deuda_previa_clasifica_reposicion_y_cubre, pero con
+    solo_simular=True -- mismo código de retorno, cero escritura (sí lee banco_de_horas, es sólo
+    lectura)."""
+    fake_db = _fake_db(
+        [
+            ("jornada_asignada", _tabla_jornadas_persona([_jornada()])),
+            ("patron_semanal", _tabla_patron_semanal([_patron("lunes"), _patron("martes")])),
+            ("dia", _tabla_dia_periodo(list(_dias_lunes_martes().values()))),
+            ("tramo", _tabla_tramo_periodo([_tramo(201, 240), _tramo(202, 360)])),
+            ("clasificacion_de_tiempo", _tabla_clasificacion_existente([])),
+            ("banco_de_horas", _tabla_banco_select([{"id": 9, "monto": "3"}])),
+        ]
+    )
+
+    resultado = _procesar_persona(
+        fake_db,
+        PERSONA_1,
+        PERIODO_DESDE,
+        PERIODO_HASTA,
+        PERIODO_DESDE_ISO,
+        PERIODO_HASTA_ISO,
+        set(),
+        solo_simular=True,
+    )
+
+    assert resultado == PROCESADA_OK
+    fake_db.postgrest.schema.return_value.rpc.assert_not_called()
+
+
 def test_excedente_con_deuda_previa_clasifica_reposicion_y_cubre():
     """esperadas=8h, trabajadas=10h (4h+6h) -- el segundo tramo cruza el umbral entero (nunca se
     parte). Deuda previa de 3h: reposicion cubre min(6, 3)=3h, deuda queda en 0."""

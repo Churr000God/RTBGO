@@ -22,6 +22,7 @@ const RESUMEN = {
   horas_adeudadas: 4.5,
   horas_fuera_ventana: 0,
   personas_fuera_ventana: 0,
+  personas_corte_pendiente: 0,
   ventana_meses: 6,
   top_en_deuda: [
     { persona_id: "persona-1", persona_nombre: "Persona Endeudada", monto: 4.5, meses_antiguedad_max: 1 },
@@ -39,6 +40,7 @@ const SALDO_ENDEUDADO = {
   horas_fuera_ventana: 0,
   meses_antiguedad_max: 1,
   conciliado: true,
+  corte_pendiente: false,
 };
 
 const SALDO_AL_CORRIENTE = {
@@ -52,6 +54,21 @@ const SALDO_AL_CORRIENTE = {
   horas_fuera_ventana: 0,
   meses_antiguedad_max: 0,
   conciliado: true,
+  corte_pendiente: false,
+};
+
+const SALDO_SINTETICO_CORTE_PENDIENTE = {
+  persona_id: "persona-3",
+  persona_nombre: "Persona Sin Marcar",
+  monto: 0,
+  vivo_desde: null,
+  actualizado_en: null,
+  horas_reciente: 0,
+  horas_media: 0,
+  horas_fuera_ventana: 0,
+  meses_antiguedad_max: 0,
+  conciliado: true,
+  corte_pendiente: true,
 };
 
 const MOVIMIENTOS = [
@@ -289,6 +306,53 @@ describe("BancoDeHorasPage", () => {
     await userEvent.click(fila);
     await waitFor(() => expect(screen.getByText("cubrió falta")).toBeInTheDocument());
     expect(llamadasMovimientos).toBe(1);
+  });
+
+  it('badge "Corte pendiente" aparece en la fila real y muestra la métrica nueva', async () => {
+    const conCortePendiente = { ...SALDO_ENDEUDADO, corte_pendiente: true };
+    mockApiFetch({
+      banco: new Response(
+        JSON.stringify({
+          total: 2,
+          resumen: { ...RESUMEN, personas_corte_pendiente: 1 },
+          saldos: [conCortePendiente, SALDO_AL_CORRIENTE],
+        }),
+      ),
+    });
+
+    const { container } = render(<BancoDeHorasPage />);
+    const tabla = await screen.findByRole("table");
+    const fila = await waitFor(() => within(tabla).getByRole("row", { name: /persona endeudada/i }));
+    expect(within(fila).getByText("Corte pendiente")).toBeInTheDocument();
+
+    const filaOk = within(tabla).getByRole("row", { name: /persona al corriente/i });
+    expect(within(filaOk).queryByText("Corte pendiente")).not.toBeInTheDocument();
+
+    const bandaMetricas = container.querySelector(".banda-metricas") as HTMLElement;
+    expect(within(bandaMetricas).getByText(/^corte pendiente$/i).nextElementSibling).toHaveTextContent(
+      "1",
+    );
+  });
+
+  it("fila sintética con actualizado_en null muestra — y el badge de corte pendiente", async () => {
+    mockApiFetch({
+      banco: new Response(
+        JSON.stringify({
+          total: 1,
+          resumen: { ...RESUMEN, personas_corte_pendiente: 1 },
+          saldos: [SALDO_SINTETICO_CORTE_PENDIENTE],
+        }),
+      ),
+    });
+
+    render(<BancoDeHorasPage />);
+    const tabla = await screen.findByRole("table");
+    const fila = await waitFor(() =>
+      within(tabla).getByRole("row", { name: /persona sin marcar/i }),
+    );
+    expect(within(fila).getByText("Corte pendiente")).toBeInTheDocument();
+    const celdaActualizado = within(fila).getAllByRole("cell")[6];
+    expect(celdaActualizado).toHaveTextContent("—");
   });
 
   it("muestra estado vacío cuando la búsqueda no coincide con nadie", async () => {

@@ -8,12 +8,13 @@ class BancoDeHorasItem(BaseModel):
     persona_nombre: str | None = None
     monto: float
     vivo_desde: datetime | None
-    actualizado_en: datetime
+    actualizado_en: datetime | None
     horas_reciente: float
     horas_media: float
     horas_fuera_ventana: float
     meses_antiguedad_max: int
     conciliado: bool
+    corte_pendiente: bool
 
 
 class TopEnDeudaItem(BaseModel):
@@ -30,6 +31,7 @@ class BancoDeHorasResumen(BaseModel):
     horas_adeudadas: float
     horas_fuera_ventana: float
     personas_fuera_ventana: int
+    personas_corte_pendiente: int
     ventana_meses: int
     top_en_deuda: list[TopEnDeudaItem]
 

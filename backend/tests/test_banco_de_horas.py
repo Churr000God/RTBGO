@@ -154,12 +154,85 @@ def _tabla_persona(busqueda_ids=None, nombres=None):
     return tabla
 
 
-def _fake_service_client(parametro=None, banco=None, movimiento=None, persona=None):
+def _tabla_festivos(datos=None):
+    """_festivos_del_periodo: select().gte().lte().execute()."""
+    tabla = MagicMock()
+    tabla.select.return_value.gte.return_value.lte.return_value.execute.return_value.data = datos or []
+    return tabla
+
+
+def _tabla_jornada_asignada(candidatas=None, jornadas_por_persona=None):
+    """Una sola tabla soporta las 2 formas de consulta de corte_quincenal.py sobre
+    jornada_asignada -- _personas_normal_flexible_del_periodo (select().in_().lte().or_()) y
+    _jornadas_del_periodo (select().eq().lte().or_()) -- son atributos distintos del mismo mock
+    (.in_ vs .eq), no chocan."""
+    tabla = MagicMock()
+    (
+        tabla.select.return_value.in_.return_value.lte.return_value.or_.return_value
+        .execute.return_value.data
+    ) = candidatas or []
+    (
+        tabla.select.return_value.eq.return_value.lte.return_value.or_.return_value
+        .execute.return_value.data
+    ) = jornadas_por_persona or []
+    return tabla
+
+
+def _tabla_dia_periodo(datos=None):
+    """_dias_del_periodo: select().eq(persona_id).gte().lte().execute()."""
+    tabla = MagicMock()
+    (
+        tabla.select.return_value.eq.return_value.gte.return_value.lte.return_value
+        .execute.return_value.data
+    ) = datos or []
+    return tabla
+
+
+def _tabla_tramo_periodo(datos=None):
+    tabla = MagicMock()
+    tabla.select.return_value.in_.return_value.order.return_value.execute.return_value.data = datos or []
+    return tabla
+
+
+def _tabla_clasificacion_existente(datos=None):
+    tabla = MagicMock()
+    tabla.select.return_value.in_.return_value.limit.return_value.execute.return_value.data = datos or []
+    return tabla
+
+
+def _tabla_patron_semanal(datos=None):
+    tabla = MagicMock()
+    tabla.select.return_value.in_.return_value.execute.return_value.data = datos or []
+    return tabla
+
+
+def _fake_service_client(
+    parametro=None,
+    banco=None,
+    movimiento=None,
+    persona=None,
+    dia_festivo=None,
+    jornada_asignada=None,
+    dia=None,
+    tramo=None,
+    clasificacion_de_tiempo=None,
+    patron_semanal=None,
+):
     defaults = {
         "parametro": parametro if parametro is not None else _tabla_parametro(),
         "banco_de_horas": banco if banco is not None else _tabla_plana([]),
         "movimiento_de_saldo": movimiento if movimiento is not None else _tabla_in([]),
         "persona": persona if persona is not None else _tabla_persona(nombres=[]),
+        # Previsión de corte quincenal (corte_pendiente) -- por defecto nadie es candidato, así
+        # los tests que no le importa esto no necesitan mockear nada más.
+        "dia_festivo": dia_festivo if dia_festivo is not None else _tabla_festivos(),
+        "jornada_asignada": jornada_asignada if jornada_asignada is not None else _tabla_jornada_asignada(),
+        "dia": dia if dia is not None else _tabla_dia_periodo(),
+        "tramo": tramo if tramo is not None else _tabla_tramo_periodo(),
+        "clasificacion_de_tiempo": (
+            clasificacion_de_tiempo if clasificacion_de_tiempo is not None else _tabla_clasificacion_existente()
+        ),
+        "patron_semanal": patron_semanal if patron_semanal is not None else _tabla_patron_semanal(),
     }
 
     def side_effect(nombre_tabla):
@@ -384,6 +457,57 @@ def test_listar_banco_de_horas_desconciliado_marca_bandera():
     saldo = response.json()["saldos"][0]
     assert saldo["conciliado"] is False
     assert saldo["horas_media"] == 8.0
+
+
+def _jornada_vigente_siempre(id_=1):
+    return {"id": id_, "tipo_jornada": "normal", "vigente_desde": "2020-01-01", "vigente_hasta": None}
+
+
+def test_listar_banco_de_horas_marca_corte_pendiente_en_fila_real():
+    """dia=[] (sin mockear, default) -- _procesar_persona(solo_simular=True) encuentra el primer
+    día esperado sin tiempo.dia y devuelve PENDIENTE_DIA_ABIERTO -> corte_pendiente=True."""
+    banco = _tabla_plana([_fila_banco(PERSONA_1, 1, monto=5.0, vivo_desde=_iso(10))])
+    movimiento = _tabla_in([_mov(1, 1, _iso(10), 5.0)])
+    jornada_asignada = _tabla_jornada_asignada(
+        candidatas=[{"persona_id": PERSONA_1}],
+        jornadas_por_persona=[_jornada_vigente_siempre()],
+    )
+    _preparar(banco=banco, movimiento=movimiento, jornada_asignada=jornada_asignada)
+
+    response = _pedir()
+
+    _limpiar()
+    assert response.status_code == 200, response.text
+    cuerpo = response.json()
+    assert cuerpo["saldos"][0]["corte_pendiente"] is True
+    assert cuerpo["resumen"]["personas_corte_pendiente"] == 1
+
+
+def test_listar_banco_de_horas_fila_sintetica_para_persona_sin_banco_real():
+    """PERSONA_2 no tiene fila en tiempo.banco_de_horas pero sí corte pendiente -- aparece como
+    fila sintética en 0, para que RH la vea igual."""
+    banco = _tabla_plana([])  # nadie con fila real
+    jornada_asignada = _tabla_jornada_asignada(
+        candidatas=[{"persona_id": PERSONA_2}],
+        jornadas_por_persona=[_jornada_vigente_siempre()],
+    )
+    persona = _tabla_persona(nombres=[{"id": PERSONA_2, "primer_nombre": "Beto", "apellido_paterno": "Ruiz"}])
+    _preparar(banco=banco, jornada_asignada=jornada_asignada, persona=persona)
+
+    response = _pedir()
+
+    _limpiar()
+    assert response.status_code == 200, response.text
+    cuerpo = response.json()
+    assert cuerpo["total"] == 1
+    saldo = cuerpo["saldos"][0]
+    assert saldo["persona_id"] == PERSONA_2
+    assert saldo["persona_nombre"] == "Beto Ruiz"
+    assert saldo["monto"] == 0.0
+    assert saldo["actualizado_en"] is None
+    assert saldo["corte_pendiente"] is True
+    assert cuerpo["resumen"]["personas_corte_pendiente"] == 1
+    assert cuerpo["resumen"]["total_personas"] == 1
 
 
 # ---------------------------------------------------------------------------

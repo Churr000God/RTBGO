@@ -94,6 +94,13 @@ def _rango_periodo(fecha_corte: date) -> tuple[date, date]:
     return date(ultimo_dia_mes_anterior.year, ultimo_dia_mes_anterior.month, 16), ultimo_dia_mes_anterior
 
 
+def resolver_ultimo_periodo_vencido(hoy: date) -> tuple[date, date]:
+    """Wrapper público de _rango_periodo -- mismo cálculo, para reuso desde
+    prevision_corte_quincenal.py sin tocar el símbolo que los tests ya mockean por nombre exacto
+    (mocker.patch("app.batches.corte_quincenal._rango_periodo", ...))."""
+    return _rango_periodo(hoy)
+
+
 def _fechas_del_periodo(periodo_desde: date, periodo_hasta: date) -> list[date]:
     dias = (periodo_hasta - periodo_desde).days + 1
     return [periodo_desde + timedelta(days=i) for i in range(dias)]
@@ -307,6 +314,8 @@ def _procesar_persona(
     periodo_desde_iso: str,
     periodo_hasta_iso: str,
     festivos: set[str],
+    *,
+    solo_simular: bool = False,
 ) -> str:
     jornadas = _jornadas_del_periodo(db, persona_id, periodo_desde_iso, periodo_hasta_iso)
     patrones_por_jornada = _patrones_por_jornada(db, [j["id"] for j in jornadas])
@@ -349,7 +358,8 @@ def _procesar_persona(
             clasificaciones.append({"tramo_id": tramo["id"], "tipo": "ordinario"})
         deficit = esperadas_totales - trabajadas_totales
         movimientos.append({"tramo_id": None, "tipo": "generado_quincena", "monto": deficit})
-        _aplicar_persona(db, persona_id, clasificaciones, movimientos, motivo)
+        if not solo_simular:
+            _aplicar_persona(db, persona_id, clasificaciones, movimientos, motivo)
         return PROCESADA_DEFICIT
 
     if not tramos:
@@ -374,7 +384,8 @@ def _procesar_persona(
         else:
             clasificaciones.append({"tramo_id": tramo["id"], "tipo": "extra"})
 
-    _aplicar_persona(db, persona_id, clasificaciones, movimientos, motivo)
+    if not solo_simular:
+        _aplicar_persona(db, persona_id, clasificaciones, movimientos, motivo)
     return PROCESADA_OK
 
 

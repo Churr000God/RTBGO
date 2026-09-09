@@ -25,7 +25,14 @@ from supabase import Client
 from app import alertas_horario
 from app.deps import get_caller_client, get_service_client
 from app.permisos import requiere_permiso, requiere_todos_los_permisos
-from app.schemas.dias import DiaListaOut, DiaPrevisualizacionOut, DiaRevisadoOut, DiaRevisarRequest
+from app.prevision_corte_quincenal import resolver_dias_faltantes, resolver_periodo_en_curso
+from app.schemas.dias import (
+    DiaListaOut,
+    DiaPrevisualizacionOut,
+    DiaRevisadoOut,
+    DiaRevisarRequest,
+    DiasFaltantesOut,
+)
 
 router = APIRouter(prefix="/api/dias", tags=["dias"])
 
@@ -243,6 +250,35 @@ def listar_dias(
         {**fila, "persona_nombre": nombres.get(fila["persona_id"])} for fila in filas_enriquecidas
     ]
     return {"total": resultado.count, "dias": dias}
+
+
+@router.get("/pendientes-corte-quincenal", response_model=DiasFaltantesOut)
+def dias_pendientes_corte_quincenal(
+    db_servicio: Client = Depends(get_service_client),
+    _permiso: None = Depends(requiere_todos_los_permisos("dia_lectura", "marca_lectura")),
+) -> dict:
+    """Alerta preventiva -- a quién le falta un tiempo.dia en el periodo EN CURSO (todavía sin
+    cerrar), para que RH pueda actuar antes de que el corte quincenal se trabe cuando llegue su
+    hora (SCJ-PRO-13). Mismo gate que el resto del router: expone datos derivados de
+    tiempo.marca/tiempo.dia, no sólo tiempo.dia. Sin filtros/paginación -- resumen chico
+    (decenas de personas, unas pocas fechas cada una)."""
+    periodo_desde, periodo_hasta = resolver_periodo_en_curso(date.today())
+    faltantes = resolver_dias_faltantes(db_servicio, periodo_desde, periodo_hasta, date.today())
+
+    fechas_por_persona: dict[str, list[str]] = {}
+    for item in faltantes:
+        fechas_por_persona.setdefault(item["persona_id"], []).append(item["fecha"])
+
+    nombres = _resolver_nombres_persona(db_servicio, list(fechas_por_persona.keys()))
+    personas = [
+        {
+            "persona_id": persona_id,
+            "persona_nombre": nombres.get(persona_id),
+            "fechas_faltantes": fechas,
+        }
+        for persona_id, fechas in fechas_por_persona.items()
+    ]
+    return {"periodo_desde": periodo_desde, "periodo_hasta": periodo_hasta, "personas": personas}
 
 
 @router.get("/{dia_id}/previsualizar-tramos", response_model=DiaPrevisualizacionOut)

@@ -23,7 +23,15 @@ tabla de saldos completa + los movimientos de quienes tienen monto > 0, se calcu
 recién ahí se filtra/ordena/pagina. Volumen esperado bajo (2 movimientos/persona/mes) -- no
 justifica una vista materializada todavía. El `resumen` (métricas globales + top-8 en deuda)
 se calcula sobre TODAS las personas, antes de aplicar busqueda_persona/tramo_antiguedad -- son
-"la foto completa del banco", no deberían cambiar porque alguien filtró la tabla."""
+"la foto completa del banco", no deberían cambiar porque alguien filtró la tabla.
+
+`corte_pendiente` (alerta preventiva, sin DDL nueva): reusa `_procesar_persona(...,
+solo_simular=True)` de `batches/corte_quincenal.py` para simular, EN CADA `GET`, si el corte del
+último periodo ya vencido se aplicó de verdad para cada persona normal/flexible -- mismo trabajo
+que haría el batch real, sin escribir nada. A la escala actual (decenas de personas) es aceptable
+correrlo por request; no se cachea en este corte. Personas con corte pendiente que todavía no
+tienen fila real en `tiempo.banco_de_horas` aparecen como fila sintética (monto=0,
+actualizado_en=None) -- así RH las ve en la pantalla aunque el trigger nunca las haya tocado."""
 
 from datetime import date, datetime, timezone
 from typing import Literal
@@ -37,8 +45,10 @@ from app.banco_antiguedad import (
     calcular_lotes,
     resolver_ventana_meses,
 )
+from app.batches.corte_quincenal import _festivos_del_periodo, resolver_ultimo_periodo_vencido
 from app.deps import get_service_client
 from app.permisos import requiere_permiso
+from app.prevision_corte_quincenal import resolver_personas_con_corte_pendiente
 from app.schemas.banco_de_horas import BancoDeHorasListaOut, MovimientoSaldoListaOut
 
 router = APIRouter(prefix="/api/banco-de-horas", tags=["banco-de-horas"])
@@ -113,9 +123,38 @@ def _resultado_a_dict(resultado: ResultadoAntiguedad) -> dict:
     }
 
 
+def _resolver_personas_con_corte_pendiente(db_servicio: Client, hoy: datetime) -> set[str]:
+    periodo_desde, periodo_hasta = resolver_ultimo_periodo_vencido(hoy.date())
+    periodo_desde_iso = periodo_desde.isoformat()
+    periodo_hasta_iso = periodo_hasta.isoformat()
+    festivos = _festivos_del_periodo(db_servicio, periodo_desde_iso, periodo_hasta_iso)
+    return resolver_personas_con_corte_pendiente(
+        db_servicio, periodo_desde, periodo_hasta, periodo_desde_iso, periodo_hasta_iso, festivos
+    )
+
+
+def _fila_sintetica_corte_pendiente(persona_id: str, persona_nombre: str | None) -> dict:
+    """Persona con corte pendiente que todavía no tiene fila real en tiempo.banco_de_horas (el
+    trigger nunca la tocó) -- se muestra igual, en 0, para que RH la vea."""
+    return {
+        "persona_id": persona_id,
+        "persona_nombre": persona_nombre,
+        "monto": 0.0,
+        "vivo_desde": None,
+        "actualizado_en": None,
+        "horas_reciente": 0.0,
+        "horas_media": 0.0,
+        "horas_fuera_ventana": 0.0,
+        "meses_antiguedad_max": 0,
+        "conciliado": True,
+        "corte_pendiente": True,
+    }
+
+
 def _armar_saldos_completos(db_servicio: Client, hoy: datetime) -> tuple[list[dict], int]:
-    """Toda la tabla banco_de_horas, enriquecida con nombre + desglose de antigüedad -- base
-    tanto del `resumen` como de `saldos` (filtrado/ordenado/paginado después, en memoria)."""
+    """Toda la tabla banco_de_horas, enriquecida con nombre + desglose de antigüedad, más la
+    alerta de corte_pendiente -- base tanto del `resumen` como de `saldos` (filtrado/ordenado/
+    paginado después, en memoria)."""
     ventana_meses = resolver_ventana_meses(db_servicio, date.today().isoformat())
     filas = (
         db_servicio.postgrest.schema("tiempo")
@@ -124,12 +163,19 @@ def _armar_saldos_completos(db_servicio: Client, hoy: datetime) -> tuple[list[di
         .execute()
         .data
     )
-    if not filas:
+    pendientes = _resolver_personas_con_corte_pendiente(db_servicio, hoy)
+
+    if not filas and not pendientes:
         return [], ventana_meses
 
     banco_ids_con_deuda = [fila["id"] for fila in filas if float(fila["monto"]) > 0]
     movimientos_por_banco = _resolver_movimientos_por_banco(db_servicio, banco_ids_con_deuda)
-    nombres = _resolver_nombres_persona(db_servicio, [fila["persona_id"] for fila in filas])
+
+    persona_ids_reales = {fila["persona_id"] for fila in filas}
+    persona_ids_sinteticas = sorted(pendientes - persona_ids_reales)
+    nombres = _resolver_nombres_persona(
+        db_servicio, [fila["persona_id"] for fila in filas] + persona_ids_sinteticas
+    )
 
     saldos: list[dict] = []
     for fila in filas:
@@ -151,14 +197,20 @@ def _armar_saldos_completos(db_servicio: Client, hoy: datetime) -> tuple[list[di
                 "vivo_desde": fila["vivo_desde"],
                 "actualizado_en": fila["actualizado_en"],
                 **_resultado_a_dict(resultado),
+                "corte_pendiente": fila["persona_id"] in pendientes,
             }
         )
+
+    for persona_id in persona_ids_sinteticas:
+        saldos.append(_fila_sintetica_corte_pendiente(persona_id, nombres.get(persona_id)))
+
     return saldos, ventana_meses
 
 
 def _armar_resumen(saldos_completos: list[dict], ventana_meses: int) -> dict:
     en_deuda = [item for item in saldos_completos if item["monto"] > 0]
     fuera_ventana = [item for item in saldos_completos if item["horas_fuera_ventana"] > 0]
+    corte_pendiente = [item for item in saldos_completos if item["corte_pendiente"]]
     top = sorted(en_deuda, key=lambda item: item["monto"], reverse=True)[:TOP_EN_DEUDA_CANTIDAD]
     return {
         "total_personas": len(saldos_completos),
@@ -167,6 +219,7 @@ def _armar_resumen(saldos_completos: list[dict], ventana_meses: int) -> dict:
         "horas_adeudadas": round(sum(item["monto"] for item in en_deuda), 2),
         "horas_fuera_ventana": round(sum(item["horas_fuera_ventana"] for item in fuera_ventana), 2),
         "personas_fuera_ventana": len(fuera_ventana),
+        "personas_corte_pendiente": len(corte_pendiente),
         "ventana_meses": ventana_meses,
         "top_en_deuda": [
             {

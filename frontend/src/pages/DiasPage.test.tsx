@@ -55,12 +55,25 @@ const DIA_REVISADO = {
 };
 
 function mockApiFetch(
-  opciones: { dias?: Response; revisar?: Response; previsualizar?: Response } = {},
+  opciones: {
+    dias?: Response;
+    revisar?: Response;
+    previsualizar?: Response;
+    pendientesCorte?: Response;
+  } = {},
 ) {
   vi.mocked(apiFetch).mockImplementation((path: string, init?: RequestInit) => {
     if (path === "/api/sesion") {
       return Promise.resolve(
         new Response(JSON.stringify({ acceso_permitido: true, motivo_bloqueo: null })),
+      );
+    }
+    if (path === "/api/dias/pendientes-corte-quincenal") {
+      return Promise.resolve(
+        opciones.pendientesCorte ??
+          new Response(
+            JSON.stringify({ periodo_desde: "2026-09-01", periodo_hasta: "2026-09-15", personas: [] }),
+          ),
       );
     }
     if (path.startsWith("/api/dias?")) {
@@ -424,6 +437,65 @@ describe("DiasPage", () => {
 
     expect(screen.getByRole("button", { name: /^anterior$/i })).toBeDisabled();
     expect(screen.getByRole("button", { name: /^siguiente$/i })).toBeDisabled();
+  });
+
+  it("banner de pendientes de corte quincenal muestra el conteo y la lista de persona+fechas", async () => {
+    mockApiFetch({
+      pendientesCorte: new Response(
+        JSON.stringify({
+          periodo_desde: "2026-09-01",
+          periodo_hasta: "2026-09-15",
+          personas: [
+            { persona_id: "p1", persona_nombre: "Ana Pérez", fechas_faltantes: ["2026-09-03", "2026-09-05"] },
+            { persona_id: "p2", persona_nombre: "Beto Ruiz", fechas_faltantes: ["2026-09-07"] },
+          ],
+        }),
+      ),
+    });
+
+    render(<DiasPage />);
+
+    await waitFor(() =>
+      expect(screen.getByText(/2 persona\(s\) con días sin marcar/i)).toBeInTheDocument(),
+    );
+    expect(screen.getByText(/03 sep 2026, 05 sep 2026/i)).toBeInTheDocument();
+    const filaBeto = screen.getByText(/Beto Ruiz/i).closest("li")!;
+    expect(within(filaBeto).getByText(/07 sep 2026/i)).toBeInTheDocument();
+  });
+
+  it("banner de pendientes de corte queda oculto cuando personas viene vacío", async () => {
+    mockApiFetch();
+
+    render(<DiasPage />);
+    await waitFor(() => expect(screen.getByText("Persona Ficticia Uno")).toBeInTheDocument());
+
+    expect(screen.queryByText(/días sin marcar/i)).not.toBeInTheDocument();
+  });
+
+  it("banner de pendientes de corte es colapsable", async () => {
+    mockApiFetch({
+      pendientesCorte: new Response(
+        JSON.stringify({
+          periodo_desde: "2026-09-01",
+          periodo_hasta: "2026-09-15",
+          personas: [{ persona_id: "p1", persona_nombre: "Ana Pérez", fechas_faltantes: ["2026-09-03"] }],
+        }),
+      ),
+    });
+
+    render(<DiasPage />);
+    await waitFor(() => expect(screen.getByText(/Ana Pérez/i)).toBeInTheDocument());
+
+    const boton = screen.getByRole("button", { name: /días sin marcar/i });
+    expect(boton).toHaveAttribute("aria-expanded", "true");
+
+    await userEvent.click(boton);
+    expect(boton).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText(/Ana Pérez/i)).not.toBeInTheDocument();
+
+    await userEvent.click(boton);
+    expect(boton).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText(/Ana Pérez/i)).toBeInTheDocument();
   });
 
   it("muestra el estado de error con Reintentar", async () => {

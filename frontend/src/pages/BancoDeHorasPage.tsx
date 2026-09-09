@@ -39,6 +39,7 @@ type Resumen = {
   horas_adeudadas: number;
   horas_fuera_ventana: number;
   personas_fuera_ventana: number;
+  personas_corte_pendiente: number;
   ventana_meses: number;
   top_en_deuda: TopEnDeuda[];
 };
@@ -48,12 +49,15 @@ type SaldoBancoHoras = {
   persona_nombre: string | null;
   monto: number;
   vivo_desde: string | null;
-  actualizado_en: string;
+  // null cuando es una fila sintética -- persona con corte pendiente que nunca tuvo fila real en
+  // tiempo.banco_de_horas (nunca se le generó/actualizó un saldo).
+  actualizado_en: string | null;
   horas_reciente: number;
   horas_media: number;
   horas_fuera_ventana: number;
   meses_antiguedad_max: number;
   conciliado: boolean;
+  corte_pendiente: boolean;
 };
 
 type RespuestaBancoHoras = { total: number; resumen: Resumen; saldos: SaldoBancoHoras[] };
@@ -248,6 +252,13 @@ export function BancoDeHorasPage() {
                 {formatearHoras(datos.resumen.horas_fuera_ventana)}
               </span>
             </div>
+            <div className="metrica">
+              <span className="etiqueta-metrica">
+                <span className="punto punto--aviso" aria-hidden="true" />
+                Corte pendiente
+              </span>
+              <strong>{datos.resumen.personas_corte_pendiente}</strong>
+            </div>
           </div>
         )}
 
@@ -429,7 +440,19 @@ export function BancoDeHorasPage() {
                             )}
                           </td>
                           <td>{formatearFechaHora(saldo.vivo_desde)}</td>
-                          <td>{formatearFechaHora(saldo.actualizado_en)}</td>
+                          <td>
+                            {formatearFechaHora(saldo.actualizado_en)}
+                            {saldo.corte_pendiente && (
+                              <div className="ayuda-campo">
+                                <Badge
+                                  variante="aviso"
+                                  title="El corte quincenal del último periodo ya vencido todavía no se aplicó para esta persona -- puede estar bloqueado por un día sin marcar, o simplemente no haberse disparado todavía."
+                                >
+                                  Corte pendiente
+                                </Badge>
+                              </div>
+                            )}
+                          </td>
                         </tr>
                         {expandida && (
                           <tr>

@@ -1,10 +1,11 @@
 import { Fragment, useEffect, useRef, useState } from "react";
-import { AlertCircle, Loader2, Search } from "lucide-react";
+import { AlertCircle, AlertTriangle, ChevronDown, ChevronRight, Loader2, Search } from "lucide-react";
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
 import { Badge } from "../components/Badge";
 import { Button } from "../components/Button";
+import { Card } from "../components/Card";
 import { Input } from "../components/Input";
 
 // Debounce del buscador de persona: mismo criterio que TramosPage — es el único filtro sin
@@ -43,6 +44,18 @@ type Orden = "fecha_desc" | "fecha_asc" | "horas_desc" | "horas_asc";
 type FaseConfirmacion = "calcular" | "calculando" | "bloqueada" | "editable";
 
 type Previsualizacion = { horas_calculadas: number; tiene_huerfana_sin_pareja: boolean };
+
+type PersonaPendienteCorte = {
+  persona_id: string;
+  persona_nombre: string | null;
+  fechas_faltantes: string[];
+};
+
+type RespuestaPendientesCorte = {
+  periodo_desde: string;
+  periodo_hasta: string;
+  personas: PersonaPendienteCorte[];
+};
 
 function formatearFecha(fecha: string): string {
   const valor = new Date(`${fecha}T00:00:00`);
@@ -129,6 +142,24 @@ export function DiasPage() {
   const [revisando, setRevisando] = useState(false);
   const [valorHoras, setValorHoras] = useState("");
   const [faseConfirmacion, setFaseConfirmacion] = useState<FaseConfirmacion>("calcular");
+
+  // Fetch propio, independiente de la paginación/filtros de la tabla principal -- mismo criterio
+  // que otros datos auxiliares de esta familia de pantallas (ej. el ledger de Banco de Horas).
+  // Puramente informativo (no bloquea nada): si falla, el banner simplemente no aparece.
+  const [pendientesCorte, setPendientesCorte] = useState<RespuestaPendientesCorte | null>(null);
+  const [bannerAbierto, setBannerAbierto] = useState(true);
+
+  useEffect(() => {
+    apiFetch("/api/dias/pendientes-corte-quincenal")
+      .then((respuesta) => {
+        if (!respuesta.ok) throw new Error(`status ${respuesta.status}`);
+        return respuesta.json();
+      })
+      .then((datos: RespuestaPendientesCorte) => setPendientesCorte(datos))
+      .catch(() => {
+        // silencioso a propósito -- ver comentario arriba.
+      });
+  }, []);
 
   useEffect(() => {
     const id = setTimeout(() => {
@@ -271,6 +302,41 @@ export function DiasPage() {
             </p>
           </div>
         </div>
+
+        {pendientesCorte && pendientesCorte.personas.length > 0 && (
+          <Card>
+            <button
+              type="button"
+              className="boton-con-icono"
+              style={{ justifyContent: "space-between", width: "100%", textAlign: "left" }}
+              aria-expanded={bannerAbierto}
+              onClick={() => setBannerAbierto((anterior) => !anterior)}
+            >
+              <span className="boton-con-icono" style={{ justifyContent: "flex-start" }}>
+                <AlertTriangle size={16} aria-hidden="true" />
+                {pendientesCorte.personas.length} persona(s) con días sin marcar en el periodo
+                actual ({formatearFecha(pendientesCorte.periodo_desde)}–
+                {formatearFecha(pendientesCorte.periodo_hasta)}) — van a bloquear el corte
+                quincenal si no se resuelven antes del corte.
+              </span>
+              {bannerAbierto ? (
+                <ChevronDown size={16} aria-hidden="true" />
+              ) : (
+                <ChevronRight size={16} aria-hidden="true" />
+              )}
+            </button>
+            {bannerAbierto && (
+              <ul style={{ marginTop: "0.75rem", marginBottom: 0 }}>
+                {pendientesCorte.personas.map((persona) => (
+                  <li key={persona.persona_id}>
+                    {persona.persona_nombre ?? "—"}:{" "}
+                    {persona.fechas_faltantes.map((fecha) => formatearFecha(fecha)).join(", ")}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        )}
 
         <div className="barra-filtros">
           <div className="campo-con-icono">

@@ -1,5 +1,5 @@
 from datetime import date
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
 from postgrest.exceptions import APIError
@@ -540,6 +540,80 @@ def test_listar_dias_excepciones_resueltas_no_cuentan():
 
     _limpiar()
     assert response.json()["dias"][0]["excepciones_pendientes"] == 0
+
+
+# ---------------------------------------------------------------------------
+# GET /api/dias/pendientes-corte-quincenal
+# ---------------------------------------------------------------------------
+
+
+def _pedir_pendientes_corte_quincenal():
+    client = TestClient(app)
+    return client.get(
+        "/api/dias/pendientes-corte-quincenal", headers={"Authorization": "Bearer fake-token"}
+    )
+
+
+def test_dias_pendientes_corte_quincenal_agrupa_por_persona():
+    tabla_persona = _tabla_persona(
+        nombres=[{"id": PERSONA_1, "primer_nombre": "Ana", "apellido_paterno": "Pérez"}]
+    )
+    _preparar(tabla_dia=_tabla_encadenada([]), persona=tabla_persona)
+
+    with (
+        patch(
+            "app.routers.dias.resolver_periodo_en_curso",
+            return_value=(date(2026, 9, 1), date(2026, 9, 15)),
+        ),
+        patch(
+            "app.routers.dias.resolver_dias_faltantes",
+            return_value=[
+                {"persona_id": PERSONA_1, "fecha": "2026-09-03"},
+                {"persona_id": PERSONA_1, "fecha": "2026-09-05"},
+            ],
+        ),
+    ):
+        response = _pedir_pendientes_corte_quincenal()
+
+    _limpiar()
+    assert response.status_code == 200, response.text
+    cuerpo = response.json()
+    assert cuerpo["periodo_desde"] == "2026-09-01"
+    assert cuerpo["periodo_hasta"] == "2026-09-15"
+    assert len(cuerpo["personas"]) == 1
+    persona = cuerpo["personas"][0]
+    assert persona["persona_id"] == PERSONA_1
+    assert persona["persona_nombre"] == "Ana Pérez"
+    assert persona["fechas_faltantes"] == ["2026-09-03", "2026-09-05"]
+
+
+def test_dias_pendientes_corte_quincenal_sin_faltantes_devuelve_lista_vacia():
+    _preparar(tabla_dia=_tabla_encadenada([]))
+
+    with (
+        patch(
+            "app.routers.dias.resolver_periodo_en_curso",
+            return_value=(date(2026, 9, 1), date(2026, 9, 15)),
+        ),
+        patch("app.routers.dias.resolver_dias_faltantes", return_value=[]),
+    ):
+        response = _pedir_pendientes_corte_quincenal()
+
+    _limpiar()
+    assert response.status_code == 200, response.text
+    assert response.json()["personas"] == []
+
+
+def test_dias_pendientes_corte_quincenal_sin_dia_lectura_devuelve_403():
+    fake_caller = _fake_caller_client_con_permisos({"marca_lectura"})
+    app.dependency_overrides[get_caller_client] = lambda: fake_caller
+    app.dependency_overrides[get_service_client] = lambda: MagicMock()
+    _override_identidad()
+
+    response = _pedir_pendientes_corte_quincenal()
+
+    _limpiar()
+    assert response.status_code == 403
 
 
 # ---------------------------------------------------------------------------
