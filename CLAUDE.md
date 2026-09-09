@@ -302,6 +302,36 @@ backend y un frontend que lo exponen. Ver `README.md` y `docs/00-contexto/SCJ-CT
   (`service_role` para leer el insumo de la validación, el caller sólo para el INSERT real) — ver
   gotcha nuevo abajo. Formulario dentro de la fila expandible del ledger que ya tenía Banco de
   Horas (sin pantalla ni ruta nueva), visible sólo si la persona tiene deuda fuera de la ventana.
+- **Parámetros del sistema 100% dinámicos + corridas batch con fecha/bloqueo horario (9 de
+  septiembre de 2026, cuatro cortes independientes):** cierra los últimos huecos de "6"
+  hardcodeado en `ventana_banco_meses` (mensaje de error del 422 con `{meses}` interpolado,
+  badge del catálogo corregido, frontend usa piso entero `Math.floor` para la mitad de la ventana
+  — antes usaba división real y mentía con ventana impar). **Corridas batch**: el panel de
+  `/tiempo/corridas-batch` gana selector de fecha por botón (backend ya aceptaba `fecha` opcional,
+  el frontend nunca la mandaba) y el disparo manual de `cierre_dia` rechaza fecha futura siempre y
+  fecha de hoy antes de `hora_corte_dia + hora_corrida_cierre_dia` (nuevo
+  `backend/app/hora_cierre_dia.py`, primer consumidor real de `hora_corte_dia`). De paso se
+  encontró y arregló un **bug real del scheduler**: el job programado de `cierre_dia` corría a las
+  03:00 pasando `date.today()` en vez del día anterior — procesaba un día de tres horas de vida,
+  sin marcas, generando faltas falsas; contradecía tanto el texto de la UI como
+  `prevision_corte_quincenal.py`, que ya asumía la semántica correcta. Corregido a
+  `date.today() - timedelta(days=1)`; `de_confianza`/`corte_quincenal` siguen sin cambio.
+  **Alerta de magnitud de deuda en Banco de Horas**: el pedido original era ampliar Alertas de
+  retardo con `umbral_aviso_pct`/`umbral_escalamiento_pct` — la investigación encontró que esos
+  parámetros son el segundo eje de alerta del Banco de Horas por especificación (`SCJ-ESP-01
+  §VI.6`, magnitud de la deuda como % de la jornada semanal, complementando el eje de antigüedad
+  que ya existía), no de retardo; confirmado con el usuario, Alertas de retardo no se tocó. Nuevo
+  `backend/app/banco_alertas_magnitud.py` (`jornada_semanal_horas` reusa el cálculo de
+  `jornada_asignada.py::_horas_patron`, nunca la columna `horas_semanales_calculadas` que está
+  siempre `NULL`); cada saldo suma nivel `sin_alerta`/`aviso`/`escalamiento`, badge, filtro y
+  tarjetas de resumen. Con este corte **las 8 claves del catálogo de parámetros quedan con
+  consumidor real** — cero badges "Sin efecto en la lógica actual" en la pantalla de Parámetros.
+  **Fix de UI**: Alertas de retardo mandaba la petición igual si el usuario borraba el rango de
+  fechas (`desde`/`hasta` son requeridos sin default en ese endpoint, a diferencia de Tramos/Días)
+  — 422 y pantalla de error genérica; ahora corta antes del fetch con un mensaje que invita a
+  completar el rango. Ver
+  `bitacora/2026-09-09_parametros_dinamicos_completos_y_corridas_batch.md` para el detalle
+  completo de los 4 cortes.
 
 ## Arquitectura y módulos
 
