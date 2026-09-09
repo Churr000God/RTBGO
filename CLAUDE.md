@@ -50,7 +50,7 @@ backend y un frontend que lo exponen. Ver `README.md` y `docs/00-contexto/SCJ-CT
   `--no-dev` (sin pytest) y el frontend prod es nginx sirviendo el bundle (sin npm/node); el script
   corta con un mensaje explícito en vez de fallar con un error de `docker exec`. Las pruebas
   siempre corren con `dev pruebas`.
-- **Tests:** backend `uv run pytest` (343 casos), frontend `npm test` (443 casos, 60 archivos).
+- **Tests:** backend `uv run pytest` (363 casos), frontend `npm test` (448 casos, 60 archivos).
   Ambos corren igual dentro de los contenedores (`./scripts/desplegar.sh <entorno> pruebas`).
   Cobertura instrumentada desde el 4 de septiembre de 2026: `uv run pytest --cov=app
   --cov-report=term-missing` (backend) y `npm run test:coverage` / `npm test -- --coverage`
@@ -239,6 +239,26 @@ backend y un frontend que lo exponen. Ver `README.md` y `docs/00-contexto/SCJ-CT
   Fix en `db/ddl/67_*.sql`: `ERRCODE SCJ02` nuevo rechaza el caso antes de escribir, más
   `CHECK ck_jornada_asignada_vigencia` como red de seguridad a nivel base. Ver
   `bitacora/2026-09-08_jornada_asignada_rediseno_y_bug_vigencia.md`.
+- **Banco de Horas: desglose de antigüedad del saldo (8 de septiembre de 2026, corte posterior,
+  sin DDL):** `tiempo.banco_de_horas.vivo_desde` es un único timestamp por persona (se resetea a
+  `NULL` cuando el saldo toca 0) — no distingue horas viejas de nuevas dentro de la misma persona.
+  `backend/app/banco_antiguedad.py` (nuevo) reconstruye el desglose 0-3/3-6/6+ meses con FIFO puro
+  sobre el ledger `tiempo.movimiento_de_saldo` (append-only, ya existía desde `02_tiempo.sql`, sin
+  migración nueva), usando `ventana_banco_meses` — primer consumidor real de ese parámetro,
+  sembrado desde hace semanas sin nadie que lo leyera. Reconciliación explícita contra
+  `banco_de_horas.monto`: si el FIFO no cuadra, `conciliado=false` y cae a un fallback por
+  `vivo_desde` en vez de esconder la desalineación (el hueco que `SCJ-DEC-02` ya documentaba sin
+  resolver). `GET /api/banco-de-horas` pasa de un array plano sin filtros a
+  `{total, resumen, saldos}` paginado/filtrable/ordenable — filtro y orden por tramo de antigüedad
+  se hacen en memoria (el desglose no es una columna real, no hay `.range()`/`.order()` de
+  PostgREST posible sobre eso). Cambio de postura deliberado: pasa de `get_caller_client` a
+  `get_service_client` con dos permisos exigidos explícitos (`banco_de_horas_lectura` AND
+  `movimiento_de_saldo_lectura`-o-`edicion`) — con el gate viejo, alguien sin permiso sobre el
+  ledger habría visto toda la antigüedad en cero sin ningún error. `GET
+  /api/banco-de-horas/{persona_id}/movimientos` nuevo alimenta una fila expandible con el ledger
+  completo de la persona. Métricas y gráfica "Top en deuda" de la pantalla se conservaron, ahora
+  alimentadas por el `resumen` del backend en vez de un `useMemo` local (corrige de paso que antes
+  no reaccionaban a la búsqueda).
 
 ## Arquitectura y módulos
 
