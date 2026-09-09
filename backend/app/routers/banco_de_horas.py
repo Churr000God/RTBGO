@@ -8,6 +8,12 @@ Este corte suma el desglose de antigüedad del saldo (0-V/2, V/2-V, V+ meses, V 
 (app/banco_antiguedad.py) -- sin migración nueva, vivo_desde no alcanza para distinguir horas
 viejas de horas nuevas dentro de la misma persona.
 
+Segundo eje de alerta (SCJ-ESP-01 §VI.6, este corte, sin DDL nueva): MAGNITUD de la deuda como %
+de la jornada semanal de la persona (app/banco_alertas_magnitud.py) -- independiente del eje de
+antigüedad de arriba. jornada_semanal_horas/porcentaje_jornada_semanal/nivel_alerta son `None`
+para quien no tiene jornada normal/flexible vigente (de_confianza incluida, no maneja banco de
+horas) -- nunca 0.0, no hay "0% de nada" que mostrar.
+
 Cambio de postura respecto del corte anterior: de get_caller_client a get_service_client para el
 dato, sumando el gate explícito del ledger. Con get_caller_client, alguien con
 banco_de_horas_lectura pero SIN permiso sobre el ledger vería `[]` de movimientos y toda la
@@ -40,6 +46,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from postgrest.exceptions import APIError
 from supabase import Client
 
+from app.banco_alertas_magnitud import (
+    clasificar_nivel_deuda,
+    resolver_jornadas_semanales,
+    resolver_umbrales_pct,
+)
 from app.banco_antiguedad import (
     ResultadoAntiguedad,
     calcular_antiguedad_saldo,
@@ -149,9 +160,31 @@ def _resolver_personas_con_corte_pendiente(db_servicio: Client, hoy: datetime) -
     )
 
 
-def _fila_sintetica_corte_pendiente(persona_id: str, persona_nombre: str | None) -> dict:
+def _campos_alerta_magnitud(
+    monto: float, jornada_semanal_horas: float | None, aviso_pct: int, escalamiento_pct: int
+) -> dict:
+    porcentaje = None
+    if jornada_semanal_horas is not None and jornada_semanal_horas > 0:
+        porcentaje = round(monto / jornada_semanal_horas * 100, 1)
+    return {
+        "jornada_semanal_horas": jornada_semanal_horas,
+        "porcentaje_jornada_semanal": porcentaje,
+        "nivel_alerta": clasificar_nivel_deuda(
+            monto, jornada_semanal_horas, aviso_pct, escalamiento_pct
+        ),
+    }
+
+
+def _fila_sintetica_corte_pendiente(
+    persona_id: str,
+    persona_nombre: str | None,
+    jornada_semanal_horas: float | None,
+    aviso_pct: int,
+    escalamiento_pct: int,
+) -> dict:
     """Persona con corte pendiente que todavía no tiene fila real en tiempo.banco_de_horas (el
-    trigger nunca la tocó) -- se muestra igual, en 0, para que RH la vea."""
+    trigger nunca la tocó) -- se muestra igual, en 0, para que RH la vea. monto=0.0 -> nivel_alerta
+    siempre "sin_alerta" si tiene jornada resuelta (0% nunca alcanza ningún umbral), None si no."""
     return {
         "persona_id": persona_id,
         "persona_nombre": persona_nombre,
@@ -164,14 +197,17 @@ def _fila_sintetica_corte_pendiente(persona_id: str, persona_nombre: str | None)
         "meses_antiguedad_max": 0,
         "conciliado": True,
         "corte_pendiente": True,
+        **_campos_alerta_magnitud(0.0, jornada_semanal_horas, aviso_pct, escalamiento_pct),
     }
 
 
-def _armar_saldos_completos(db_servicio: Client, hoy: datetime) -> tuple[list[dict], int]:
-    """Toda la tabla banco_de_horas, enriquecida con nombre + desglose de antigüedad, más la
-    alerta de corte_pendiente -- base tanto del `resumen` como de `saldos` (filtrado/ordenado/
-    paginado después, en memoria)."""
-    ventana_meses = resolver_ventana_meses(db_servicio, date.today().isoformat())
+def _armar_saldos_completos(db_servicio: Client, hoy: datetime) -> tuple[list[dict], int, int, int]:
+    """Toda la tabla banco_de_horas, enriquecida con nombre + desglose de antigüedad + alerta de
+    magnitud, más la alerta de corte_pendiente -- base tanto del `resumen` como de `saldos`
+    (filtrado/ordenado/paginado después, en memoria)."""
+    fecha_iso = date.today().isoformat()
+    ventana_meses = resolver_ventana_meses(db_servicio, fecha_iso)
+    aviso_pct, escalamiento_pct = resolver_umbrales_pct(db_servicio, fecha_iso)
     filas = (
         db_servicio.postgrest.schema("tiempo")
         .table("banco_de_horas")
@@ -182,16 +218,16 @@ def _armar_saldos_completos(db_servicio: Client, hoy: datetime) -> tuple[list[di
     pendientes = _resolver_personas_con_corte_pendiente(db_servicio, hoy)
 
     if not filas and not pendientes:
-        return [], ventana_meses
+        return [], ventana_meses, aviso_pct, escalamiento_pct
 
     banco_ids_con_deuda = [fila["id"] for fila in filas if float(fila["monto"]) > 0]
     movimientos_por_banco = _resolver_movimientos_por_banco(db_servicio, banco_ids_con_deuda)
 
     persona_ids_reales = {fila["persona_id"] for fila in filas}
     persona_ids_sinteticas = sorted(pendientes - persona_ids_reales)
-    nombres = _resolver_nombres_persona(
-        db_servicio, [fila["persona_id"] for fila in filas] + persona_ids_sinteticas
-    )
+    persona_ids_todas = [fila["persona_id"] for fila in filas] + persona_ids_sinteticas
+    nombres = _resolver_nombres_persona(db_servicio, persona_ids_todas)
+    jornadas = resolver_jornadas_semanales(db_servicio, persona_ids_todas, fecha_iso)
 
     saldos: list[dict] = []
     for fila in filas:
@@ -214,19 +250,33 @@ def _armar_saldos_completos(db_servicio: Client, hoy: datetime) -> tuple[list[di
                 "actualizado_en": fila["actualizado_en"],
                 **_resultado_a_dict(resultado),
                 "corte_pendiente": fila["persona_id"] in pendientes,
+                **_campos_alerta_magnitud(
+                    float(fila["monto"]),
+                    jornadas.get(fila["persona_id"]),
+                    aviso_pct,
+                    escalamiento_pct,
+                ),
             }
         )
 
     for persona_id in persona_ids_sinteticas:
-        saldos.append(_fila_sintetica_corte_pendiente(persona_id, nombres.get(persona_id)))
+        saldos.append(
+            _fila_sintetica_corte_pendiente(
+                persona_id, nombres.get(persona_id), jornadas.get(persona_id), aviso_pct, escalamiento_pct
+            )
+        )
 
-    return saldos, ventana_meses
+    return saldos, ventana_meses, aviso_pct, escalamiento_pct
 
 
-def _armar_resumen(saldos_completos: list[dict], ventana_meses: int) -> dict:
+def _armar_resumen(
+    saldos_completos: list[dict], ventana_meses: int, aviso_pct: int, escalamiento_pct: int
+) -> dict:
     en_deuda = [item for item in saldos_completos if item["monto"] > 0]
     fuera_ventana = [item for item in saldos_completos if item["horas_fuera_ventana"] > 0]
     corte_pendiente = [item for item in saldos_completos if item["corte_pendiente"]]
+    en_aviso = [item for item in saldos_completos if item["nivel_alerta"] == "aviso"]
+    en_escalamiento = [item for item in saldos_completos if item["nivel_alerta"] == "escalamiento"]
     top = sorted(en_deuda, key=lambda item: item["monto"], reverse=True)[:TOP_EN_DEUDA_CANTIDAD]
     return {
         "total_personas": len(saldos_completos),
@@ -236,7 +286,11 @@ def _armar_resumen(saldos_completos: list[dict], ventana_meses: int) -> dict:
         "horas_fuera_ventana": round(sum(item["horas_fuera_ventana"] for item in fuera_ventana), 2),
         "personas_fuera_ventana": len(fuera_ventana),
         "personas_corte_pendiente": len(corte_pendiente),
+        "personas_en_aviso": len(en_aviso),
+        "personas_en_escalamiento": len(en_escalamiento),
         "ventana_meses": ventana_meses,
+        "aviso_pct": aviso_pct,
+        "escalamiento_pct": escalamiento_pct,
         "top_en_deuda": [
             {
                 "persona_id": item["persona_id"],
@@ -258,6 +312,7 @@ def listar_banco_de_horas(
     ),
     busqueda_persona: str | None = Query(None, description="Texto libre sobre el nombre."),
     tramo_antiguedad: Literal["reciente", "media", "fuera_ventana"] | None = Query(None),
+    nivel_alerta: Literal["sin_alerta", "aviso", "escalamiento"] | None = Query(None),
     orden: Literal["monto_desc", "monto_asc", "antiguedad_desc", "antiguedad_asc"] = Query(
         "monto_desc"
     ),
@@ -265,8 +320,10 @@ def listar_banco_de_horas(
     desplazamiento: int = Query(0, ge=0),
 ) -> dict:
     hoy = datetime.now(timezone.utc)
-    saldos_completos, ventana_meses = _armar_saldos_completos(db_servicio, hoy)
-    resumen = _armar_resumen(saldos_completos, ventana_meses)
+    saldos_completos, ventana_meses, aviso_pct, escalamiento_pct = _armar_saldos_completos(
+        db_servicio, hoy
+    )
+    resumen = _armar_resumen(saldos_completos, ventana_meses, aviso_pct, escalamiento_pct)
 
     filtrados = saldos_completos
     if busqueda_persona is not None:
@@ -280,6 +337,9 @@ def listar_banco_de_horas(
     }
     if tramo_antiguedad is not None:
         filtrados = [item for item in filtrados if item[campo_tramo[tramo_antiguedad]] > 0]
+
+    if nivel_alerta is not None:
+        filtrados = [item for item in filtrados if item["nivel_alerta"] == nivel_alerta]
 
     clave, descendente = ORDEN_A_CLAVE[orden]
     filtrados = sorted(filtrados, key=clave, reverse=descendente)

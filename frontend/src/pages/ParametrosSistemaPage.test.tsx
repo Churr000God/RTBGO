@@ -38,7 +38,10 @@ type ParametroHistorialItem = {
   nombre_registrado_por: string | null;
 };
 
-// Las 8 claves reales del catálogo -- 4 con impacta_logica=true, 4 con false, 1 con nota.
+// Las 8 claves reales del catálogo -- las 8 con impacta_logica=true, 1 con nota, cero sin
+// consumidor. hora_corte_dia/ventana_banco_meses ya lo tenían de cortes anteriores de esta misma
+// sesión; umbral_aviso_pct/umbral_escalamiento_pct lo ganan ahora con la alerta de magnitud de
+// deuda de Banco de Horas (nivel_alerta).
 // "Ventana del banco de horas" no aparece en HISTORIAL_FIJO -- sirve de marca de carga sin
 // ambigüedad entre las dos tablas de la página.
 const VIGENTES_FIJOS: ParametroVigente[] = [
@@ -61,7 +64,7 @@ const VIGENTES_FIJOS: ParametroVigente[] = [
     descripcion: "A qué hora se considera cerrado un día.",
     tipo: "hora",
     unidad: null,
-    impacta_logica: false,
+    impacta_logica: true,
     nota: null,
   },
   {
@@ -72,7 +75,7 @@ const VIGENTES_FIJOS: ParametroVigente[] = [
     descripcion: "Duración de la ventana de resolución del banco de horas.",
     tipo: "entero",
     unidad: "meses",
-    impacta_logica: false,
+    impacta_logica: true,
     nota: null,
   },
   {
@@ -83,7 +86,7 @@ const VIGENTES_FIJOS: ParametroVigente[] = [
     descripcion: "Porcentaje de la jornada semanal para avisar.",
     tipo: "entero",
     unidad: "%",
-    impacta_logica: false,
+    impacta_logica: true,
     nota: null,
   },
   {
@@ -94,7 +97,7 @@ const VIGENTES_FIJOS: ParametroVigente[] = [
     descripcion: "Porcentaje de la jornada semanal para escalar.",
     tipo: "entero",
     unidad: "%",
-    impacta_logica: false,
+    impacta_logica: true,
     nota: null,
   },
   {
@@ -402,30 +405,19 @@ describe("ParametrosSistemaPage", () => {
     });
   });
 
-  it("el badge de 'sin efecto' aparece en las 4 claves decorativas y no en las 4 reales", async () => {
+  it("el badge de 'sin efecto' ya no aparece en ninguna clave -- las 8 tienen consumidor real", async () => {
     mockApiFetch();
     render(<ParametrosSistemaPage />);
     await esperarCarga();
 
     const tabla = tablaVigentes();
-    const insigniasSinEfecto = within(tabla).getAllByText("Sin efecto en la lógica actual");
-    expect(insigniasSinEfecto).toHaveLength(4);
+    const insigniasSinEfecto = within(tabla).queryAllByText("Sin efecto en la lógica actual");
+    expect(insigniasSinEfecto).toHaveLength(0);
 
-    const filaTolerancia = within(tabla).getByText("Tolerancia de retardo").closest("tr")!;
-    expect(within(filaTolerancia).queryByText("Sin efecto en la lógica actual")).toBeNull();
-    const filaDiasHabiles = within(tabla)
-      .getByText("Días hábiles para corrección de marca")
-      .closest("tr")!;
-    expect(within(filaDiasHabiles).queryByText("Sin efecto en la lógica actual")).toBeNull();
     const filaCierreDia = within(tabla)
       .getByText("Hora de corrida de cierre de día")
       .closest("tr")!;
-    expect(within(filaCierreDia).queryByText("Sin efecto en la lógica actual")).toBeNull();
-    const filaDescuentoPausa = within(tabla)
-      .getByText("Descuento por pausa no registrada")
-      .closest("tr")!;
-    expect(within(filaDescuentoPausa).queryByText("Sin efecto en la lógica actual")).toBeNull();
-
+    const filaTolerancia = within(tabla).getByText("Tolerancia de retardo").closest("tr")!;
     expect(within(filaCierreDia).getByText(/requiere reiniciar el backend/i)).toBeInTheDocument();
     expect(within(filaTolerancia).queryByText(/requiere reiniciar el backend/i)).toBeNull();
   });

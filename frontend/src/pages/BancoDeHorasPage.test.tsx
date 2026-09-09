@@ -23,6 +23,10 @@ const RESUMEN = {
   horas_fuera_ventana: 0,
   personas_fuera_ventana: 0,
   personas_corte_pendiente: 0,
+  personas_en_aviso: 0,
+  personas_en_escalamiento: 0,
+  aviso_pct: 100,
+  escalamiento_pct: 200,
   ventana_meses: 6,
   top_en_deuda: [
     { persona_id: "persona-1", persona_nombre: "Persona Endeudada", monto: 4.5, meses_antiguedad_max: 1 },
@@ -41,6 +45,9 @@ const SALDO_ENDEUDADO = {
   meses_antiguedad_max: 1,
   conciliado: true,
   corte_pendiente: false,
+  jornada_semanal_horas: 45,
+  porcentaje_jornada_semanal: 10.0,
+  nivel_alerta: "sin_alerta",
 };
 
 const SALDO_AL_CORRIENTE = {
@@ -55,6 +62,9 @@ const SALDO_AL_CORRIENTE = {
   meses_antiguedad_max: 0,
   conciliado: true,
   corte_pendiente: false,
+  jornada_semanal_horas: 45,
+  porcentaje_jornada_semanal: 0,
+  nivel_alerta: "sin_alerta",
 };
 
 const SALDO_SINTETICO_CORTE_PENDIENTE = {
@@ -69,6 +79,9 @@ const SALDO_SINTETICO_CORTE_PENDIENTE = {
   meses_antiguedad_max: 0,
   conciliado: true,
   corte_pendiente: true,
+  jornada_semanal_horas: null,
+  porcentaje_jornada_semanal: null,
+  nivel_alerta: null,
 };
 
 const MOVIMIENTOS = [
@@ -257,7 +270,8 @@ describe("BancoDeHorasPage", () => {
     expect(within(filaConDeuda).getByText("3.00 h")).toBeInTheDocument();
 
     const filaAlCorriente = within(tabla).getByRole("row", { name: /persona al corriente/i });
-    const celdaFueraVentana = within(filaAlCorriente).getAllByRole("cell")[4];
+    // índice 5: Persona(0)/Saldo(1)/Nivel(2)/reciente(3)/media(4)/fuera_ventana(5)
+    const celdaFueraVentana = within(filaAlCorriente).getAllByRole("cell")[5];
     expect(celdaFueraVentana).toHaveTextContent("—");
   });
 
@@ -363,7 +377,8 @@ describe("BancoDeHorasPage", () => {
       within(tabla).getByRole("row", { name: /persona sin marcar/i }),
     );
     expect(within(fila).getByText("Corte pendiente")).toBeInTheDocument();
-    const celdaActualizado = within(fila).getAllByRole("cell")[6];
+    // índice 7: Persona(0)/Saldo(1)/Nivel(2)/reciente(3)/media(4)/fuera_ventana(5)/deuda desde(6)/actualizado(7)
+    const celdaActualizado = within(fila).getAllByRole("cell")[7];
     expect(celdaActualizado).toHaveTextContent("—");
   });
 
@@ -520,5 +535,106 @@ describe("BancoDeHorasPage", () => {
       expect(screen.getByText(/no se pudo cargar el banco de horas/i)).toBeInTheDocument(),
     );
     expect(screen.getByRole("button", { name: /reintentar/i })).toBeInTheDocument();
+  });
+
+  it("columna Nivel muestra el badge correcto para escalamiento, aviso, sin_alerta y null", async () => {
+    const enEscalamiento = { ...SALDO_ENDEUDADO, persona_id: "p-esc", persona_nombre: "En Escalamiento", nivel_alerta: "escalamiento" };
+    const enAviso = { ...SALDO_ENDEUDADO, persona_id: "p-avi", persona_nombre: "En Aviso", nivel_alerta: "aviso" };
+    const sinAlerta = { ...SALDO_ENDEUDADO, persona_id: "p-sin", persona_nombre: "Sin Alerta", nivel_alerta: "sin_alerta" };
+    const nivelNulo = { ...SALDO_ENDEUDADO, persona_id: "p-null", persona_nombre: "Sin Jornada", nivel_alerta: null };
+    mockApiFetch({
+      banco: new Response(
+        JSON.stringify({
+          total: 4,
+          resumen: RESUMEN,
+          saldos: [enEscalamiento, enAviso, sinAlerta, nivelNulo],
+        }),
+      ),
+    });
+
+    render(<BancoDeHorasPage />);
+    const tabla = await screen.findByRole("table");
+    await waitFor(() => expect(within(tabla).getByText("En Escalamiento")).toBeInTheDocument());
+
+    const filaEscalamiento = within(tabla).getByRole("row", { name: /en escalamiento/i });
+    expect(within(filaEscalamiento).getByText("Escalamiento")).toBeInTheDocument();
+
+    const filaAviso = within(tabla).getByRole("row", { name: /^en aviso/i });
+    expect(within(filaAviso).getByText("Aviso")).toBeInTheDocument();
+
+    const filaSinAlerta = within(tabla).getByRole("row", { name: /sin alerta/i });
+    // índice 2: Persona(0)/Saldo(1)/Nivel(2)
+    expect(within(filaSinAlerta).getAllByRole("cell")[2]).toHaveTextContent("—");
+
+    const filaNula = within(tabla).getByRole("row", { name: /sin jornada/i });
+    expect(within(filaNula).getAllByRole("cell")[2]).toHaveTextContent("—");
+  });
+
+  it("filtro por nivel de alerta manda nivel_alerta= en la query y resetea la página", async () => {
+    mockApiFetch();
+
+    render(<BancoDeHorasPage />);
+    const tabla = await screen.findByRole("table");
+    await waitFor(() => expect(within(tabla).getByText("Persona Endeudada")).toBeInTheDocument());
+
+    await userEvent.selectOptions(screen.getByLabelText(/filtrar por nivel de alerta/i), "escalamiento");
+
+    await waitFor(() => {
+      const llamadas = vi
+        .mocked(apiFetch)
+        .mock.calls.filter(([path]) => (path as string).startsWith("/api/banco-de-horas?"));
+      const ultima = llamadas.at(-1)![0] as string;
+      expect(ultima).toContain("nivel_alerta=escalamiento");
+      expect(ultima).toContain("desplazamiento=0");
+    });
+  });
+
+  it("banda de métricas muestra los contadores nuevos de aviso y escalamiento", async () => {
+    mockApiFetch({
+      banco: new Response(
+        JSON.stringify({
+          total: 2,
+          resumen: { ...RESUMEN, personas_en_aviso: 3, personas_en_escalamiento: 1 },
+          saldos: [SALDO_ENDEUDADO, SALDO_AL_CORRIENTE],
+        }),
+      ),
+    });
+
+    const { container } = render(<BancoDeHorasPage />);
+    await waitFor(() => expect(screen.getByText("En aviso")).toBeInTheDocument());
+
+    const bandaMetricas = container.querySelector(".banda-metricas") as HTMLElement;
+    expect(within(bandaMetricas).getByText("En aviso").nextElementSibling).toHaveTextContent("3");
+    expect(within(bandaMetricas).getByText("En escalamiento").nextElementSibling).toHaveTextContent(
+      "1",
+    );
+  });
+
+  it("fila expandida muestra la jornada semanal y el % de deuda, o el motivo cuando es null", async () => {
+    const conJornada = { ...SALDO_ENDEUDADO, jornada_semanal_horas: 45, porcentaje_jornada_semanal: 10.0 };
+    const sinJornada = { ...SALDO_AL_CORRIENTE, persona_id: "p-conf", persona_nombre: "De Confianza", jornada_semanal_horas: null, porcentaje_jornada_semanal: null, nivel_alerta: null };
+    mockApiFetch({
+      banco: new Response(
+        JSON.stringify({ total: 2, resumen: RESUMEN, saldos: [conJornada, sinJornada] }),
+      ),
+    });
+
+    render(<BancoDeHorasPage />);
+    const tabla = await screen.findByRole("table");
+    const filaConJornada = await waitFor(() =>
+      within(tabla).getByRole("row", { name: /persona endeudada/i }),
+    );
+    await userEvent.click(filaConJornada);
+    await waitFor(() =>
+      expect(screen.getByText(/10% de una jornada semanal de 45.00 h/)).toBeInTheDocument(),
+    );
+
+    const filaSinJornada = within(tabla).getByRole("row", { name: /de confianza/i });
+    await userEvent.click(filaSinJornada);
+    await waitFor(() =>
+      expect(
+        screen.getByText(/sin jornada normal\/flexible vigente/i),
+      ).toBeInTheDocument(),
+    );
   });
 });

@@ -4,14 +4,16 @@ catálogo lo define el código, no el dato), el campo `tipo` alimenta la validac
 schemas/parametros.py, y columnas nuevas duplicarían lo que ya está documentado en el
 diccionario de datos.
 
-`impacta_logica=True` sólo en las 6 claves que algún router/batch lee hoy (confirmado por grep):
-tolerancia_retardo_min (alertas_de_retardo.py), dias_habiles_correccion_marca
-(correcciones.py), hora_corrida_cierre_dia y hora_corte_dia (ambas vía
-app/hora_cierre_dia.py::resolver_umbral_cierre_dia, consumidor real desde este corte --
-scheduler.py + el bloqueo horario de POST /api/corridas-batch/cierre-dia),
-descuento_pausa_no_registrada_min (batches/cierre_dia.py) y ventana_banco_meses
-(app/banco_antiguedad.py::resolver_ventana_meses). Las otras 2 están sembradas pero ningún
-código las consume -- la pantalla lo marca con un badge en vez de esconderlo."""
+`impacta_logica=True` en las 8 claves del catálogo -- todas tienen consumidor real desde este
+corte (confirmado por grep): tolerancia_retardo_min (alertas_de_retardo.py),
+dias_habiles_correccion_marca (correcciones.py), hora_corrida_cierre_dia y hora_corte_dia (ambas
+vía app/hora_cierre_dia.py::resolver_umbral_cierre_dia -- scheduler.py + el bloqueo horario de
+POST /api/corridas-batch/cierre-dia), descuento_pausa_no_registrada_min (batches/cierre_dia.py),
+ventana_banco_meses (app/banco_antiguedad.py::resolver_ventana_meses) y umbral_aviso_pct/
+umbral_escalamiento_pct (ambas vía app/banco_alertas_magnitud.py::resolver_umbrales_pct --
+segundo eje de alerta del banco de horas, magnitud de la deuda vs. jornada semanal, SCJ-ESP-01
+§VI.6). El badge de "sin efecto" de la pantalla queda sin uso por ahora -- no se quita el campo
+del catálogo por si una clave futura lo vuelve a necesitar."""
 
 from dataclasses import dataclass
 from typing import Literal
@@ -54,14 +56,14 @@ CATALOGO: dict[str, EntradaParametro] = {
         descripcion="Porcentaje de la jornada semanal para avisar.",
         tipo="entero",
         unidad="%",
-        impacta_logica=False,
+        impacta_logica=True,
     ),
     "umbral_escalamiento_pct": EntradaParametro(
         etiqueta="Umbral de escalamiento",
         descripcion="Porcentaje de la jornada semanal para escalar.",
         tipo="entero",
         unidad="%",
-        impacta_logica=False,
+        impacta_logica=True,
     ),
     "descuento_pausa_no_registrada_min": EntradaParametro(
         etiqueta="Descuento por pausa no registrada",

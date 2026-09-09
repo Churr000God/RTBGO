@@ -128,6 +128,41 @@ def _tabla_parametro(valor=None):
     return tabla
 
 
+def _tabla_parametro_por_clave(valores: dict) -> MagicMock:
+    """A diferencia de _tabla_parametro (mismo valor para cualquier clave), distingue cada
+    lectura por el valor pasado a .eq('clave', ...) -- necesario para mover UN umbral (ej.
+    umbral_aviso_pct) sin arrastrar ventana_banco_meses/umbral_escalamiento_pct con él."""
+    tabla = MagicMock()
+
+    def eq_side_effect(campo, valor_clave):
+        assert campo == "clave"
+        resultado = MagicMock()
+        datos = [{"valor": valores[valor_clave]}] if valor_clave in valores else []
+        resultado.lte.return_value.order.return_value.limit.return_value.execute.return_value.data = datos
+        return resultado
+
+    tabla.select.return_value.eq.side_effect = eq_side_effect
+    return tabla
+
+
+def _fila_patron_semanal(jornada_id, dia_semana, hora_entrada, hora_salida, minutos_comida=0):
+    return {
+        "jornada_asignada_id": jornada_id,
+        "dia_semana": dia_semana,
+        "hora_entrada": hora_entrada,
+        "hora_salida": hora_salida,
+        "minutos_comida": minutos_comida,
+    }
+
+
+def _patron_5x8(jornada_id):
+    """Jornada normal, 8h/día de lunes a viernes -- 40h semanales."""
+    return [
+        _fila_patron_semanal(jornada_id, dia, "08:00", "17:00", 60)
+        for dia in ("lunes", "martes", "miercoles", "jueves", "viernes")
+    ]
+
+
 def _tabla_plana(datos):
     tabla = MagicMock()
     tabla.select.return_value.execute.return_value.data = datos
@@ -162,11 +197,13 @@ def _tabla_festivos(datos=None):
     return tabla
 
 
-def _tabla_jornada_asignada(candidatas=None, jornadas_por_persona=None):
-    """Una sola tabla soporta las 2 formas de consulta de corte_quincenal.py sobre
-    jornada_asignada -- _personas_normal_flexible_del_periodo (select().in_().lte().or_()) y
-    _jornadas_del_periodo (select().eq().lte().or_()) -- son atributos distintos del mismo mock
-    (.in_ vs .eq), no chocan."""
+def _tabla_jornada_asignada(candidatas=None, jornadas_por_persona=None, jornadas_alerta_magnitud=None):
+    """Una sola tabla soporta las 3 formas de consulta sobre jornada_asignada --
+    _personas_normal_flexible_del_periodo (select().in_().lte().or_()),
+    _jornadas_del_periodo (select().eq().lte().or_()) -- ambas de corte_quincenal.py, reusadas
+    por la previsión de corte pendiente -- y _jornadas_normal_flexible_vigentes
+    (select().in_().in_().lte().or_(), banco_alertas_magnitud.py, doble .in_) -- son atributos
+    distintos del mismo mock, no chocan."""
     tabla = MagicMock()
     (
         tabla.select.return_value.in_.return_value.lte.return_value.or_.return_value
@@ -176,6 +213,10 @@ def _tabla_jornada_asignada(candidatas=None, jornadas_por_persona=None):
         tabla.select.return_value.eq.return_value.lte.return_value.or_.return_value
         .execute.return_value.data
     ) = jornadas_por_persona or []
+    (
+        tabla.select.return_value.in_.return_value.in_.return_value.lte.return_value.or_
+        .return_value.execute.return_value.data
+    ) = jornadas_alerta_magnitud or []
     return tabla
 
 
@@ -509,6 +550,151 @@ def test_listar_banco_de_horas_fila_sintetica_para_persona_sin_banco_real():
     assert saldo["corte_pendiente"] is True
     assert cuerpo["resumen"]["personas_corte_pendiente"] == 1
     assert cuerpo["resumen"]["total_personas"] == 1
+
+
+# ---------------------------------------------------------------------------
+# Alerta por magnitud (umbral_aviso_pct/umbral_escalamiento_pct) -- segundo eje, independiente
+# del de antigüedad de arriba.
+# ---------------------------------------------------------------------------
+
+
+def test_listar_banco_de_horas_calcula_porcentaje_y_nivel_de_alerta():
+    """PERSONA_1: 50h de deuda / 40h de jornada semanal = 125% -> "aviso" (umbrales por defecto
+    100/200). PERSONA_2: sin jornada normal/flexible vigente -> None en los 3 campos."""
+    banco = _tabla_plana(
+        [
+            _fila_banco(PERSONA_1, 1, monto=50.0, vivo_desde=_iso(10)),
+            _fila_banco(PERSONA_2, 2, monto=50.0, vivo_desde=_iso(10)),
+        ]
+    )
+    movimiento = _tabla_in(
+        [
+            _mov(1, 1, _iso(10), 50.0),
+            _mov(2, 2, _iso(10), 50.0),
+        ]
+    )
+    jornada_asignada = _tabla_jornada_asignada(
+        jornadas_alerta_magnitud=[{"id": 10, "persona_id": PERSONA_1, "vigente_desde": "2020-01-01"}],
+    )
+    patron_semanal = _tabla_patron_semanal(_patron_5x8(10))
+    _preparar(
+        banco=banco, movimiento=movimiento, jornada_asignada=jornada_asignada, patron_semanal=patron_semanal
+    )
+
+    response = _pedir()
+
+    _limpiar()
+    assert response.status_code == 200, response.text
+    saldos_por_persona = {item["persona_id"]: item for item in response.json()["saldos"]}
+    saldo_1 = saldos_por_persona[PERSONA_1]
+    assert saldo_1["jornada_semanal_horas"] == 40.0
+    assert saldo_1["porcentaje_jornada_semanal"] == 125.0
+    assert saldo_1["nivel_alerta"] == "aviso"
+    saldo_2 = saldos_por_persona[PERSONA_2]
+    assert saldo_2["jornada_semanal_horas"] is None
+    assert saldo_2["porcentaje_jornada_semanal"] is None
+    assert saldo_2["nivel_alerta"] is None
+
+
+def test_listar_banco_de_horas_resumen_expone_umbrales_y_conteos():
+    banco = _tabla_plana(
+        [
+            _fila_banco(PERSONA_1, 1, monto=50.0, vivo_desde=_iso(10)),  # 125% -> aviso
+            _fila_banco(PERSONA_2, 2, monto=90.0, vivo_desde=_iso(10)),  # 225% -> escalamiento
+        ]
+    )
+    movimiento = _tabla_in(
+        [
+            _mov(1, 1, _iso(10), 50.0),
+            _mov(2, 2, _iso(10), 90.0),
+        ]
+    )
+    jornada_asignada = _tabla_jornada_asignada(
+        jornadas_alerta_magnitud=[
+            {"id": 10, "persona_id": PERSONA_1, "vigente_desde": "2020-01-01"},
+            {"id": 11, "persona_id": PERSONA_2, "vigente_desde": "2020-01-01"},
+        ],
+    )
+    patron_semanal = _tabla_patron_semanal(_patron_5x8(10) + _patron_5x8(11))
+    _preparar(
+        banco=banco, movimiento=movimiento, jornada_asignada=jornada_asignada, patron_semanal=patron_semanal
+    )
+
+    response = _pedir()
+
+    _limpiar()
+    assert response.status_code == 200, response.text
+    resumen = response.json()["resumen"]
+    assert resumen["aviso_pct"] == 100
+    assert resumen["escalamiento_pct"] == 200
+    assert resumen["personas_en_aviso"] == 1
+    assert resumen["personas_en_escalamiento"] == 1
+
+
+def test_listar_banco_de_horas_filtra_por_nivel_alerta():
+    banco = _tabla_plana(
+        [
+            _fila_banco(PERSONA_1, 1, monto=50.0, vivo_desde=_iso(10)),  # 125% -> aviso
+            _fila_banco(PERSONA_2, 2, monto=90.0, vivo_desde=_iso(10)),  # 225% -> escalamiento
+        ]
+    )
+    movimiento = _tabla_in(
+        [
+            _mov(1, 1, _iso(10), 50.0),
+            _mov(2, 2, _iso(10), 90.0),
+        ]
+    )
+    jornada_asignada = _tabla_jornada_asignada(
+        jornadas_alerta_magnitud=[
+            {"id": 10, "persona_id": PERSONA_1, "vigente_desde": "2020-01-01"},
+            {"id": 11, "persona_id": PERSONA_2, "vigente_desde": "2020-01-01"},
+        ],
+    )
+    patron_semanal = _tabla_patron_semanal(_patron_5x8(10) + _patron_5x8(11))
+    _preparar(
+        banco=banco, movimiento=movimiento, jornada_asignada=jornada_asignada, patron_semanal=patron_semanal
+    )
+
+    response = _pedir(nivel_alerta="escalamiento")
+
+    _limpiar()
+    assert response.status_code == 200, response.text
+    cuerpo = response.json()
+    assert cuerpo["total"] == 1
+    assert cuerpo["saldos"][0]["persona_id"] == PERSONA_2
+    # el resumen sigue reflejando a las 2 personas, el filtro no lo toca.
+    assert cuerpo["resumen"]["total_personas"] == 2
+
+
+def test_listar_banco_de_horas_umbral_aviso_distinto_del_default_cambia_el_nivel():
+    """umbral_aviso_pct=50 (en vez del sembrado 100) -- 50h/40h=125% ya no cae en "sin_alerta"
+    contra un umbral de 100, cae directo en "aviso" incluso con un umbral más bajo. El punto es
+    que el nivel lo decide el PARÁMETRO real, no un 100/200 hardcodeado en el cálculo."""
+    banco = _tabla_plana([_fila_banco(PERSONA_1, 1, monto=44.0, vivo_desde=_iso(10))])  # 110%
+    movimiento = _tabla_in([_mov(1, 1, _iso(10), 44.0)])
+    jornada_asignada = _tabla_jornada_asignada(
+        jornadas_alerta_magnitud=[{"id": 10, "persona_id": PERSONA_1, "vigente_desde": "2020-01-01"}],
+    )
+    patron_semanal = _tabla_patron_semanal(_patron_5x8(10))
+    parametro = _tabla_parametro_por_clave({"umbral_aviso_pct": "50"})
+    _preparar(
+        banco=banco,
+        movimiento=movimiento,
+        jornada_asignada=jornada_asignada,
+        patron_semanal=patron_semanal,
+        parametro=parametro,
+    )
+
+    response = _pedir()
+
+    _limpiar()
+    assert response.status_code == 200, response.text
+    cuerpo = response.json()
+    assert cuerpo["resumen"]["aviso_pct"] == 50
+    assert cuerpo["resumen"]["escalamiento_pct"] == 200  # sin override -- sigue en el default
+    saldo = cuerpo["saldos"][0]
+    assert saldo["porcentaje_jornada_semanal"] == 110.0
+    assert saldo["nivel_alerta"] == "aviso"  # 110% >= 50% (umbral bajado) -> aviso
 
 
 # ---------------------------------------------------------------------------

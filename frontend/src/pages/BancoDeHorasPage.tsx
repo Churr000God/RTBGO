@@ -17,7 +17,7 @@ import { Input } from "../components/Input";
 // sin precedente de "dispara al toque".
 const DEBOUNCE_BUSQUEDA_MS = 300;
 const LIMITE = 20;
-const COLUMNAS = 7;
+const COLUMNAS = 8;
 
 // Ventana por defecto mientras el primer GET no resolvió — sólo afecta la etiqueta de los
 // selectores/columnas durante el spinner inicial; en cuanto llega `resumen.ventana_meses` real
@@ -25,6 +25,10 @@ const COLUMNAS = 7;
 const VENTANA_MESES_DEFECTO = 6;
 
 type Orden = "monto_desc" | "monto_asc" | "antiguedad_desc" | "antiguedad_asc";
+
+// Eje de alerta por MAGNITUD de la deuda (% de la jornada semanal) -- distinto del eje de
+// antigüedad (TramoAntiguedad, tramosAntiguedad.ts) y sin relación con Alertas de retardo.
+type NivelAlerta = "sin_alerta" | "aviso" | "escalamiento";
 
 type TopEnDeuda = {
   persona_id: string;
@@ -41,6 +45,10 @@ type Resumen = {
   horas_fuera_ventana: number;
   personas_fuera_ventana: number;
   personas_corte_pendiente: number;
+  personas_en_aviso: number;
+  personas_en_escalamiento: number;
+  aviso_pct: number;
+  escalamiento_pct: number;
   ventana_meses: number;
   top_en_deuda: TopEnDeuda[];
 };
@@ -59,6 +67,11 @@ type SaldoBancoHoras = {
   meses_antiguedad_max: number;
   conciliado: boolean;
   corte_pendiente: boolean;
+  // null cuando la persona no tiene jornada normal/flexible vigente (ej. de_confianza) -- ahí no
+  // hay base contra la que medir el % de la jornada semanal.
+  jornada_semanal_horas: number | null;
+  porcentaje_jornada_semanal: number | null;
+  nivel_alerta: NivelAlerta | null;
 };
 
 type RespuestaBancoHoras = { total: number; resumen: Resumen; saldos: SaldoBancoHoras[] };
@@ -108,6 +121,12 @@ async function mensajeDeError(respuesta: Response, generico: string): Promise<st
   return generico;
 }
 
+const ETIQUETA_NIVEL_ALERTA: Record<NivelAlerta, string> = {
+  sin_alerta: "Sin alerta",
+  aviso: "Aviso",
+  escalamiento: "Escalamiento",
+};
+
 function formatearFechaHora(fecha: string | null): string {
   if (!fecha) return "—";
   const valor = new Date(fecha);
@@ -127,6 +146,7 @@ export function BancoDeHorasPage() {
   const [busqueda, setBusqueda] = useState("");
   const [busquedaDebounced, setBusquedaDebounced] = useState("");
   const [filtroTramo, setFiltroTramo] = useState<TramoAntiguedad | "">("");
+  const [filtroNivel, setFiltroNivel] = useState<NivelAlerta | "">("");
   const [orden, setOrden] = useState<Orden>("monto_desc");
   const [desplazamiento, setDesplazamiento] = useState(0);
   // Mismo propósito que TramosPage/DiasPage: con debounce + filtros encadenados las respuestas
@@ -158,6 +178,7 @@ export function BancoDeHorasPage() {
     const params = new URLSearchParams();
     if (busquedaDebounced) params.set("busqueda_persona", busquedaDebounced);
     if (filtroTramo) params.set("tramo_antiguedad", filtroTramo);
+    if (filtroNivel) params.set("nivel_alerta", filtroNivel);
     params.set("orden", orden);
     params.set("limite", String(LIMITE));
     params.set("desplazamiento", String(desplazamiento));
@@ -181,14 +202,15 @@ export function BancoDeHorasPage() {
   }
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(cargar, [busquedaDebounced, filtroTramo, orden, desplazamiento]);
+  useEffect(cargar, [busquedaDebounced, filtroTramo, filtroNivel, orden, desplazamiento]);
 
-  const hayFiltrosActivos = !!(busqueda || filtroTramo);
+  const hayFiltrosActivos = !!(busqueda || filtroTramo || filtroNivel);
 
   function limpiarFiltros() {
     setBusqueda("");
     setBusquedaDebounced("");
     setFiltroTramo("");
+    setFiltroNivel("");
     setDesplazamiento(0);
   }
 
@@ -326,6 +348,24 @@ export function BancoDeHorasPage() {
               </span>
               <strong>{datos.resumen.personas_corte_pendiente}</strong>
             </div>
+            <div className="metrica">
+              <span className="etiqueta-metrica">
+                <span className="punto punto--aviso" aria-hidden="true" />
+                En aviso
+              </span>
+              <strong>{datos.resumen.personas_en_aviso}</strong>
+              <span className="detalle-metrica">≥ {datos.resumen.aviso_pct}% de la jornada semanal</span>
+            </div>
+            <div className="metrica">
+              <span className="etiqueta-metrica">
+                <span className="punto punto--peligro" aria-hidden="true" />
+                En escalamiento
+              </span>
+              <strong>{datos.resumen.personas_en_escalamiento}</strong>
+              <span className="detalle-metrica">
+                ≥ {datos.resumen.escalamiento_pct}% de la jornada semanal
+              </span>
+            </div>
           </div>
         )}
 
@@ -404,6 +444,19 @@ export function BancoDeHorasPage() {
               ))}
             </select>
             <select
+              value={filtroNivel}
+              onChange={(evento) => {
+                setFiltroNivel(evento.target.value as NivelAlerta | "");
+                setDesplazamiento(0);
+              }}
+              aria-label="Filtrar por nivel de alerta"
+            >
+              <option value="">Nivel: Todos</option>
+              <option value="sin_alerta">Sin alerta</option>
+              <option value="aviso">Aviso</option>
+              <option value="escalamiento">Escalamiento</option>
+            </select>
+            <select
               value={orden}
               onChange={(evento) => {
                 setOrden(evento.target.value as Orden);
@@ -458,6 +511,7 @@ export function BancoDeHorasPage() {
                   <tr>
                     <th>Persona</th>
                     <th>Saldo</th>
+                    <th>Nivel</th>
                     <th>{etiquetaTramoAntiguedad("reciente", ventanaMeses)}</th>
                     <th>{etiquetaTramoAntiguedad("media", ventanaMeses)}</th>
                     <th>{etiquetaTramoAntiguedad("fuera_ventana", ventanaMeses)}</th>
@@ -497,6 +551,15 @@ export function BancoDeHorasPage() {
                               {formatearHoras(saldo.monto)} {saldo.monto > 0 ? "en deuda" : "sin deuda"}
                             </Badge>
                           </td>
+                          <td>
+                            {saldo.nivel_alerta === "escalamiento" && (
+                              <Badge variante="peligro">{ETIQUETA_NIVEL_ALERTA.escalamiento}</Badge>
+                            )}
+                            {saldo.nivel_alerta === "aviso" && (
+                              <Badge variante="aviso">{ETIQUETA_NIVEL_ALERTA.aviso}</Badge>
+                            )}
+                            {(saldo.nivel_alerta === "sin_alerta" || saldo.nivel_alerta === null) && "—"}
+                          </td>
                           <td>{formatearHoras(saldo.horas_reciente)}</td>
                           <td>{formatearHoras(saldo.horas_media)}</td>
                           <td>
@@ -524,6 +587,12 @@ export function BancoDeHorasPage() {
                         {expandida && (
                           <tr>
                             <td colSpan={COLUMNAS}>
+                              <p className="ayuda-campo">
+                                {saldo.jornada_semanal_horas != null &&
+                                saldo.porcentaje_jornada_semanal != null
+                                  ? `${formatearHoras(saldo.monto)} de deuda · ${saldo.porcentaje_jornada_semanal}% de una jornada semanal de ${saldo.jornada_semanal_horas.toFixed(2)} h`
+                                  : "Sin jornada normal/flexible vigente -- no se puede medir el % de la jornada semanal."}
+                              </p>
                               {saldo.horas_fuera_ventana > 0 && (
                                 <div className="fieldset-formulario" style={{ marginBottom: "1.25rem" }}>
                                   <p style={{ margin: 0 }}>

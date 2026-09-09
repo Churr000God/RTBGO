@@ -16,6 +16,9 @@ class BancoDeHorasItem(BaseModel):
     meses_antiguedad_max: int
     conciliado: bool
     corte_pendiente: bool
+    jornada_semanal_horas: float | None
+    porcentaje_jornada_semanal: float | None
+    nivel_alerta: Literal["sin_alerta", "aviso", "escalamiento"] | None
 
 
 class TopEnDeudaItem(BaseModel):
@@ -33,7 +36,11 @@ class BancoDeHorasResumen(BaseModel):
     horas_fuera_ventana: float
     personas_fuera_ventana: int
     personas_corte_pendiente: int
+    personas_en_aviso: int
+    personas_en_escalamiento: int
     ventana_meses: int
+    aviso_pct: int
+    escalamiento_pct: int
     top_en_deuda: list[TopEnDeudaItem]
 
 
