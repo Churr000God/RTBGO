@@ -50,7 +50,7 @@ backend y un frontend que lo exponen. Ver `README.md` y `docs/00-contexto/SCJ-CT
   `--no-dev` (sin pytest) y el frontend prod es nginx sirviendo el bundle (sin npm/node); el script
   corta con un mensaje explícito en vez de fallar con un error de `docker exec`. Las pruebas
   siempre corren con `dev pruebas`.
-- **Tests:** backend `uv run pytest` (384 casos), frontend `npm test` (453 casos, 60 archivos).
+- **Tests:** backend `uv run pytest` (393 casos), frontend `npm test` (458 casos, 60 archivos).
   Ambos corren igual dentro de los contenedores (`./scripts/desplegar.sh <entorno> pruebas`).
   Cobertura instrumentada desde el 4 de septiembre de 2026: `uv run pytest --cov=app
   --cov-report=term-missing` (backend) y `npm run test:coverage` / `npm test -- --coverage`
@@ -279,6 +279,29 @@ backend y un frontend que lo exponen. Ver `README.md` y `docs/00-contexto/SCJ-CT
   **último periodo ya vencido**, con fila sintética (`monto=0`) para quien nunca tuvo fila real en
   `tiempo.banco_de_horas` — antes esas personas eran invisibles en la pantalla. Es diagnóstico, no
   arregla nada: no crea días ni dispara ningún corte, el hueco de `SCJ-PRA-01 #14` sigue abierto.
+- **Movimiento de saldo manual — renovar/descontar/condonar deuda vieja (8 de septiembre de 2026,
+  corte posterior):** cierra el pendiente más viejo del proyecto ("cuarta pantalla" de Parámetros
+  mencionada desde el 7 de septiembre, nunca construida). `db/ddl/68_*.sql` — primera vía de
+  escritura humana sobre `tiempo.movimiento_de_saldo` (hasta entonces sólo tenía policy de SELECT,
+  el único escritor real era el batch de corte quincenal con `service_role`): policy RLS de INSERT
+  nueva + RPC `fn_movimiento_de_saldo_manual_registrar` (`SECURITY INVOKER`, gateado por el permiso
+  `movimiento_de_saldo_edicion` ya sembrado desde semanas atrás sin ningún consumidor). Semántica
+  de negocio confirmada con el usuario tras una ronda de preguntas (su propio texto tenía
+  incertidumbre real sobre "cubrir"/"arrastrar"): **"Renovar antigüedad"** (persiste
+  `tipo='arrastrar'`, nunca `'cubrir'` — esa palabra ya significa "repago real" en el batch
+  automático y no se reutiliza para evitar un significado ambiguo) NO reduce el saldo total —
+  inserta un par de filas (`-monto`/`+monto`, mismo `motivo`, mismo `creado_en` porque `now()` es
+  estable dentro de una transacción) en una sola transacción, que el FIFO ya existente en
+  `banco_antiguedad.py::calcular_lotes` procesa sin ningún cambio (la fila vieja se consume, la
+  nueva abre un lote fechado hoy). **"Descontar"/"Condonar"** sí reducen el saldo de verdad (una
+  sola fila) — sólo difieren en significado (descontar es campo para un futuro módulo de nómina,
+  condonar no genera ninguna consecuencia). Validación en 2 capas: Python topa el monto contra la
+  porción con 6+ meses de antigüedad de esa persona (recalculada al momento, nunca confía en algo
+  cacheado del frontend) antes de llamar al RPC, que sólo puede topar contra el saldo total como
+  backstop grueso (no tiene el FIFO). El endpoint usa 2 clientes Supabase distintos a propósito
+  (`service_role` para leer el insumo de la validación, el caller sólo para el INSERT real) — ver
+  gotcha nuevo abajo. Formulario dentro de la fila expandible del ledger que ya tenía Banco de
+  Horas (sin pantalla ni ruta nueva), visible sólo si la persona tiene deuda fuera de la ventana.
 
 ## Arquitectura y módulos
 
@@ -323,7 +346,7 @@ Cada una vive en su propio documento de decisión — no se duplican aquí, sól
   `http://localhost:5173` fijo a mano — esa configuración no vive en este repositorio. Al pasar a
   producción (`docker compose … prod`, frontend en `:8080`) hay que actualizarla ahí también, o
   los links de invitación/recuperación de contraseña no aterrizan en la app.
-- El DDL corre hasta `db/ddl/67_*.sql`. `personas.permiso`
+- El DDL corre hasta `db/ddl/68_*.sql`. `personas.permiso`
   es la única tabla del proyecto con clave natural (`codigo varchar PRIMARY KEY`) en vez de `uuid`
   — decisión deliberada, fiel a la redacción literal de `SCJ-PRO-05`, no un descuido a corregir.
 - Las tablas de bitácora inmutables (`bitacora_movimiento_persona`,
@@ -427,6 +450,21 @@ Cada una vive en su propio documento de decisión — no se duplican aquí, sól
   debería tener su propio `CHECK (vigente_hasta IS NULL OR vigente_hasta >= vigente_desde)` — sólo
   `jornada_asignada` lo tiene por ahora, agregado recién tras encontrar el bug, no por diseño desde
   el principio. Revisar las demás si se vuelve a tocar alguna.
+- **Un endpoint que lee de una tabla para validar y escribe en otra no debe asumir que el permiso
+  de escritura siempre va a traer consigo el de lectura de la primera.** Encontrado el 8 de
+  septiembre de 2026 al construir el POST manual de `movimiento_de_saldo`
+  (`routers/banco_de_horas.py::registrar_movimiento_manual`, `db/ddl/68_*.sql`): el endpoint
+  necesita leer `tiempo.banco_de_horas` (RLS exige específicamente `banco_de_horas_lectura`, sin
+  `OR` con `movimiento_de_saldo_edicion` — no existe `banco_de_horas_edicion` en el catálogo) antes
+  de poder escribir en `movimiento_de_saldo` (gateado por `movimiento_de_saldo_edicion`). Con
+  `get_caller_client` para todo, alguien con sólo el segundo permiso habría recibido un 404 falso
+  ("no tiene banco de horas") en vez de la validación real — hoy no pasa porque los 3 puestos que
+  tienen `movimiento_de_saldo_edicion` también tienen `banco_de_horas_lectura` mapeado, pero el
+  código no debería depender de esa coincidencia. **Lección:** cuando un endpoint combina lectura
+  de insumo (para validar) con una escritura real gateada por RLS, usar dos clientes Supabase
+  distintos si los permisos no están garantizados de estar siempre acoplados — `service_role` para
+  la lectura de insumo (no es la autorización, sólo datos para decidir), el cliente del caller sólo
+  para la escritura real (ahí sí importa la identidad, RLS es la autorización).
 
 ## Historial de decisiones
 
