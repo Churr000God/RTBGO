@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { type ChangeEvent, type FormEvent, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
   AlertCircle,
@@ -6,6 +6,7 @@ import {
   CalendarClock,
   KeyRound,
   Loader2,
+  Pencil,
   Plus,
   RefreshCw,
   Repeat,
@@ -13,8 +14,25 @@ import {
 
 import { apiFetch } from "../lib/apiClient";
 import { AppShell } from "../layouts/AppShell";
+import { Button } from "../components/Button";
+import { Card } from "../components/Card";
+import { Input } from "../components/Input";
 import { DetalleJornadaAsignada, type JornadaVigente } from "../components/DetalleJornadaAsignada";
 import { derivarTransiciones, type Estado, type Movimiento } from "../lib/movimientos";
+
+function aMayusculas(evento: ChangeEvent<HTMLInputElement>) {
+  evento.currentTarget.value = evento.currentTarget.value.toUpperCase();
+}
+
+async function mensajeDeError(respuesta: Response, generico: string): Promise<string> {
+  try {
+    const cuerpo = await respuesta.json();
+    if (typeof cuerpo?.detail === "string") return cuerpo.detail;
+  } catch {
+    // cuerpo no era JSON legible — cae al genérico
+  }
+  return generico;
+}
 
 type PuestoVigente = {
   asignacion_id: string;
@@ -126,6 +144,9 @@ export function FichaPersonaPage() {
   const [estadoJornada, setEstadoJornada] = useState<
     "cargando" | "listo" | "sin_jornada" | "sin_permiso"
   >("cargando");
+  const [editando, setEditando] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+  const [errorEdicion, setErrorEdicion] = useState<string | null>(null);
 
   function cargar() {
     setEstadoCarga("cargando");
@@ -197,6 +218,71 @@ export function FichaPersonaPage() {
       })
       .catch(() => setEstadoJornada("sin_permiso"));
   }, [id]);
+
+  function handleCancelar() {
+    setEditando(false);
+    setErrorEdicion(null);
+  }
+
+  async function handleGuardar(evento: FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    if (!persona) return;
+    setErrorEdicion(null);
+    const f = new FormData(evento.currentTarget);
+    const primerNombre = String(f.get("primer_nombre") ?? "").trim();
+    const segundoNombre = String(f.get("segundo_nombre") ?? "").trim() || null;
+    const apellidoPaterno = String(f.get("apellido_paterno") ?? "").trim();
+    const apellidoMaterno = String(f.get("apellido_materno") ?? "").trim() || null;
+    const curp = String(f.get("curp") ?? "").trim();
+    const rfc = String(f.get("rfc") ?? "").trim();
+    const nss = String(f.get("nss") ?? "").trim();
+    const fechaNacimiento = String(f.get("fecha_nacimiento") ?? "").trim();
+    const fechaIngreso = String(f.get("fecha_ingreso") ?? "").trim();
+    const tipoContrato = String(f.get("tipo_contrato") ?? "").trim() || null;
+    const documentoRef = String(f.get("documento_ref") ?? "").trim() || null;
+
+    // Sólo se manda lo que cambió — el PATCH acepta los 11 campos opcionales, pero mandar
+    // valores sin tocar arriesga pisar una regla del backend (ej. documento_ref/tipo_contrato
+    // deben ir juntos si la persona no tenía expediente previo).
+    const cambios: Record<string, unknown> = {};
+    if (primerNombre !== persona.primer_nombre) cambios.primer_nombre = primerNombre;
+    if (segundoNombre !== persona.segundo_nombre) cambios.segundo_nombre = segundoNombre;
+    if (apellidoPaterno !== persona.apellido_paterno) cambios.apellido_paterno = apellidoPaterno;
+    if (apellidoMaterno !== persona.apellido_materno) cambios.apellido_materno = apellidoMaterno;
+    if (curp !== persona.curp) cambios.curp = curp;
+    if (rfc !== persona.rfc) cambios.rfc = rfc;
+    if (nss !== persona.nss) cambios.nss = nss;
+    if (fechaNacimiento !== persona.fecha_nacimiento) cambios.fecha_nacimiento = fechaNacimiento;
+    if (fechaIngreso !== persona.fecha_ingreso) cambios.fecha_ingreso = fechaIngreso;
+    if (tipoContrato !== persona.tipo_contrato) cambios.tipo_contrato = tipoContrato;
+    if (documentoRef !== persona.documento_ref) cambios.documento_ref = documentoRef;
+
+    if (Object.keys(cambios).length === 0) {
+      setErrorEdicion("No modificaste ningún campo.");
+      return;
+    }
+
+    setGuardando(true);
+    const respuesta = await apiFetch(`/api/personas/${persona.id}`, {
+      method: "PATCH",
+      body: JSON.stringify(cambios),
+    });
+    if (!respuesta.ok) {
+      if (respuesta.status === 403) {
+        setErrorEdicion("No tenés permiso para editar esta persona.");
+      } else if (respuesta.status === 404) {
+        setErrorEdicion("Esta persona ya no existe.");
+      } else {
+        setErrorEdicion(await mensajeDeError(respuesta, "No se pudo guardar el cambio."));
+      }
+      setGuardando(false);
+      return;
+    }
+    const actualizada = await respuesta.json();
+    setPersona(actualizada);
+    setGuardando(false);
+    setEditando(false);
+  }
 
   if (estadoCarga === "cargando") {
     return (
@@ -283,57 +369,209 @@ export function FichaPersonaPage() {
           </div>
         </div>
 
-        <div className="tarjeta-resumen">
-          <h3>Datos personales</h3>
-          <div className="rejilla-datos">
-            <div className="dato">
-              <span>Nombre completo</span>
-              <strong>{nombreCompleto}</strong>
+        {editando ? (
+          <Card as="form" onSubmit={handleGuardar}>
+            <h3>Datos personales</h3>
+            <div className="rejilla-campos">
+              <Input
+                id="primer_nombre"
+                name="primer_nombre"
+                label="Primer nombre"
+                required
+                defaultValue={persona.primer_nombre}
+              />
+              <Input
+                id="segundo_nombre"
+                name="segundo_nombre"
+                label="Segundo nombre"
+                defaultValue={persona.segundo_nombre ?? ""}
+              />
+              <Input
+                id="apellido_paterno"
+                name="apellido_paterno"
+                label="Apellido paterno"
+                required
+                defaultValue={persona.apellido_paterno}
+              />
+              <Input
+                id="apellido_materno"
+                name="apellido_materno"
+                label="Apellido materno"
+                defaultValue={persona.apellido_materno ?? ""}
+              />
+              <Input
+                id="curp"
+                name="curp"
+                label="CURP"
+                required
+                maxLength={18}
+                className="campo-identificador"
+                style={{ textTransform: "uppercase" }}
+                onChange={aMayusculas}
+                defaultValue={persona.curp}
+                ayuda="18 caracteres"
+              />
+              <Input
+                id="rfc"
+                name="rfc"
+                label="RFC"
+                required
+                maxLength={13}
+                className="campo-identificador"
+                style={{ textTransform: "uppercase" }}
+                onChange={aMayusculas}
+                defaultValue={persona.rfc}
+                ayuda="13 caracteres con homoclave"
+              />
+              <Input
+                id="nss"
+                name="nss"
+                label="NSS"
+                required
+                maxLength={11}
+                className="campo-identificador"
+                defaultValue={persona.nss}
+                ayuda="11 dígitos"
+              />
+              <Input
+                id="fecha_nacimiento"
+                name="fecha_nacimiento"
+                label="Fecha de nacimiento"
+                type="date"
+                required
+                defaultValue={persona.fecha_nacimiento}
+              />
+              <Input
+                id="fecha_ingreso"
+                name="fecha_ingreso"
+                label="Fecha de ingreso"
+                type="date"
+                required
+                defaultValue={persona.fecha_ingreso}
+              />
             </div>
-            <div className="dato">
-              <span>CURP</span>
-              <strong className="campo-identificador">{persona.curp}</strong>
-            </div>
-            <div className="dato">
-              <span>RFC</span>
-              <strong className="campo-identificador">{persona.rfc}</strong>
-            </div>
-            <div className="dato">
-              <span>NSS</span>
-              <strong className="campo-identificador">{persona.nss}</strong>
-            </div>
-            <div className="dato">
-              <span>Fecha de nacimiento</span>
-              <strong>{formatearFecha(persona.fecha_nacimiento)}</strong>
-            </div>
-          </div>
-        </div>
 
-        <div className="tarjeta-resumen">
-          <h3>Expediente</h3>
-          <div className="dato">
-            <span>Referencia de documento (documento_ref)</span>
-            {persona.documento_ref ? (
-              <p>
-                <span className="pildora-monoespaciada">{persona.documento_ref}</span>
-              </p>
-            ) : (
-              <p>Sin expediente asignado.</p>
-            )}
-            <small className="ayuda-campo">
-              Formato RTB-__-__ · referencia única del expediente físico. Sólo se almacena esta
-              referencia — no existe catálogo de documentos individuales por persona.
-            </small>
-          </div>
-          <div className="rejilla-datos" style={{ marginTop: "1rem" }}>
-            <div className="dato">
-              <span>Tipo de contrato</span>
-              <strong>
-                {persona.tipo_contrato ? ETIQUETA_TIPO_CONTRATO[persona.tipo_contrato] ?? persona.tipo_contrato : "—"}
-              </strong>
+            <h3 style={{ marginTop: "1.5rem" }}>Expediente</h3>
+            <Input
+              id="documento_ref"
+              name="documento_ref"
+              label="Referencia de documento (documento_ref)"
+              placeholder="RTB-__-__"
+              className="campo-identificador"
+              defaultValue={persona.documento_ref ?? ""}
+              ayuda="Formato RTB-__-__ · referencia única del expediente físico. Sólo se almacena esta referencia — no existe catálogo de documentos individuales por persona."
+            />
+            <div className="campo" style={{ marginTop: "1rem" }}>
+              <label>Tipo de contrato</label>
+              <div className="opciones-seleccionables opciones-seleccionables--compacta">
+                <label className="opcion-seleccionable">
+                  <input
+                    type="radio"
+                    name="tipo_contrato"
+                    value="indefinido"
+                    defaultChecked={persona.tipo_contrato === "indefinido"}
+                  />
+                  <span className="texto-opcion">
+                    <strong>Indefinido</strong>
+                  </span>
+                </label>
+                <label className="opcion-seleccionable">
+                  <input
+                    type="radio"
+                    name="tipo_contrato"
+                    value="prestacion_servicios"
+                    defaultChecked={persona.tipo_contrato === "prestacion_servicios"}
+                  />
+                  <span className="texto-opcion">
+                    <strong>Prestación de servicios</strong>
+                  </span>
+                </label>
+                <label className="opcion-seleccionable">
+                  <input
+                    type="radio"
+                    name="tipo_contrato"
+                    value="por_proyecto"
+                    defaultChecked={persona.tipo_contrato === "por_proyecto"}
+                  />
+                  <span className="texto-opcion">
+                    <strong>Por proyecto</strong>
+                  </span>
+                </label>
+              </div>
             </div>
-          </div>
-        </div>
+
+            {errorEdicion && <p role="alert">{errorEdicion}</p>}
+            <div className="botonera">
+              <Button type="button" onClick={handleCancelar}>
+                Cancelar
+              </Button>
+              <Button type="submit" variante="primario" cargando={guardando} textoCargando="Guardando…">
+                Guardar
+              </Button>
+            </div>
+          </Card>
+        ) : (
+          <>
+            <div className="tarjeta-resumen">
+              <div className="fila-cabecera-tarjeta">
+                <h3>Datos personales</h3>
+                <Button type="button" onClick={() => setEditando(true)} icono={Pencil} tamanoIcono={14}>
+                  Editar
+                </Button>
+              </div>
+              <div className="rejilla-datos">
+                <div className="dato">
+                  <span>Nombre completo</span>
+                  <strong>{nombreCompleto}</strong>
+                </div>
+                <div className="dato">
+                  <span>CURP</span>
+                  <strong className="campo-identificador">{persona.curp}</strong>
+                </div>
+                <div className="dato">
+                  <span>RFC</span>
+                  <strong className="campo-identificador">{persona.rfc}</strong>
+                </div>
+                <div className="dato">
+                  <span>NSS</span>
+                  <strong className="campo-identificador">{persona.nss}</strong>
+                </div>
+                <div className="dato">
+                  <span>Fecha de nacimiento</span>
+                  <strong>{formatearFecha(persona.fecha_nacimiento)}</strong>
+                </div>
+              </div>
+            </div>
+
+            <div className="tarjeta-resumen">
+              <h3>Expediente</h3>
+              <div className="dato">
+                <span>Referencia de documento (documento_ref)</span>
+                {persona.documento_ref ? (
+                  <p>
+                    <span className="pildora-monoespaciada">{persona.documento_ref}</span>
+                  </p>
+                ) : (
+                  <p>Sin expediente asignado.</p>
+                )}
+                <small className="ayuda-campo">
+                  Formato RTB-__-__ · referencia única del expediente físico. Sólo se almacena esta
+                  referencia — no existe catálogo de documentos individuales por persona.
+                </small>
+              </div>
+              <div className="rejilla-datos" style={{ marginTop: "1rem" }}>
+                <div className="dato">
+                  <span>Tipo de contrato</span>
+                  <strong>
+                    {persona.tipo_contrato
+                      ? ETIQUETA_TIPO_CONTRATO[persona.tipo_contrato] ?? persona.tipo_contrato
+                      : "—"}
+                  </strong>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
 
         <div className="tarjeta-resumen">
           <div className="fila-cabecera-tarjeta">

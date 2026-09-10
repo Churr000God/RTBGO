@@ -529,4 +529,267 @@ describe("FichaPersonaPage", () => {
       `/tiempo/asignacion-jornada?persona_id=${PERSONA.id}`,
     );
   });
+
+  describe("edición in-place de Datos personales/Expediente", () => {
+    it("al hacer click en Editar precarga los inputs con los valores actuales, sin GET nuevo", async () => {
+      mockApiFetch();
+      renderPagina();
+
+      await waitFor(() =>
+        expect(screen.getAllByText("Mariana Guadalupe Alcántara Ruvalcaba").length).toBeGreaterThan(0)
+      );
+      const llamadasAntes = vi.mocked(apiFetch).mock.calls.length;
+
+      await userEvent.click(screen.getByRole("button", { name: /^editar$/i }));
+
+      expect(screen.getByLabelText(/primer nombre/i)).toHaveValue(PERSONA.primer_nombre);
+      expect(screen.getByLabelText(/apellido paterno/i)).toHaveValue(PERSONA.apellido_paterno);
+      expect(screen.getByLabelText(/^curp$/i)).toHaveValue(PERSONA.curp);
+      expect(screen.getByLabelText(/^rfc$/i)).toHaveValue(PERSONA.rfc);
+      expect(screen.getByLabelText(/^nss$/i)).toHaveValue(PERSONA.nss);
+      expect(screen.getByLabelText(/fecha de nacimiento/i)).toHaveValue(PERSONA.fecha_nacimiento);
+      expect(screen.getByLabelText(/fecha de ingreso/i)).toHaveValue(PERSONA.fecha_ingreso);
+      expect(screen.getByLabelText(/referencia de documento/i)).toHaveValue(PERSONA.documento_ref);
+      expect(vi.mocked(apiFetch).mock.calls.length).toBe(llamadasAntes);
+    });
+
+    it("submit sin cambios corta antes del fetch con 'No modificaste ningún campo.'", async () => {
+      mockApiFetch();
+      renderPagina();
+
+      await waitFor(() =>
+        expect(screen.getAllByText("Mariana Guadalupe Alcántara Ruvalcaba").length).toBeGreaterThan(0)
+      );
+      await userEvent.click(screen.getByRole("button", { name: /^editar$/i }));
+      const llamadasAntes = vi.mocked(apiFetch).mock.calls.length;
+
+      await userEvent.click(screen.getByRole("button", { name: /^guardar$/i }));
+
+      await waitFor(() =>
+        expect(screen.getByText("No modificaste ningún campo.")).toBeInTheDocument()
+      );
+      expect(vi.mocked(apiFetch).mock.calls.length).toBe(llamadasAntes);
+    });
+
+    it("submit con cambios manda PATCH sólo con los campos modificados, actualiza la vista y vuelve a modo lectura", async () => {
+      let cuerpoPatch: unknown = null;
+      vi.mocked(apiFetch).mockImplementation((path: string, opciones?: RequestInit) => {
+        if (path === "/api/sesion") {
+          return Promise.resolve(
+            new Response(JSON.stringify({ acceso_permitido: true, motivo_bloqueo: null }))
+          );
+        }
+        if (path.endsWith("/movimientos")) {
+          return Promise.resolve(new Response(JSON.stringify(MOVIMIENTOS)));
+        }
+        if (path === "/api/asignaciones") {
+          return Promise.resolve(new Response(JSON.stringify(ASIGNACIONES)));
+        }
+        if (path === `/api/personas/${PERSONA.id}` && opciones?.method === "PATCH") {
+          cuerpoPatch = JSON.parse(String(opciones.body));
+          return Promise.resolve(
+            new Response(JSON.stringify({ ...PERSONA, primer_nombre: "Marianela" }))
+          );
+        }
+        return Promise.resolve(new Response(JSON.stringify(PERSONA)));
+      });
+
+      renderPagina();
+      await waitFor(() =>
+        expect(screen.getAllByText("Mariana Guadalupe Alcántara Ruvalcaba").length).toBeGreaterThan(0)
+      );
+      await userEvent.click(screen.getByRole("button", { name: /^editar$/i }));
+
+      const campoPrimerNombre = screen.getByLabelText(/primer nombre/i);
+      await userEvent.clear(campoPrimerNombre);
+      await userEvent.type(campoPrimerNombre, "Marianela");
+      await userEvent.click(screen.getByRole("button", { name: /^guardar$/i }));
+
+      await waitFor(() =>
+        expect(screen.getAllByText(/Marianela Guadalupe Alcántara Ruvalcaba/).length).toBeGreaterThan(0)
+      );
+      expect(cuerpoPatch).toEqual({ primer_nombre: "Marianela" });
+      // vuelve a modo lectura: el botón "Editar" reaparece, ya no hay "Guardar"/"Cancelar"
+      expect(screen.getByRole("button", { name: /^editar$/i })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /^guardar$/i })).not.toBeInTheDocument();
+    });
+
+    it("403 al guardar muestra 'No tenés permiso para editar esta persona.' y mantiene el formulario abierto", async () => {
+      vi.mocked(apiFetch).mockImplementation((path: string, opciones?: RequestInit) => {
+        if (path === "/api/sesion") {
+          return Promise.resolve(
+            new Response(JSON.stringify({ acceso_permitido: true, motivo_bloqueo: null }))
+          );
+        }
+        if (path.endsWith("/movimientos")) {
+          return Promise.resolve(new Response(JSON.stringify(MOVIMIENTOS)));
+        }
+        if (path === "/api/asignaciones") {
+          return Promise.resolve(new Response(JSON.stringify(ASIGNACIONES)));
+        }
+        if (path === `/api/personas/${PERSONA.id}` && opciones?.method === "PATCH") {
+          return Promise.resolve(new Response(null, { status: 403 }));
+        }
+        return Promise.resolve(new Response(JSON.stringify(PERSONA)));
+      });
+
+      renderPagina();
+      await waitFor(() =>
+        expect(screen.getAllByText("Mariana Guadalupe Alcántara Ruvalcaba").length).toBeGreaterThan(0)
+      );
+      await userEvent.click(screen.getByRole("button", { name: /^editar$/i }));
+      const campoPrimerNombre = screen.getByLabelText(/primer nombre/i);
+      await userEvent.clear(campoPrimerNombre);
+      await userEvent.type(campoPrimerNombre, "Marianela");
+      await userEvent.click(screen.getByRole("button", { name: /^guardar$/i }));
+
+      await waitFor(() =>
+        expect(screen.getByText("No tenés permiso para editar esta persona.")).toBeInTheDocument()
+      );
+      expect(screen.getByLabelText(/primer nombre/i)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /^guardar$/i })).toBeInTheDocument();
+    });
+
+    it("404 al guardar muestra 'Esta persona ya no existe.'", async () => {
+      vi.mocked(apiFetch).mockImplementation((path: string, opciones?: RequestInit) => {
+        if (path === "/api/sesion") {
+          return Promise.resolve(
+            new Response(JSON.stringify({ acceso_permitido: true, motivo_bloqueo: null }))
+          );
+        }
+        if (path.endsWith("/movimientos")) {
+          return Promise.resolve(new Response(JSON.stringify(MOVIMIENTOS)));
+        }
+        if (path === "/api/asignaciones") {
+          return Promise.resolve(new Response(JSON.stringify(ASIGNACIONES)));
+        }
+        if (path === `/api/personas/${PERSONA.id}` && opciones?.method === "PATCH") {
+          return Promise.resolve(new Response(null, { status: 404 }));
+        }
+        return Promise.resolve(new Response(JSON.stringify(PERSONA)));
+      });
+
+      renderPagina();
+      await waitFor(() =>
+        expect(screen.getAllByText("Mariana Guadalupe Alcántara Ruvalcaba").length).toBeGreaterThan(0)
+      );
+      await userEvent.click(screen.getByRole("button", { name: /^editar$/i }));
+      const campoPrimerNombre = screen.getByLabelText(/primer nombre/i);
+      await userEvent.clear(campoPrimerNombre);
+      await userEvent.type(campoPrimerNombre, "Marianela");
+      await userEvent.click(screen.getByRole("button", { name: /^guardar$/i }));
+
+      await waitFor(() =>
+        expect(screen.getByText("Esta persona ya no existe.")).toBeInTheDocument()
+      );
+    });
+
+    it("409/422 al guardar muestra el detail del backend tal cual", async () => {
+      vi.mocked(apiFetch).mockImplementation((path: string, opciones?: RequestInit) => {
+        if (path === "/api/sesion") {
+          return Promise.resolve(
+            new Response(JSON.stringify({ acceso_permitido: true, motivo_bloqueo: null }))
+          );
+        }
+        if (path.endsWith("/movimientos")) {
+          return Promise.resolve(new Response(JSON.stringify(MOVIMIENTOS)));
+        }
+        if (path === "/api/asignaciones") {
+          return Promise.resolve(new Response(JSON.stringify(ASIGNACIONES)));
+        }
+        if (path === `/api/personas/${PERSONA.id}` && opciones?.method === "PATCH") {
+          return Promise.resolve(
+            new Response(JSON.stringify({ detail: "Ya existe una persona con ese CURP." }), {
+              status: 409,
+            })
+          );
+        }
+        return Promise.resolve(new Response(JSON.stringify(PERSONA)));
+      });
+
+      renderPagina();
+      await waitFor(() =>
+        expect(screen.getAllByText("Mariana Guadalupe Alcántara Ruvalcaba").length).toBeGreaterThan(0)
+      );
+      await userEvent.click(screen.getByRole("button", { name: /^editar$/i }));
+      const campoPrimerNombre = screen.getByLabelText(/primer nombre/i);
+      await userEvent.clear(campoPrimerNombre);
+      await userEvent.type(campoPrimerNombre, "Marianela");
+      await userEvent.click(screen.getByRole("button", { name: /^guardar$/i }));
+
+      await waitFor(() =>
+        expect(screen.getByText("Ya existe una persona con ese CURP.")).toBeInTheDocument()
+      );
+    });
+
+    it("Cancelar descarta los cambios tipeados y vuelve a modo lectura con los valores originales", async () => {
+      mockApiFetch();
+      renderPagina();
+
+      await waitFor(() =>
+        expect(screen.getAllByText("Mariana Guadalupe Alcántara Ruvalcaba").length).toBeGreaterThan(0)
+      );
+      await userEvent.click(screen.getByRole("button", { name: /^editar$/i }));
+      const campoPrimerNombre = screen.getByLabelText(/primer nombre/i);
+      await userEvent.clear(campoPrimerNombre);
+      await userEvent.type(campoPrimerNombre, "Nombre Cambiado Que No Se Guarda");
+      await userEvent.click(screen.getByRole("button", { name: /^cancelar$/i }));
+
+      expect(screen.queryByLabelText(/primer nombre/i)).not.toBeInTheDocument();
+      expect(
+        screen.getAllByText("Mariana Guadalupe Alcántara Ruvalcaba").length
+      ).toBeGreaterThan(0);
+      expect(screen.queryByText("Nombre Cambiado Que No Se Guarda")).not.toBeInTheDocument();
+
+      // reabrir Editar confirma que el descarte fue real, no sólo visual
+      await userEvent.click(screen.getByRole("button", { name: /^editar$/i }));
+      expect(screen.getByLabelText(/primer nombre/i)).toHaveValue(PERSONA.primer_nombre);
+    });
+
+    it("doble submit bloqueado mientras el PATCH está en curso", async () => {
+      let resolverPatch!: (respuesta: Response) => void;
+      let llamadasPatch = 0;
+      vi.mocked(apiFetch).mockImplementation((path: string, opciones?: RequestInit) => {
+        if (path === "/api/sesion") {
+          return Promise.resolve(
+            new Response(JSON.stringify({ acceso_permitido: true, motivo_bloqueo: null }))
+          );
+        }
+        if (path.endsWith("/movimientos")) {
+          return Promise.resolve(new Response(JSON.stringify(MOVIMIENTOS)));
+        }
+        if (path === "/api/asignaciones") {
+          return Promise.resolve(new Response(JSON.stringify(ASIGNACIONES)));
+        }
+        if (path === `/api/personas/${PERSONA.id}` && opciones?.method === "PATCH") {
+          llamadasPatch += 1;
+          return new Promise<Response>((resolver) => {
+            resolverPatch = resolver;
+          });
+        }
+        return Promise.resolve(new Response(JSON.stringify(PERSONA)));
+      });
+
+      renderPagina();
+      await waitFor(() =>
+        expect(screen.getAllByText("Mariana Guadalupe Alcántara Ruvalcaba").length).toBeGreaterThan(0)
+      );
+      await userEvent.click(screen.getByRole("button", { name: /^editar$/i }));
+      const campoPrimerNombre = screen.getByLabelText(/primer nombre/i);
+      await userEvent.clear(campoPrimerNombre);
+      await userEvent.type(campoPrimerNombre, "Marianela");
+
+      const botonGuardar = screen.getByRole("button", { name: /^guardar$/i });
+      await userEvent.click(botonGuardar);
+
+      await waitFor(() => expect(screen.getByRole("button", { name: /guardando/i })).toBeDisabled());
+      await userEvent.click(screen.getByRole("button", { name: /guardando/i }));
+      expect(llamadasPatch).toBe(1);
+
+      resolverPatch(new Response(JSON.stringify({ ...PERSONA, primer_nombre: "Marianela" })));
+      await waitFor(() =>
+        expect(screen.getAllByText(/Marianela Guadalupe Alcántara Ruvalcaba/).length).toBeGreaterThan(0)
+      );
+    });
+  });
 });
