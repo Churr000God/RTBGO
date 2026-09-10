@@ -332,6 +332,20 @@ backend y un frontend que lo exponen. Ver `README.md` y `docs/00-contexto/SCJ-CT
   completar el rango. Ver
   `bitacora/2026-09-09_parametros_dinamicos_completos_y_corridas_batch.md` para el detalle
   completo de los 4 cortes.
+- **Subproyecto del checador físico creado (9 de septiembre de 2026):** `SCJ-PRO-11 §V` ya
+  especificaba que el checador es su propio subproyecto con repositorio propio — creado en
+  `/home/diego/Proyectos/checador-fisico/`, pusheado a
+  `https://github.com/Churr000God/Checador_RTB.git` (rama `main`). Versión deliberadamente básica
+  (sin Raspberry Pi ni lector biométrico decidido todavía): FastAPI + Jinja2 sin build de Node,
+  SQLite local sin ORM sobre el esquema ER que mandó el usuario (`entidad_local.marca` +
+  `entidad_local.persona_cache`) más una columna no negociable, `evento_id` (idempotencia,
+  `SCJ-CDT-01 §VIII.2`), lector biométrico abstracto con stub, JWT autofirmado con
+  `role=terminal_checador` (el rol de Postgres ya existe acá desde
+  `db/ddl/37_tiempo_rls_terminal.sql`), sync simple contra `tiempo.marca` real. Identidad visual de
+  Kairos aplicada a las 3 pestañas (Marcar/Historial/Config) para pantalla táctil de kiosco. Todo
+  lo diferido (protocolo de lotes, reintentos con backoff, lector real, etc.) documentado en el
+  `README.md` de ese repo, no acá. Ver
+  `bitacora/2026-09-09_checador_fisico_subproyecto_creado.md`.
 
 ## Arquitectura y módulos
 
