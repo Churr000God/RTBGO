@@ -25,6 +25,31 @@ class PersonaCreate(BaseModel):
         return valor.strip().upper()
 
 
+class PersonaActualizar(BaseModel):
+    """Campos editables vía PATCH /api/personas/{id} -- espejo de fn_persona_actualizar_datos
+    (db/ddl/69_personas_edicion.sql), sin p_ prefix. Todos opcionales: sólo lo enviado se cambia
+    (exclude_unset en el router), NULL/omitido = no tocar ese campo (COALESCE en el RPC).
+    A propósito, SIN estado/fecha_baja -- eso lo maneja únicamente POST
+    /api/personas/{id}/movimientos, nunca este endpoint."""
+
+    curp: str | None = None
+    rfc: str | None = None
+    nss: str | None = None
+    primer_nombre: str | None = None
+    segundo_nombre: str | None = None
+    apellido_paterno: str | None = None
+    apellido_materno: str | None = None
+    fecha_nacimiento: date | None = None
+    fecha_ingreso: date | None = None
+    tipo_contrato: str | None = None
+    documento_ref: str | None = None
+
+    @field_validator("curp", "rfc")
+    @classmethod
+    def normalizar_mayusculas(cls, valor: str | None) -> str | None:
+        return valor.strip().upper() if valor is not None else None
+
+
 class PersonaOut(BaseModel):
     id: str
     primer_nombre: str

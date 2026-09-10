@@ -4,14 +4,28 @@ Gate de permisos: GET (listado, ficha) sin cambio -- no existe código de lectur
 módulo, sigue el gate débil de sólo get_caller_client (RLS) a propósito. POST (alta) exige
 además requiere_permiso("alta_personas_usuarios") (app/permisos.py)."""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
+from postgrest.exceptions import APIError
 from supabase import Client
 
 from app.deps import get_caller_client
+from app.errores import manejar_violacion_unicidad
 from app.permisos import requiere_permiso
-from app.schemas.personas import PersonaConExpediente, PersonaCreate, PersonaOut
+from app.schemas.personas import (
+    PersonaActualizar,
+    PersonaConExpediente,
+    PersonaCreate,
+    PersonaOut,
+)
 
 router = APIRouter(prefix="/api/personas", tags=["personas"])
+
+CODIGO_PERSONA_NO_ENCONTRADA = "SCJ10"
+MENSAJE_PERSONA_NO_ENCONTRADA = "Persona no encontrada."
+MENSAJE_DUPLICADO = "CURP, RFC, NSS o número de documento ya está en uso por otra persona."
+MENSAJE_EXPEDIENTE_INCOMPLETO = (
+    "Esta persona no tiene expediente todavía -- mandá tipo_contrato y documento_ref juntos."
+)
 
 
 def _resolver_personas_con_jornada_vigente(db: Client, persona_ids: list[str]) -> set[str]:
@@ -85,8 +99,7 @@ def listar_personas(db: Client = Depends(get_caller_client)) -> list[dict]:
     ]
 
 
-@router.get("/{persona_id}", response_model=PersonaConExpediente)
-def ficha_persona(persona_id: str, db: Client = Depends(get_caller_client)) -> dict:
+def _construir_ficha_persona(db: Client, persona_id: str) -> dict:
     fila = (
         db.postgrest.schema("personas")
         .table("persona")
@@ -141,3 +154,62 @@ def ficha_persona(persona_id: str, db: Client = Depends(get_caller_client)) -> d
         "tiene_jornada_vigente": tiene_jornada_vigente,
         "puestos_vigentes": puestos_vigentes,
     }
+
+
+@router.get("/{persona_id}", response_model=PersonaConExpediente)
+def ficha_persona(persona_id: str, db: Client = Depends(get_caller_client)) -> dict:
+    return _construir_ficha_persona(db, persona_id)
+
+
+@router.patch("/{persona_id}", response_model=PersonaConExpediente)
+def actualizar_persona(
+    persona_id: str,
+    datos: PersonaActualizar,
+    db: Client = Depends(get_caller_client),
+    _permiso: None = Depends(requiere_permiso("persona_edicion")),
+) -> dict:
+    """SCJ-PRO-01 corrección de expediente post-alta. Nunca toca estado/fecha_baja -- eso sigue
+    siendo exclusivo de POST /api/personas/{id}/movimientos. get_caller_client (RLS exige
+    cambio_estado_persona OR persona_edicion en personas.persona, persona_edicion a secas en
+    personas.expediente, db/ddl/69_*.sql) es la autorización real; requiere_permiso sólo da un
+    403 legible antes de llegar ahí."""
+    campos = datos.model_dump(exclude_unset=True)
+    if not campos:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, "No se envió ningún campo a actualizar."
+        )
+
+    # personas.expediente tiene tipo_contrato/documento_ref NOT NULL -- el RPC sólo intenta el
+    # INSERT...ON CONFLICT si viene alguno de los dos. Con persona sin expediente todavía y sólo
+    # uno de los dos en el payload, ese INSERT revienta con NOT NULL real de Postgres -- lo
+    # cortamos acá con un 422 legible en vez de dejarlo caer como 500.
+    trae_tipo_contrato = "tipo_contrato" in campos
+    trae_documento_ref = "documento_ref" in campos
+    if trae_tipo_contrato != trae_documento_ref:
+        tiene_expediente = bool(
+            db.postgrest.schema("personas")
+            .table("expediente")
+            .select("persona_id")
+            .eq("persona_id", persona_id)
+            .execute()
+            .data
+        )
+        if not tiene_expediente:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, MENSAJE_EXPEDIENTE_INCOMPLETO)
+
+    argumentos_rpc = {f"p_{campo}": valor for campo, valor in campos.items()}
+    for campo in ("fecha_nacimiento", "fecha_ingreso"):
+        if campo in campos and campos[campo] is not None:
+            argumentos_rpc[f"p_{campo}"] = campos[campo].isoformat()
+
+    try:
+        db.postgrest.schema("personas").rpc(
+            "fn_persona_actualizar_datos",
+            {"p_persona_id": persona_id, **argumentos_rpc},
+        ).execute()
+    except APIError as error:
+        if error.code == CODIGO_PERSONA_NO_ENCONTRADA:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, MENSAJE_PERSONA_NO_ENCONTRADA) from error
+        manejar_violacion_unicidad(error, MENSAJE_DUPLICADO)
+
+    return _construir_ficha_persona(db, persona_id)
