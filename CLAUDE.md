@@ -332,6 +332,21 @@ backend y un frontend que lo exponen. Ver `README.md` y `docs/00-contexto/SCJ-CT
   completar el rango. Ver
   `bitacora/2026-09-09_parametros_dinamicos_completos_y_corridas_batch.md` para el detalle
   completo de los 4 cortes.
+- **Edición de datos de persona y expediente (10 de septiembre de 2026):** el módulo Personas era
+  append-only — sólo alta y cambio de estado, sin vía para corregir CURP/RFC/NSS/nombre/fechas
+  tras el alta. Nuevo permiso `persona_edicion` (`db/ddl/69_*.sql`), RPC transaccional
+  `fn_persona_actualizar_datos` (`SECURITY INVOKER`, nunca toca `estado`/`fecha_baja`),
+  `PATCH /api/personas/{id}` gateado por `requiere_permiso("persona_edicion")`, edición in-place
+  en `FichaPersonaPage.tsx` (mismo patrón de `FichaAreaPage`/`FichaDepartamentoPage`/
+  `FichaPuestoPage`). Sin auditoría de ediciones por ahora (decisión deliberada). `db/ddl/` llega
+  hasta `70_*.sql` — el `70_*.sql` es un fix de seguridad real encontrado por `security` antes de
+  commitear: el `OR` de `persona_update_requiere_permiso` (`cambio_estado_persona OR
+  persona_edicion`) no distinguía qué columnas tocaba el UPDATE, así que cualquiera con sólo
+  `cambio_estado_persona` podía reescribir identidad completa vía PostgREST directo — mismo
+  patrón del hallazgo ya documentado sobre `31_*.sql`. Corregido con un trigger `BEFORE UPDATE`
+  (`trg_persona_protege_columnas_identidad`), porque el `WITH CHECK` de una policy RLS de UPDATE
+  sólo ve la fila nueva, nunca la anterior — comparar OLD/NEW exige trigger, no se puede resolver
+  sólo con RLS. Ver `bitacora/2026-09-10_edicion_personas_expediente.md`.
 - **Subproyecto del checador físico creado (9 de septiembre de 2026):** `SCJ-PRO-11 §V` ya
   especificaba que el checador es su propio subproyecto con repositorio propio — creado en
   `/home/diego/Proyectos/checador-fisico/`, pusheado a
@@ -509,6 +524,23 @@ Cada una vive en su propio documento de decisión — no se duplican aquí, sól
   distintos si los permisos no están garantizados de estar siempre acoplados — `service_role` para
   la lectura de insumo (no es la autorización, sólo datos para decidir), el cliente del caller sólo
   para la escritura real (ahí sí importa la identidad, RLS es la autorización).
+
+- **Un `OR` agregado a una policy RLS de UPDATE para "dejar pasar un trigger interno" abre acceso
+  más ancho de lo previsto para todos los demás callers — y el `WITH CHECK` no puede cerrarlo.**
+  Segunda vez que pasa (la primera fue `31_*.sql`, ya documentada arriba). El 10 de septiembre de
+  2026, al agregar edición de datos de persona: `persona_update_requiere_permiso` necesitaba dejar
+  pasar a `trg_bitacora_sincroniza_persona` (corre con los privilegios de quien sólo tiene
+  `cambio_estado_persona`) sin perder la exigencia de `persona_edicion` para editar identidad —
+  la solución obvia, `cambio_estado_persona OR persona_edicion`, deja que cualquiera con el primero
+  toque cualquier columna, porque RLS no filtra por columna. **El `WITH CHECK` de una policy de
+  UPDATE en Postgres sólo ve la fila NUEVA — no hay forma de referenciar la fila anterior (OLD)
+  desde una expresión de policy**, así que "sólo permitir el cambio si NO tocó columnas de
+  identidad" no se puede expresar ahí. Se resolvió con un trigger `BEFORE UPDATE` aparte
+  (`trg_persona_protege_columnas_identidad`, `db/ddl/70_*.sql`) cuyo `WHEN` compara OLD/NEW.
+  **Lección:** cualquier `OR` nuevo en una policy de UPDATE para dejar pasar un trigger interno
+  no-`SECURITY DEFINER` necesita, desde el diseño inicial, evaluar si además hace falta un trigger
+  `BEFORE UPDATE` con columnas explícitas — no asumir que el permiso más amplio del `OR` sólo se va
+  a usar para lo que se diseñó.
 
 ## Historial de decisiones
 
