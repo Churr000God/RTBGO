@@ -347,6 +347,23 @@ backend y un frontend que lo exponen. Ver `README.md` y `docs/00-contexto/SCJ-CT
   (`trg_persona_protege_columnas_identidad`), porque el `WITH CHECK` de una policy RLS de UPDATE
   sólo ve la fila nueva, nunca la anterior — comparar OLD/NEW exige trigger, no se puede resolver
   sólo con RLS. Ver `bitacora/2026-09-10_edicion_personas_expediente.md`.
+- **Sincronización de fixes/feature desde RTB-CRM-APP, sentido inverso (11 de septiembre de
+  2026):** por primera vez el trabajo urgente se hizo directo en el repo real (bugs encontrados en
+  vivo) y se portó hacia acá, filtrando identidad real (excluido a propósito el DDL de expediente
+  `documento_ref` con folio `RTB-RH-EIT-...`, fuera del alcance de este corte de todos modos).
+  `db/ddl/` suma 5 archivos, renumerados `72`-`76` (numeración real) → `71`-`75` (numeración local)
+  para encajar en la secuencia: `fn_marca_valida_revision` ahora respeta `genera_alerta_horario`
+  (jornada flexible ya no genera `fuera_de_horario`); alias de tabla en
+  `fn_dia_calcular_armado_tramos` (columnas ambiguas bloqueaban "Revisar" con tramo huérfano);
+  `fn_dia_revisar` resuelve también excepciones de día (`paridad_impar`, antes quedaban pendientes
+  para siempre); 4 triggers de protección sobre `jornada_asignada`/`patron_semanal` (cierran un
+  hueco real de RLS de `39_*.sql`); 3 RPCs nuevos de editar/eliminar jornada futura y mover el
+  límite de la en curso, con la UI correspondiente en `AsignarJornadaPage.tsx` (cadena completa de
+  jornadas en la fila expandible, badges Pasada/En curso/Futura). Decisión local: **no** se copió
+  el "cierra el formulario tras éxito" que traía el real — este repo ya había decidido antes que el
+  formulario se queda abierto tras un alta exitosa (botón de cabecera como affordance explícito);
+  se preservó, sólo cerrar explícito en Cancelar y en éxito de editar. Ver
+  `bitacora/2026-09-11_sincronizacion_desde_rtb-crm-app.md`.
 - **Subproyecto del checador físico creado (9 de septiembre de 2026):** `SCJ-PRO-11 §V` ya
   especificaba que el checador es su propio subproyecto con repositorio propio — creado en
   `/home/diego/Proyectos/checador-fisico/`, pusheado a
@@ -361,6 +378,28 @@ backend y un frontend que lo exponen. Ver `README.md` y `docs/00-contexto/SCJ-CT
   lo diferido (protocolo de lotes, reintentos con backoff, lector real, etc.) documentado en el
   `README.md` de ese repo, no acá. Ver
   `bitacora/2026-09-09_checador_fisico_subproyecto_creado.md`.
+- **Sincronización de fix "día cerrado revisable" desde RTB-CRM-APP, sentido inverso (15 de
+  septiembre de 2026):** de nuevo, el trabajo urgente se hizo directo en el repo real (bug real
+  encontrado en vivo: un día cerró con paridad par, sin alerta, pero faltaban 2 marcas capturadas
+  un día después vía captura manual — quedaban muertas para siempre, `fn_dia_calcular_armado_tramos`
+  las armaba bien pero ningún camino de escritura admitía un día `cerrado`, sólo `bloqueado`
+  — `SCJ-DEC-06` nunca contempló ese caso, sólo paridad impar). `db/ddl/` suma 3 archivos,
+  renumerados `77`-`79` (numeración real) → `76`-`78` (numeración local): `dia_update_revision`/
+  `fn_dia_revisar` amplían el chequeo de estado a `'bloqueado' O 'cerrado'` (mismo algoritmo, sin
+  rama nueva); un `CONSTRAINT TRIGGER DEFERRABLE INITIALLY DEFERRED` (primero del proyecto) sobre
+  `tiempo.excepcion` que bloquea resolver una excepción `motivo=dia_cerrado` fuera de
+  `fn_dia_revisar` (hallazgo de seguridad colateral: esa vía estaba abierta a cualquiera con
+  `excepcion_edicion` por PostgREST directo — evalúa al COMMIT si el día terminó `revisado` en la
+  misma transacción, única forma de distinguir el caso legítimo del ilegítimo ya que ambos
+  comparten el mismo rol/permiso); y el `GRANT EXECUTE` que destraba `fn_dia_calcular_armado_tramos`
+  para `service_role`. Backend suma `tiene_marcas_por_armar` en `GET /api/dias` (deliberadamente NO
+  basado en `tiempo.excepcion.estado`, que puede quedar `resuelto` sin resolución real — sería
+  esconder el botón justo en el caso que hay que resolver); frontend gatea el botón "Revisar" con
+  ese flag en vez de mostrarlo en todo día `cerrado` sin distinción (objeción real del propio
+  `frontend` de RTB-CRM-APP durante el corte original, corregida antes de darlo por bueno). DDL
+  agregado como migración versionada, **no aplicado todavía** contra el Supabase propio de este
+  proyecto académico — pendiente de decisión. Ver
+  `bitacora/2026-09-15_sincronizacion_dia_cerrado_desde_rtb-crm-app.md`.
 
 ## Arquitectura y módulos
 
@@ -405,7 +444,7 @@ Cada una vive en su propio documento de decisión — no se duplican aquí, sól
   `http://localhost:5173` fijo a mano — esa configuración no vive en este repositorio. Al pasar a
   producción (`docker compose … prod`, frontend en `:8080`) hay que actualizarla ahí también, o
   los links de invitación/recuperación de contraseña no aterrizan en la app.
-- El DDL corre hasta `db/ddl/68_*.sql`. `personas.permiso`
+- El DDL corre hasta `db/ddl/78_*.sql`. `personas.permiso`
   es la única tabla del proyecto con clave natural (`codigo varchar PRIMARY KEY`) en vez de `uuid`
   — decisión deliberada, fiel a la redacción literal de `SCJ-PRO-05`, no un descuido a corregir.
 - Las tablas de bitácora inmutables (`bitacora_movimiento_persona`,
@@ -541,6 +580,35 @@ Cada una vive en su propio documento de decisión — no se duplican aquí, sól
   no-`SECURITY DEFINER` necesita, desde el diseño inicial, evaluar si además hace falta un trigger
   `BEFORE UPDATE` con columnas explícitas — no asumir que el permiso más amplio del `OR` sólo se va
   a usar para lo que se diseñó.
+- **`SCJ-DEC-06` modeló sólo el caso de paridad impar como motivo de "día bloqueado" — una marca
+  tardía sobre un día que ya cerró completo (par, sin excepción de día) no tenía ningún camino de
+  reprocesamiento.** Encontrado el 15 de septiembre de 2026 en `RTB-CRM-APP` (bug real, ver
+  `bitacora/2026-09-15_sincronizacion_dia_cerrado_desde_rtb-crm-app.md`): `tiempo.dia.estado
+  ='cerrado'` es un estado terminal por diseño para el flujo automático, pero nada impedía que
+  llegaran marcas de captura manual después (mismo trigger que las señala sobre un día `bloqueado`
+  las señala igual sobre uno `cerrado` — "nunca reabre, sólo se señala", `02_tiempo.sql`). Como
+  `fn_dia_revisar`/`dia_update_revision` sólo aceptaban `estado='bloqueado'` a secas, ese tiempo
+  quedaba muerto para siempre. **Lección:** cualquier estado "terminal" de un flujo automático que
+  puede recibir eventos tardíos por una vía manual (captura manual, corrección) necesita un camino
+  de reprocesamiento explícito desde el diseño — no asumir que "terminal" significa "nunca más
+  puede necesitar escritura humana". Revisar si `tiempo.dia.estado='revisado'` tiene el mismo hueco
+  (marca tardía sobre un día ya revisado) — no se tocó en este corte, sigue abierto.
+- **Un `CONSTRAINT TRIGGER` normal (`BEFORE`) no alcanza para distinguir "esto lo disparó un RPC
+  legítimo `SECURITY INVOKER`" de "esto lo tecleó un humano con el mismo permiso directo por
+  PostgREST" — ambos casos comparten exactamente el mismo rol.** Encontrado el 15 de septiembre de
+  2026 (`77_tiempo_excepcion_protege_dia_cerrado.sql`, portado desde `RTB-CRM-APP`): a diferencia
+  del patrón ya usado en `trg_persona_protege_columnas_identidad` (`70_*.sql`, que sólo necesita
+  comparar OLD/NEW de la misma fila), acá el caso legítimo y el ilegítimo son indistinguibles
+  mirando sólo la fila que cambia — lo que los distingue es el efecto en OTRA tabla dentro de la
+  MISMA transacción (`tiempo.dia.estado` pasa a `'revisado'` sólo en el caso legítimo, y sólo
+  después de la escritura que el trigger vigila). Un `BEFORE UPDATE` normal se ejecuta demasiado
+  temprano para verlo. **Solución:** `CREATE CONSTRAINT TRIGGER ... DEFERRABLE INITIALLY DEFERRED`
+  (`AFTER UPDATE`) evalúa recién al `COMMIT` de toda la transacción — para entonces el efecto
+  colateral legítimo ya ocurrió (o no). **Lección:** cuando un trigger de protección necesita
+  distinguir origen y el permiso/rol es idéntico en ambos casos, buscar primero si hay un efecto
+  colateral verificable en OTRA tabla dentro de la misma transacción antes de asumir que hace falta
+  tocar la capa de aplicación (ej. un flag de sesión) — un constraint trigger deferrable puede
+  resolverlo sin tocar código Python.
 
 ## Historial de decisiones
 
